@@ -20,6 +20,7 @@ import {
   CheckOutlined,
   WarningOutlined,
   MoreOutlined,
+  MenuOutlined, // Added for mobile hamburger icon
 } from "@ant-design/icons";
 import {
   Menu,
@@ -32,6 +33,8 @@ import {
   message,
   Tag,
   Modal,
+  Tooltip,
+  Drawer, // Import Drawer for mobile menu
 } from "antd";
 
 import { Endponit } from "../helper/enpoint";
@@ -58,7 +61,6 @@ const NotificationInterface = ({
   const [loading, setLoading] = useState(false);
 
   const markAsRead = async (notificationId) => {
-    // setLoading(true);
     try {
       const response = await fetch(
         Endponit() + "/api/notification/" + notificationId.id,
@@ -79,7 +81,7 @@ const NotificationInterface = ({
       }
 
       const updatedNotifications = notifications.map((notification) =>
-        notification.id === notificationId
+        notification.id === notificationId.id
           ? { ...notification, read: true }
           : notification
       );
@@ -96,7 +98,6 @@ const NotificationInterface = ({
   };
 
   const markAllAsRead = async () => {
-    // setLoading(true);
     try {
       const unreadNotifications = notifications.filter((n) => !n.read);
       const updatePromises = unreadNotifications.map((notification) =>
@@ -133,7 +134,6 @@ const NotificationInterface = ({
   return (
     <div className="p-2">
       <div className="flex justify-between items-center mb-4">
-        {/* <h2 className="text-2xl font-semibold">Notifications</h2> */}
         <Button
           type="primary"
           onClick={markAllAsRead}
@@ -207,6 +207,18 @@ const InterfaceEn = () => {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [attemptedMenu, setAttemptedMenu] = useState("");
 
+  // Responsive state for mobile view
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [drawerVisible, setDrawerVisible] = useState(false);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
   // Function to check ESN status
   const checkEsnStatus = async () => {
     try {
@@ -220,11 +232,8 @@ const InterfaceEn = () => {
 
       const data = await response.json();
       setEsnStatus(
-        String(data.data[0].Statut).toLowerCase() === "actif"  ? true : false
+        String(data.data[0].Statut).toLowerCase() === "actif" ? true : false
       );
-      console.log('====================================');
-      console.log("ESN Status:", data.data[0].Statut);
-      console.log('====================================');
       console.log("ESN Status:", data.data[0].Statut);
     } catch (error) {
       console.error("Erreur de vérification du statut ESN:", error);
@@ -234,7 +243,7 @@ const InterfaceEn = () => {
 
   // Check if menu is allowed for inactive accounts
   const isMenuAllowed = (menuKey) => {
-    // Only profile is allowed for inactive accounts
+    // Only profile and "documents" are allowed for inactive accounts
     return menuKey === "Profile" || menuKey === "documents";
   };
 
@@ -276,43 +285,10 @@ const InterfaceEn = () => {
 
   const retrieveFCMToken = async () => {
     try {
-      // const messaging = getMessaging(firebaseApp);
-
       // Request permission for notifications
       const permission = await Notification.requestPermission();
       if (permission === "granted") {
-        // Get the FCM token
-        // const currentToken = await getToken(messaging, {
-        //   vapidKey:
-        //     "BNr1YPHHD-jYLHyQcJUduQyVZA7BWGIx1q6e8m-bU442LV7Hu28P80AJyJNL998WF563PHdD97BLtZNpYJW-sSw", // Replace with your VAPID key
-        // });
-        // if (currentToken) {
-        //   console.log("FCM Token:", currentToken);
-        //   // Send the token to your backend server
-        //   await fetch(
-        //     Endponit() +
-        //       "/api/update-token/?id=" +
-        //       localStorage.getItem("id") +
-        //       "&token=" +
-        //       currentToken +
-        //       "&type=esn",
-        //     {
-        //       method: "PUT",
-        //       headers: {
-        //         "Content-Type": "application/json",
-        //       },
-        //       body: JSON.stringify({
-        //         id: localStorage.getItem("id"), // Replace with the user's ID
-        //         token: currentToken,
-        //         type: "esn",
-        //         Esn: "esn",
-        //       }),
-        //     }
-        //   );
-        //   console.log("FCM token sent to the server.");
-        // } else {
-        //   console.log("No registration token available.");
-        // }
+        // Token retrieval code goes here...
       } else {
         console.log("Permission denied for notifications.");
       }
@@ -330,26 +306,7 @@ const InterfaceEn = () => {
     if (auth === false) {
       navigate("/Login");
     }
-
-    // const unsubscribe = onMessage(messaging, (payload) => {
-    //   console.log("Message received:", payload);
-
-    //   const newNotification = {
-    //     id: Date.now(),
-    //     type: "system",
-    //     title: payload.notification?.title || "New Notification",
-    //     content: payload.notification?.body || "You have a new notification",
-    //     timestamp: new Date().toISOString(),
-    //     read: false,
-    //   };
-
-    //   setNotifications((prev) => [newNotification, ...prev]);
-    //   setUnreadNotificationsCount((prev) => prev + 1);
-    // });
     retrieveFCMToken();
-    return () => {
-      // unsubscribe();
-    };
   }, [navigate]);
 
   const handleNotificationsUpdate = (updatedNotifications) => {
@@ -378,6 +335,7 @@ const InterfaceEn = () => {
           label: "Gestion des Collaborateurs",
           key: "collaborateur",
           icon: <UsergroupAddOutlined />,
+          disabled: !esnStatus,
         },
       ],
     },
@@ -385,16 +343,19 @@ const InterfaceEn = () => {
       label: "Gestion Client",
       key: "client-management",
       icon: <TeamOutlined />,
+      disabled: !esnStatus,
       children: [
         {
           label: "Répertoire Clients",
           key: "Liste-des-Clients",
           icon: <SolutionOutlined />,
+          disabled: !esnStatus,
         },
         {
           label: "Partenariats",
           key: "Partenariat",
           icon: <BankOutlined />,
+          disabled: !esnStatus,
         },
       ],
     },
@@ -402,26 +363,31 @@ const InterfaceEn = () => {
       label: "Gestion Commerciale",
       key: "commercial-management",
       icon: <ShoppingCartOutlined />,
+      disabled: !esnStatus,
       children: [
         {
           label: "Appels d'Offres",
           key: "Liste-des-Appels-d'Offres",
           icon: <ProjectOutlined />,
+          disabled: !esnStatus,
         },
         {
           label: "Mes Candidatures",
           key: "Mes-condidateur",
           icon: <UserSwitchOutlined />,
+          disabled: !esnStatus,
         },
         {
           label: "Bons de Commande",
           key: "Bon-de-Commande",
           icon: <MacCommandOutlined />,
+          disabled: !esnStatus,
         },
         {
           label: "Contrats",
           key: "Contart",
           icon: <FileDoneOutlined />,
+          disabled: !esnStatus,
         },
       ],
     },
@@ -449,29 +415,67 @@ const InterfaceEn = () => {
       ),
       key: "notification",
       icon: <NotificationOutlined />,
+      disabled: !esnStatus,
     },
   ];
 
   const groupedMenuItems = useMemo(() => {
-    const mainItems = menuItems.filter((item) => !item.group);
+    // Handle main items with tooltips for disabled ones
+    const mainItems = menuItems
+      .filter((item) => !item.group)
+      .map((item) => {
+        if (item.disabled) {
+          return {
+            ...item,
+            label: (
+              <Tooltip title="Compte inactif: Veuillez compléter votre profil ESN pour accéder à cette section">
+                {item.label}
+              </Tooltip>
+            ),
+          };
+        }
+        return item;
+      });
+
+    // Handle grouped items with tooltips for disabled ones
     const groupedItems = menuItems.reduce((acc, item) => {
       if (item.group && !acc.find((i) => i.label === item.group)) {
-        acc.push({
+        const children = menuItems
+          .filter((i) => i.group === item.group)
+          .map((i) => {
+            const childItem = { ...i, group: undefined };
+            if (childItem.disabled) {
+              childItem.label = (
+                <Tooltip title="Compte inactif: Veuillez compléter votre profil ESN pour accéder à cette section">
+                  {childItem.label}
+                </Tooltip>
+              );
+            }
+            return childItem;
+          });
+
+        const groupItem = {
           label: item.group,
           key: item.group.toLowerCase().replace(/\s+/g, "-"),
-          children: menuItems
-            .filter((i) => i.group === item.group)
-            .map((i) => ({
-              ...i,
-              group: undefined,
-            })),
-        });
+          children,
+        };
+
+        if (item.disabled) {
+          groupItem.disabled = true;
+          groupItem.label = (
+            <Tooltip title="Compte inactif: Veuillez compléter votre profil ESN pour accéder à cette section">
+              {groupItem.label}
+            </Tooltip>
+          );
+        }
+
+        acc.push(groupItem);
       }
       return acc;
     }, []);
 
     return [...mainItems, ...groupedItems];
-  }, [menuItems, unreadNotificationsCount]);
+  }, [menuItems, unreadNotificationsCount, esnStatus]);
 
   const findMenuPath = (key, items, path = []) => {
     for (const item of items) {
@@ -528,13 +532,11 @@ const InterfaceEn = () => {
   };
 
   const handleSelect = (value) => {
-    // Check if account is inactive and the selected menu is not allowed
-    if (esnStatus == true && !isMenuAllowed(value)) {
+    if (esnStatus === false && !isMenuAllowed(value)) {
       setAttemptedMenu(value);
       setIsModalVisible(true);
       return;
     }
-    
     setCurrent(value);
     setSearchValue("");
     const path = findMenuPath(value, menuItems);
@@ -544,13 +546,11 @@ const InterfaceEn = () => {
   };
 
   const handleMenuClick = (e) => {
-    // Check if account is inactive and the selected menu is not allowed
-    if (esnStatus == false && !isMenuAllowed(e.key)) {
+    if (esnStatus === false && !isMenuAllowed(e.key)) {
       setAttemptedMenu(e.key);
       setIsModalVisible(true);
       return;
     }
-    
     setCurrent(e.key);
     const path = findMenuPath(e.key, menuItems);
     if (path) {
@@ -558,13 +558,18 @@ const InterfaceEn = () => {
     }
   };
 
+  const toggleDrawer = () => {
+    setDrawerVisible(!drawerVisible);
+  };
+
   const renderComponent = () => {
-    // If account is inactive and current menu is not allowed, redirect to profile
-    if (esnStatus === false && !isMenuAllowed(current) && current !== "dashboard") {
-      // Force redirect to profile if trying to access restricted areas
+    if (
+      esnStatus === false &&
+      !isMenuAllowed(current) &&
+      current !== "dashboard"
+    ) {
       return <ESNProfilePageFrancais />;
     }
-    
     switch (current) {
       case "dashboard":
         return null;
@@ -611,9 +616,9 @@ const InterfaceEn = () => {
         open={isModalVisible}
         onCancel={() => setIsModalVisible(false)}
         footer={[
-          <Button 
-            key="profile" 
-            type="primary" 
+          <Button
+            key="profile"
+            type="primary"
             onClick={() => {
               setCurrent("Profile");
               const path = findMenuPath("Profile", menuItems);
@@ -625,52 +630,89 @@ const InterfaceEn = () => {
           >
             Accéder à mon profil ESN
           </Button>,
-          <Button 
-            key="cancel" 
-            onClick={() => setIsModalVisible(false)}
-          >
+          <Button key="cancel" onClick={() => setIsModalVisible(false)}>
             Fermer
-          </Button>
+          </Button>,
         ]}
       >
         <div className="p-2">
-          <p className="text-base mb-3">Votre compte ESN est actuellement inactif. Vous ne pouvez pas accéder à cette section.</p>
-          <p className="text-base mb-3">Pour activer votre compte, complétez toutes les informations requises dans votre profil ESN.</p>
-          <p className="text-sm text-gray-500">Seule la section "Mon Profil ESN" est accessible jusqu'à l'activation de votre compte.</p>
+          <p className="text-base mb-3">
+            Votre compte ESN est actuellement inactif. Vous ne pouvez pas accéder à cette section.
+          </p>
+          <p className="text-base mb-3">
+            Pour activer votre compte, complétez toutes les informations requises dans votre profil ESN.
+          </p>
+          <p className="text-sm text-gray-500">
+            Seule la section "Mon Profil ESN" est accessible jusqu'à l'activation de votre compte.
+          </p>
         </div>
       </Modal>
 
+      {/* Header */}
       <div className="fixed top-0 left-0 right-0 z-50 bg-white shadow-md">
         <div className="w-full flex items-center justify-between p-4">
-          <div className="flex items-center flex-grow overflow-hidden">
-            <div className="flex-grow overflow-hidden">
+          {isMobile ? (
+            <>
+              <Button type="text" icon={<MenuOutlined />} onClick={toggleDrawer} />
+              <Drawer
+                title="Menu"
+                placement="left"
+                onClose={toggleDrawer}
+                visible={drawerVisible}
+              >
+                <Menu
+                  onClick={(e) => {
+                    handleMenuClick(e);
+                    toggleDrawer();
+                  }}
+                  selectedKeys={[current]}
+                  mode="vertical"
+                  items={groupedMenuItems}
+                />
+                <div className="mt-4">
+                  <AutoComplete
+                    value={searchValue}
+                    options={getSearchOptions(searchValue)}
+                    onSelect={handleSelect}
+                    onChange={handleSearch}
+                    style={{ width: "100%" }}
+                  >
+                    <Input
+                      placeholder="Rechercher dans le menu..."
+                      suffix={<SearchOutlined />}
+                    />
+                  </AutoComplete>
+                </div>
+              </Drawer>
+            </>
+          ) : (
+            <div className="flex items-center flex-grow overflow-hidden">
               <Menu
                 onClick={handleMenuClick}
                 selectedKeys={[current]}
                 mode="horizontal"
                 items={groupedMenuItems}
-                className="border-none"
-                overflowedIndicator={<MoreOutlined style={{ fontSize: '18px' }} />}
+                className="border-none flex-grow"
+                overflowedIndicator={<MoreOutlined style={{ fontSize: "18px" }} />}
               />
+              <AutoComplete
+                value={searchValue}
+                options={getSearchOptions(searchValue)}
+                onSelect={handleSelect}
+                onChange={handleSearch}
+                className="ml-4 w-64 flex-shrink-0"
+              >
+                <Input
+                  className="rounded-lg border border-gray-200 focus:outline-none focus:border-blue-500"
+                  placeholder="Rechercher dans le menu..."
+                  suffix={<SearchOutlined className="text-gray-400" />}
+                />
+              </AutoComplete>
             </div>
-            
-            <AutoComplete
-              value={searchValue}
-              options={getSearchOptions(searchValue)}
-              onSelect={handleSelect}
-              onChange={handleSearch}
-              className="ml-4 w-64 flex-shrink-0"
-            >
-              <Input
-                className="rounded-lg border border-gray-200 focus:outline-none focus:border-blue-500"
-                placeholder="Rechercher dans le menu..."
-                suffix={<SearchOutlined className="text-gray-400" />}
-              />
-            </AutoComplete>
-          </div>
+          )}
           <div className="flex space-x-3 items-center ml-4 flex-shrink-0">
             <Tag color={esnStatus ? "green" : "orange"}>
-              {!esnStatus ?  "Compte prestataire inactif" : "Compte actif"}
+              {!esnStatus ? "Compte prestataire inactif" : "Compte actif"}
             </Tag>
             <LogoutOutlined
               onClick={() => {
@@ -683,6 +725,7 @@ const InterfaceEn = () => {
           </div>
         </div>
       </div>
+
       <div className="pt-20 px-5 mt-5">
         <Breadcrumb className="mb-4">
           {breadcrumbItems.map((item, index) => (

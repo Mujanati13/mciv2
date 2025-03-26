@@ -19,6 +19,7 @@ import {
   PartitionOutlined,
   CheckOutlined,
   WarningOutlined,
+  MenuOutlined, // Hamburger icon for mobile
 } from "@ant-design/icons";
 import {
   Menu,
@@ -31,9 +32,9 @@ import {
   message,
   Badge,
   Modal,
+  Tooltip,
+  Drawer,
 } from "antd";
-// import { getMessaging, onMessage, getToken } from "firebase/messaging";
-// import { firebaseApp } from "../helper/firebase/config";
 import { Endponit } from "../helper/enpoint";
 
 import ClientPlusInfo from "../components/cl-interface/plus-info";
@@ -47,7 +48,6 @@ import PartenariatInterface from "../components/cl-interface/partenariat-list";
 import ConsultantManagement from "../components/cl-interface/list-consultant";
 import { isClientLoggedIn, logoutEsn } from "../helper/db";
 import { useNavigate } from "react-router-dom";
-// import { messaging } from "../helper/firebase/config";
 
 const NotificationInterface = ({
   notifications,
@@ -57,7 +57,6 @@ const NotificationInterface = ({
   const [loading, setLoading] = useState(false);
 
   const markAsRead = async (notificationId) => {
-    // setLoading(true);
     try {
       const response = await fetch(
         Endponit() + "/api/notification/" + notificationId.id,
@@ -87,13 +86,10 @@ const NotificationInterface = ({
     } catch (error) {
       console.error("Error updating notification status:", error);
       message.error("Failed to mark notification as read");
-    } finally {
-      // setLoading(false);
     }
   };
 
   const markAllAsRead = async () => {
-    // setLoading(true);
     try {
       const unreadNotifications = notifications.filter((n) => !n.read);
       const updatePromises = unreadNotifications.map((notification) =>
@@ -122,8 +118,6 @@ const NotificationInterface = ({
     } catch (error) {
       console.error("Error updating notification statuses:", error);
       message.error("Failed to mark all notifications as read");
-    } finally {
-      // setLoading(false);
     }
   };
 
@@ -136,7 +130,7 @@ const NotificationInterface = ({
           loading={loading}
           disabled={!notifications.some((n) => !n.read)}
         >
-          Tout marquer comme lu{" "}
+          Tout marquer comme lu
         </Button>
       </div>
       <List
@@ -203,6 +197,19 @@ const ClientProfile = () => {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [attemptedMenu, setAttemptedMenu] = useState("");
 
+  // Responsive states for mobile view
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [drawerVisible, setDrawerVisible] = useState(false);
+
+  // Detect window resize for responsiveness
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
   // Function to check ESN status
   const checkEsnStatus = async () => {
     try {
@@ -216,22 +223,20 @@ const ClientProfile = () => {
 
       const data = await response.json();
       setEsnStatus(
-        String(data.data[0].statut).toLowerCase() === "validé" || String(data.data[0].statut).toLowerCase() === "actif"
+        String(data.data[0].statut).toLowerCase() === "validé" ||
+          String(data.data[0].statut).toLowerCase() === "actif"
       );
-      if (String(data.data.Statut).toLowerCase() !== "actif") {
-        // message.warning("Votre compte Client est inactif");
-      }
     } catch (error) {
       console.error("Erreur de vérification du statut ESN:", error);
       message.error("Impossible de vérifier le statut du compte");
     }
   };
-  
+
   const isMenuAllowed = (menuKey) => {
-    // Only profile and documents section are allowed for inactive accounts
+    // Only "Mon-Profil" and "documents" sections are allowed for inactive accounts
     return menuKey === "Mon-Profil" || menuKey === "documents";
   };
-  
+
   useEffect(() => {
     checkEsnStatus();
   }, []);
@@ -273,40 +278,7 @@ const ClientProfile = () => {
       // Request permission for notifications
       const permission = await Notification.requestPermission();
       if (permission === "granted") {
-        // Get the FCM token
-        // const currentToken = await getToken(messaging, {
-        //   vapidKey:
-        //     "BNr1YPHHD-jYLHyQcJUduQyVZA7BWGIx1q6e8m-bU442LV7Hu28P80AJyJNL998WF563PHdD97BLtZNpYJW-sSw", // Replace with your VAPID key
-        // });
-
-        // if (currentToken) {
-        //   console.log("FCM Token:", currentToken);
-
-        //   // Send the token to your backend server
-        //   await fetch(
-        //     Endponit() +
-        //       "/api/update-token/?id=" +
-        //       localStorage.getItem("id") +
-        //       "&token=" +
-        //       currentToken +
-        //       "&type=client",
-        //     {
-        //       method: "PUT",
-        //       headers: {
-        //         "Content-Type": "application/json",
-        //       },
-        //       body: JSON.stringify({
-        //         id: localStorage.getItem("id"), // Replace with the user's ID
-        //         token: currentToken,
-        //         type: "client",
-        //       }),
-        //     }
-        //   );
-
-        //   console.log("FCM token sent to the server.");
-        // } else {
-        //   console.log("No registration token available.");
-        // }
+        // Token retrieval code would go here
       } else {
         console.log("Permission denied for notifications.");
       }
@@ -328,12 +300,10 @@ const ClientProfile = () => {
           localStorage.getItem("pendingNotifications") || "[]"
         );
         if (pendingNotifications.length > 0) {
-          // Add pending notifications to the state
           setNotifications((prev) => [...pendingNotifications, ...prev]);
           setUnreadNotificationsCount(
             (prev) => prev + pendingNotifications.length
           );
-          // Clear pending notifications
           localStorage.removeItem("pendingNotifications");
         }
       } catch (error) {
@@ -343,7 +313,7 @@ const ClientProfile = () => {
 
     retrieveFCMToken();
     fetchNotifications();
-    checkPendingNotifications(); // Check for pending notifications on component mount
+    checkPendingNotifications();
   }, [navigate, update]);
 
   const handleNotificationsUpdate = (updatedNotifications) => {
@@ -376,21 +346,25 @@ const ClientProfile = () => {
       key: "prestataires",
       icon: <BuildOutlined />,
       group: "Gestion des Services",
+      disabled: !esnStatus,
       children: [
         {
           label: "ESN Partenaires",
           key: "Entreprise-de-Services",
           icon: <BankOutlined />,
+          disabled: !esnStatus,
         },
         {
           label: "Consultants",
           key: "consultant",
           icon: <TeamOutlined />,
+          disabled: !esnStatus,
         },
         {
           label: "Partenariats",
           key: "Partenariat",
           icon: <PartitionOutlined />,
+          disabled: !esnStatus,
         },
       ],
     },
@@ -399,26 +373,31 @@ const ClientProfile = () => {
       key: "appels-offres",
       icon: <ProjectOutlined />,
       group: "Gestion Commerciale",
+      disabled: !esnStatus,
       children: [
         {
           label: "Mes offers",
           key: "Appel-d'offres",
           icon: <FileSearchOutlined />,
+          disabled: !esnStatus,
         },
         {
           label: "Candidatures",
           key: "Liste-Candidature",
           icon: <UsergroupAddOutlined />,
+          disabled: !esnStatus,
         },
         {
           label: "Bons de Commande",
           key: "Liste-BDC",
           icon: <ShoppingOutlined />,
+          disabled: !esnStatus,
         },
         {
           label: "Contrats",
           key: "Contart",
           icon: <FileDoneOutlined />,
+          disabled: !esnStatus,
         },
       ],
     },
@@ -448,29 +427,54 @@ const ClientProfile = () => {
       ),
       key: "notification",
       icon: <NotificationOutlined />,
+      disabled: !esnStatus,
     },
   ];
 
   const groupedMenuItems = useMemo(() => {
-    const mainItems = menuItems.filter((item) => !item.group);
+    const mainItems = menuItems
+      .filter((item) => !item.group)
+      .map((item) => {
+        if (item.disabled) {
+          return {
+            ...item,
+            label: (
+              <Tooltip title="Compte inactif: Veuillez compléter votre profil pour accéder à cette section">
+                {item.label}
+              </Tooltip>
+            ),
+          };
+        }
+        return item;
+      });
+
     const groupedItems = menuItems.reduce((acc, item) => {
       if (item.group && !acc.find((i) => i.label === item.group)) {
+        const children = menuItems
+          .filter((i) => i.group === item.group)
+          .map((i) => {
+            const childItem = { ...i, group: undefined };
+            if (childItem.disabled) {
+              childItem.label = (
+                <Tooltip title="Compte inactif: Veuillez compléter votre profil pour accéder à cette section">
+                  {childItem.label}
+                </Tooltip>
+              );
+            }
+            return childItem;
+          });
         acc.push({
           label: item.group,
           key: item.group.toLowerCase().replace(/\s+/g, "-"),
-          children: menuItems
-            .filter((i) => i.group === item.group)
-            .map((i) => ({
-              ...i,
-              group: undefined,
-            })),
+          children,
+          disabled: item.disabled,
         });
       }
       return acc;
     }, []);
 
     return [...mainItems, ...groupedItems];
-  }, [menuItems, unreadNotificationsCount]);
+  }, [menuItems, unreadNotificationsCount, esnStatus]);
 
   const findMenuPath = (key) => {
     for (const item of menuItems) {
@@ -489,7 +493,6 @@ const ClientProfile = () => {
 
   const getSearchOptions = (searchText) => {
     if (!searchText) return [];
-
     const search = searchText.toLowerCase();
     const flattenedItems = menuItems.reduce((acc, item) => {
       if (item.children) {
@@ -497,9 +500,10 @@ const ClientProfile = () => {
       }
       return [...acc, item];
     }, []);
-
     return flattenedItems
-      .filter((item) => item.label?.toString().toLowerCase().includes(search))
+      .filter((item) =>
+        item.label?.toString().toLowerCase().includes(search)
+      )
       .map((item) => ({
         value: item.key,
         label: (
@@ -516,37 +520,38 @@ const ClientProfile = () => {
   };
 
   const handleSelect = (value) => {
-    // Check if account is inactive and the selected menu is not allowed
-    if (esnStatus === false && !isMenuAllowed(value)) {
+    if (esnStatus === false && !["Mon-Profil", "documents"].includes(value)) {
       setAttemptedMenu(value);
       setIsModalVisible(true);
       return;
     }
-    
     setCurrent(value);
     setSearchValue("");
     setBreadcrumbItems(findMenuPath(value));
   };
 
   const handleMenuClick = (e) => {
-    // Check if account is inactive and the selected menu is not allowed
-    if (esnStatus === false && !isMenuAllowed(e.key)) {
+    if (esnStatus === false && !["Mon-Profil", "documents"].includes(e.key)) {
       setAttemptedMenu(e.key);
       setIsModalVisible(true);
       return;
     }
-    
     setCurrent(e.key);
     setBreadcrumbItems(findMenuPath(e.key));
   };
 
+  const toggleDrawer = () => {
+    setDrawerVisible(!drawerVisible);
+  };
+
   const renderComponent = () => {
-    // If account is inactive and current menu is not allowed, redirect to profile
-    if (esnStatus === false && !isMenuAllowed(current) && current !== "dashboard") {
-      // Force redirect to profile if trying to access restricted areas
+    if (
+      esnStatus === false &&
+      current !== "dashboard" &&
+      !["Mon-Profil", "documents"].includes(current)
+    ) {
       return <ClientPlusInfo />;
     }
-    
     switch (current) {
       case "Mon-Profil":
         return <ClientPlusInfo />;
@@ -591,9 +596,9 @@ const ClientProfile = () => {
         open={isModalVisible}
         onCancel={() => setIsModalVisible(false)}
         footer={[
-          <Button 
-            key="profile" 
-            type="primary" 
+          <Button
+            key="profile"
+            type="primary"
             onClick={() => {
               setCurrent("Mon-Profil");
               setBreadcrumbItems(findMenuPath("Mon-Profil"));
@@ -602,60 +607,119 @@ const ClientProfile = () => {
           >
             Accéder à mon profil
           </Button>,
-          <Button 
-            key="cancel" 
-            onClick={() => setIsModalVisible(false)}
-          >
+          <Button key="cancel" onClick={() => setIsModalVisible(false)}>
             Fermer
-          </Button>
+          </Button>,
         ]}
       >
         <div className="p-2">
-          <p className="text-base mb-3">Votre compte est actuellement inactif. Vous ne pouvez pas accéder à cette section.</p>
-          <p className="text-base mb-3">Pour activer votre compte, complétez toutes les informations requises dans votre profil.</p>
-          <p className="text-sm text-gray-500">Seule la section "Mon Profil Client" est accessible jusqu'à l'activation de votre compte.</p>
+          <p className="text-base mb-3">
+            Votre compte est actuellement inactif. L'accès aux fonctionnalités
+            est limité.
+          </p>
+          <p className="text-base mb-3">
+            Pour activer votre compte, complétez toutes les informations requises
+            dans votre profil.
+          </p>
+          <p className="text-sm text-gray-500">
+            Sections accessibles: Tableau de Bord, Mon Profil Client et Gestion
+            Documentaire
+          </p>
+          <p className="text-sm text-gray-500">
+            Sections restreintes: Prestataires, Appels d'Offres et Notifications
+          </p>
         </div>
       </Modal>
 
       <div className="fixed top-0 left-0 right-0 z-50 bg-white shadow-md">
         <div className="w-full flex items-center p-4 justify-between">
           <div className="flex items-center gap-4 flex-1">
-            <Menu
-              onClick={handleMenuClick}
-              selectedKeys={[current]}
-              mode="horizontal"
-              items={groupedMenuItems}
-              className="border-none flex-1"
-            />
-          </div>
-          <div className="flex space-x-6 items-center">
-            <AutoComplete
-              value={searchValue}
-              options={getSearchOptions(searchValue)}
-              onSelect={handleSelect}
-              onChange={handleSearch}
-              className="w-64"
-            >
-              <Input
-                className="w-full rounded-lg border border-gray-200 focus:outline-none focus:border-blue-500"
-                placeholder="Rechercher une interface..."
-                suffix={<SearchOutlined className="text-gray-400" />}
+            {isMobile ? (
+              <>
+                <Button type="text" icon={<MenuOutlined />} onClick={toggleDrawer} />
+                <Drawer
+                  title="Menu"
+                  placement="left"
+                  onClose={toggleDrawer}
+                  visible={drawerVisible}
+                >
+                  <Menu
+                    onClick={(e) => {
+                      handleMenuClick(e);
+                      toggleDrawer();
+                    }}
+                    selectedKeys={[current]}
+                    mode="vertical"
+                    items={groupedMenuItems}
+                  />
+                  <div className="mt-4">
+                    <AutoComplete
+                      value={searchValue}
+                      options={getSearchOptions(searchValue)}
+                      onSelect={handleSelect}
+                      onChange={handleSearch}
+                      style={{ width: "100%" }}
+                    >
+                      <Input
+                        placeholder="Rechercher une interface..."
+                        suffix={<SearchOutlined />}
+                      />
+                    </AutoComplete>
+                  </div>
+                </Drawer>
+              </>
+            ) : (
+              <Menu
+                onClick={handleMenuClick}
+                selectedKeys={[current]}
+                mode="horizontal"
+                items={groupedMenuItems}
+                className="border-none flex-1"
               />
-            </AutoComplete>
-            <Tag color={esnStatus ? "green" : "orange"}>
-              {!esnStatus ? "Compte Client inactif" : "Compte actif"}
-            </Tag>
-            <LogoutOutlined
-              onClick={() => {
-                logoutEsn();
-                navigate("/Login");
-              }}
-              className="text-red-500 cursor-pointer text-base hover:text-red-600"
-              title="Déconnexion"
-            />
+            )}
           </div>
+          {isMobile ? (
+            <div className="flex space-x-4 items-center">
+              <LogoutOutlined
+                onClick={() => {
+                  logoutEsn();
+                  navigate("/Login");
+                }}
+                className="text-red-500 cursor-pointer text-base hover:text-red-600"
+                title="Déconnexion"
+              />
+            </div>
+          ) : (
+            <div className="flex space-x-6 items-center">
+              <AutoComplete
+                value={searchValue}
+                options={getSearchOptions(searchValue)}
+                onSelect={handleSelect}
+                onChange={handleSearch}
+                className="w-64"
+              >
+                <Input
+                  className="w-full rounded-lg border border-gray-200 focus:outline-none focus:border-blue-500"
+                  placeholder="Rechercher une interface..."
+                  suffix={<SearchOutlined className="text-gray-400" />}
+                />
+              </AutoComplete>
+              <Tag color={esnStatus ? "green" : "orange"}>
+                {!esnStatus ? "Compte Client inactif" : "Compte actif"}
+              </Tag>
+              <LogoutOutlined
+                onClick={() => {
+                  logoutEsn();
+                  navigate("/Login");
+                }}
+                className="text-red-500 cursor-pointer text-base hover:text-red-600"
+                title="Déconnexion"
+              />
+            </div>
+          )}
         </div>
       </div>
+
       <div className="pt-20 px-5 mt-5">
         <Breadcrumb className="mb-4">
           {breadcrumbItems.map((item, index) => (

@@ -316,7 +316,6 @@ const CollaboratorList = () => {
             />
           </div>
         </div>
-
         <div className="bg-white rounded-lg shadow p-6">
           {/* Informations générales */}
           <div className="mb-6">
@@ -445,7 +444,6 @@ const CollaboratorList = () => {
             </div>
           </div>
         </div>
-
         {/* Status change notification */}
         {isEnabled && collaborator.status === "Draft" && (
           <div className="mt-6 bg-blue-50 p-4 rounded-lg border border-blue-200">
@@ -463,7 +461,6 @@ const CollaboratorList = () => {
             </div>
           </div>
         )}
-
         {!isEnabled && collaborator.status === "Draft" && (
           <div className="mt-6 bg-yellow-50 p-4 rounded-lg border border-yellow-200">
             <div className="flex items-start">
@@ -712,17 +709,14 @@ const CollaboratorList = () => {
     },
   ];
 
-  // Update the ActionButtons component
+  // First location: In the ActionButtons component
   const ActionButtons = ({ record, handleDelete, onEdit, onViewDetails }) => {
     const hasDocuments = esnsWithDocuments[record.id] || false;
     const isEnabled = record.completion >= 100 && hasDocuments;
 
     const getTooltipMessage = () => {
-      if (record.completion <= 0) {
-        return "Le profil doit être complet (100%)";
-      }
-      if (!hasDocuments) {
-        return "L'ESN doit avoir au moins un document";
+      if (!isEnabled) {
+        return "Profil incomplet";
       }
       return "Modifier";
     };
@@ -744,17 +738,15 @@ const CollaboratorList = () => {
         </Tooltip>
         <Tooltip
           title={
-            isEnabled
-              ? "Validation de l'ESN"
-              : "Le profil doit être complet avec documents"
+            isEnabled ? "Validation de l'ESN" : "Profil incomplet" // Updated message here
           }
         >
           <Button
             type="text"
             icon={<CheckCircleOutlined />}
             style={{ color: isEnabled ? "#52c41a" : undefined }}
-            onClick={isEnabled ? handleVerifyWithDetails : undefined}
-            disabled={!isEnabled}
+            onClick={handleVerifyWithDetails}
+            // disabled={!isEnabled}
           />
         </Tooltip>
         <Tooltip title="Supprimer">
@@ -769,6 +761,7 @@ const CollaboratorList = () => {
     );
   };
 
+  // In the CardView component
   const CardView = ({ data, handleDelete, onEdit, onViewDetails }) => {
     return (
       <Row gutter={[16, 16]}>
@@ -777,11 +770,8 @@ const CollaboratorList = () => {
           const isEnabled = collaborator.completion >= 100 && hasDocuments;
 
           const getTooltipMessage = () => {
-            if (collaborator.completion <= 0) {
-              return "Le profil doit être complet (100%)";
-            }
-            if (!hasDocuments) {
-              return "L'ESN doit avoir au moins un document";
+            if (!isEnabled) {
+              return "Profil incomplet";
             }
             return "Modifier";
           };
@@ -814,7 +804,7 @@ const CollaboratorList = () => {
                     title={
                       isEnabled
                         ? "Marquer comme 'à signer'"
-                        : "Le profil doit être complet avec documents"
+                        : "Profil incomplet" // Updated message here
                     }
                     key="verify-tooltip"
                   >
@@ -841,7 +831,7 @@ const CollaboratorList = () => {
                   </Tooltip>,
                 ]}
               >
-                {/* Card.Meta content unchanged */}
+                {/* Card.Meta content remains unchanged */}
                 <Card.Meta
                   avatar={<Avatar icon={<UserOutlined />} size={64} />}
                   title={

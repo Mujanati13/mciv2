@@ -602,9 +602,9 @@ const ESNProfilePageFrancais = () => {
       SIRET: { weight: 10, filled: !!data.SIRET },
       CP: { weight: 5, filled: !!data.CP },
       Ville: { weight: 5, filled: !!data.Ville },
-      Tel_Contact: { weight: 5, filled: !!data.Tel_Contact },
+      // Tel_Contact: { weight: 5, filled: !!data.Tel_Contact },
       N_TVA: { weight: 5, filled: !!data.N_TVA },
-      Province: { weight: 3, filled: !!data.Province },
+      // Province: { weight: 3, filled: !!data.Province },
     };
 
     const additionalFields = {

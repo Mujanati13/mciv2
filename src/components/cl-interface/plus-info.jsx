@@ -653,7 +653,7 @@ const ClientPlusInfo = () => {
     if (
       completion === 100 &&
       profile &&
-      profile.Statut === "Draft" // Only update if current status is specifically "Draft"
+      profile.Statut == "Draft" // Only update if current status is specifically "Draft"
     ) {
       updateClientStatus("à valider");
     }
@@ -668,7 +668,7 @@ const ClientPlusInfo = () => {
         // ...profileedit,
         mail_contact: profileedit.mail_contact,
         ID_clt: clientId,
-        statut: newStatus,
+        statut: "à valider",
       };
 
       const response = await axios.put(
@@ -685,7 +685,7 @@ const ClientPlusInfo = () => {
         // Update local profile state
         const updatedProfile = {
           ...profile,
-          Statut: newStatus,
+          statut: newStatus,
         };
 
         setProfile(updatedProfile);
@@ -716,6 +716,8 @@ const ClientPlusInfo = () => {
 
       const client = response.data.data;
       setProfileedit(client[0]);
+      console.log(client[0]);
+      
       const profileData = {
         id: client[0].ID_clt,
         img_path: client[0].img_path,
@@ -759,6 +761,8 @@ const ClientPlusInfo = () => {
       calculateProfileCompletion(profileData);
 
       setProfile(profileData);
+      console.log("profileData", profileData);
+      
       form.setFieldsValue({
         ...profileData,
         ...profileData.socialLinks,
@@ -800,7 +804,6 @@ const ClientPlusInfo = () => {
             province: values.province || "",
             siret: values.siret || "",
             n_tva: values.n_tva || "",
-            statut: values.occupation || "",
             date_validation: values.birthDate
               ? values.birthDate.format("YYYY-MM-DD")
               : null,
@@ -1060,7 +1063,7 @@ const ClientPlusInfo = () => {
               <div className="flex flex-col md:flex-row justify-between items-center">
                 <div>
                   <h3 className="text-base font-semibold text-blue-900 mb-2">
-                    Statut du contrat:{" "}
+                    Statut du contrat:
                     <Tag
                       color={
                         contractAccepted ||
