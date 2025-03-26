@@ -394,12 +394,12 @@ const SignupPage = () => {
 
               <Form.Item
                 name="siret"
-                rules={[
-                  {
-                    pattern: /^\d{14}$/,
-                    message: "Le SIRET doit contenir 14 chiffres",
-                  },
-                ]}
+                // rules={[
+                //   {
+                //     pattern: /^\d{14}$/,
+                //     message: "Le SIRET doit contenir 14 chiffres",
+                //   },
+                // ]}
               >
                 <Input prefix={<IdcardOutlined />} placeholder="Numéro SIRET" />
               </Form.Item>
