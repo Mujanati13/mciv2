@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3002:3002"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.2'
+          memory: 856M
+        reservations:
+          cpus: '0.1'
+          memory: 828M
+    environment:
+      NODE_OPTIONS: "--max-old-space-size=1006"
+    volumes:
+      - .:/usr/src/app
+      - /usr/src/app/node_modules
+    command: ["npm", "start"]
+
+volumes:
+  node_modules:
