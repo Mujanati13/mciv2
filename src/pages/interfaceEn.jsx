@@ -18,6 +18,8 @@ import {
   BankOutlined,
   ProjectOutlined,
   CheckOutlined,
+  WarningOutlined,
+  MoreOutlined,
 } from "@ant-design/icons";
 import {
   Menu,
@@ -28,6 +30,8 @@ import {
   List,
   Button,
   message,
+  Tag,
+  Modal,
 } from "antd";
 
 import { Endponit } from "../helper/enpoint";
@@ -199,6 +203,44 @@ const InterfaceEn = () => {
   const [notifications, setNotifications] = useState([]);
   const [update, setupdate] = useState([]);
   const navigate = useNavigate();
+  const [esnStatus, setEsnStatus] = useState(null);
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [attemptedMenu, setAttemptedMenu] = useState("");
+
+  // Function to check ESN status
+  const checkEsnStatus = async () => {
+    try {
+      const response = await fetch(
+        Endponit() + "/api/getEsnData/?esnId=" + localStorage.getItem("id")
+      );
+
+      if (!response.ok) {
+        throw new Error("Échec de la vérification du statut");
+      }
+
+      const data = await response.json();
+      setEsnStatus(
+        String(data.data[0].Statut).toLowerCase() === "actif"  ? true : false
+      );
+      console.log('====================================');
+      console.log("ESN Status:", data.data[0].Statut);
+      console.log('====================================');
+      console.log("ESN Status:", data.data[0].Statut);
+    } catch (error) {
+      console.error("Erreur de vérification du statut ESN:", error);
+      message.error("Impossible de vérifier le statut du compte");
+    }
+  };
+
+  // Check if menu is allowed for inactive accounts
+  const isMenuAllowed = (menuKey) => {
+    // Only profile is allowed for inactive accounts
+    return menuKey === "Profile" || menuKey === "documents";
+  };
+
+  useEffect(() => {
+    checkEsnStatus();
+  }, []);
 
   const fetchNotifications = async () => {
     try {
@@ -244,10 +286,8 @@ const InterfaceEn = () => {
         //   vapidKey:
         //     "BNr1YPHHD-jYLHyQcJUduQyVZA7BWGIx1q6e8m-bU442LV7Hu28P80AJyJNL998WF563PHdD97BLtZNpYJW-sSw", // Replace with your VAPID key
         // });
-
         // if (currentToken) {
         //   console.log("FCM Token:", currentToken);
-
         //   // Send the token to your backend server
         //   await fetch(
         //     Endponit() +
@@ -269,7 +309,6 @@ const InterfaceEn = () => {
         //       }),
         //     }
         //   );
-
         //   console.log("FCM token sent to the server.");
         // } else {
         //   console.log("No registration token available.");
@@ -432,7 +471,7 @@ const InterfaceEn = () => {
     }, []);
 
     return [...mainItems, ...groupedItems];
-  }, [menuItems]);
+  }, [menuItems, unreadNotificationsCount]);
 
   const findMenuPath = (key, items, path = []) => {
     for (const item of items) {
@@ -489,6 +528,13 @@ const InterfaceEn = () => {
   };
 
   const handleSelect = (value) => {
+    // Check if account is inactive and the selected menu is not allowed
+    if (esnStatus == true && !isMenuAllowed(value)) {
+      setAttemptedMenu(value);
+      setIsModalVisible(true);
+      return;
+    }
+    
     setCurrent(value);
     setSearchValue("");
     const path = findMenuPath(value, menuItems);
@@ -498,6 +544,13 @@ const InterfaceEn = () => {
   };
 
   const handleMenuClick = (e) => {
+    // Check if account is inactive and the selected menu is not allowed
+    if (esnStatus == false && !isMenuAllowed(e.key)) {
+      setAttemptedMenu(e.key);
+      setIsModalVisible(true);
+      return;
+    }
+    
     setCurrent(e.key);
     const path = findMenuPath(e.key, menuItems);
     if (path) {
@@ -506,6 +559,12 @@ const InterfaceEn = () => {
   };
 
   const renderComponent = () => {
+    // If account is inactive and current menu is not allowed, redirect to profile
+    if (esnStatus === false && !isMenuAllowed(current) && current !== "dashboard") {
+      // Force redirect to profile if trying to access restricted areas
+      return <ESNProfilePageFrancais />;
+    }
+    
     switch (current) {
       case "dashboard":
         return null;
@@ -542,31 +601,77 @@ const InterfaceEn = () => {
 
   return (
     <div className="w-full">
+      {/* Inactive Account Warning Modal */}
+      <Modal
+        title={
+          <div className="flex items-center text-amber-600">
+            <WarningOutlined className="mr-2" /> Compte ESN Inactif
+          </div>
+        }
+        open={isModalVisible}
+        onCancel={() => setIsModalVisible(false)}
+        footer={[
+          <Button 
+            key="profile" 
+            type="primary" 
+            onClick={() => {
+              setCurrent("Profile");
+              const path = findMenuPath("Profile", menuItems);
+              if (path) {
+                setBreadcrumbItems(path);
+              }
+              setIsModalVisible(false);
+            }}
+          >
+            Accéder à mon profil ESN
+          </Button>,
+          <Button 
+            key="cancel" 
+            onClick={() => setIsModalVisible(false)}
+          >
+            Fermer
+          </Button>
+        ]}
+      >
+        <div className="p-2">
+          <p className="text-base mb-3">Votre compte ESN est actuellement inactif. Vous ne pouvez pas accéder à cette section.</p>
+          <p className="text-base mb-3">Pour activer votre compte, complétez toutes les informations requises dans votre profil ESN.</p>
+          <p className="text-sm text-gray-500">Seule la section "Mon Profil ESN" est accessible jusqu'à l'activation de votre compte.</p>
+        </div>
+      </Modal>
+
       <div className="fixed top-0 left-0 right-0 z-50 bg-white shadow-md">
         <div className="w-full flex items-center justify-between p-4">
-          <div className="flex items-center flex-grow">
-            <Menu
-              onClick={handleMenuClick}
-              selectedKeys={[current]}
-              mode="horizontal"
-              items={groupedMenuItems}
-              className="flex-grow border-none"
-            />
+          <div className="flex items-center flex-grow overflow-hidden">
+            <div className="flex-grow overflow-hidden">
+              <Menu
+                onClick={handleMenuClick}
+                selectedKeys={[current]}
+                mode="horizontal"
+                items={groupedMenuItems}
+                className="border-none"
+                overflowedIndicator={<MoreOutlined style={{ fontSize: '18px' }} />}
+              />
+            </div>
+            
             <AutoComplete
               value={searchValue}
               options={getSearchOptions(searchValue)}
               onSelect={handleSelect}
               onChange={handleSearch}
-              className="w-64"
+              className="ml-4 w-64 flex-shrink-0"
             >
               <Input
-                className="w-32 rounded-lg border border-gray-200 focus:outline-none focus:border-blue-500"
+                className="rounded-lg border border-gray-200 focus:outline-none focus:border-blue-500"
                 placeholder="Rechercher dans le menu..."
                 suffix={<SearchOutlined className="text-gray-400" />}
               />
             </AutoComplete>
           </div>
-          <div className="flex space-x-3 items-center ml-4">
+          <div className="flex space-x-3 items-center ml-4 flex-shrink-0">
+            <Tag color={esnStatus ? "green" : "orange"}>
+              {!esnStatus ?  "Compte prestataire inactif" : "Compte actif"}
+            </Tag>
             <LogoutOutlined
               onClick={() => {
                 logoutEsn();

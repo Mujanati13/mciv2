@@ -33,10 +33,14 @@ import {
   BankOutlined,
   HomeOutlined,
   GlobalOutlined,
+  CheckCircleOutlined,
+  FileOutlined,
+  InfoCircleOutlined,
+  WarningOutlined,
 } from "@ant-design/icons";
-
 import * as XLSX from "xlsx";
 import { Endponit, token } from "../../helper/enpoint";
+import ESNDocumentViewer from "./sub-compo/ESNDocumentViewer";
 
 const { Option } = Select;
 
@@ -49,7 +53,10 @@ const CollaboratorList = () => {
   const [editingCollaborator, setEditingCollaborator] = useState(null);
   const [detailsModalVisible, setDetailsModalVisible] = useState(false);
   const [selectedCollaborator, setSelectedCollaborator] = useState(null);
+  // Add this near the other state declarations
+  const [verificationIntent, setVerificationIntent] = useState(false);
 
+  const [esnsWithDocuments, setEsnsWithDocuments] = useState({});
   const API_BASE_URL = Endponit() + "/api/ESN/";
 
   // City data mapping (simplified - expand based on your needs)
@@ -59,36 +66,108 @@ const CollaboratorList = () => {
     Suisse: ["Genève", "Zurich", "Bâle", "Lausanne", "Berne"],
   };
 
-  // Fetch Collaborators with password verification
+  const calculateProfileCompletion = (collaborator) => {
+    // Define required fields for a complete profile
+    const requiredFields = [
+      "Raison_sociale",
+      "SIRET",
+      "mail_Contact",
+      "Tel_Contact",
+      "Adresse",
+      "CP",
+      "Ville",
+      "Pays",
+      "IBAN",
+      "BIC",
+      "Banque",
+    ];
+
+    // Add this function after fetchCollaborators
+
+    // Count filled fields
+    const filledFields = requiredFields.filter(
+      (field) =>
+        collaborator[field] && collaborator[field].toString().trim() !== ""
+    ).length;
+
+    // Calculate percentage
+    return Math.round((filledFields / requiredFields.length) * 100);
+  };
+
+  const checkEsnDocuments = async (esnIds) => {
+    try {
+      const promises = esnIds.map((id) =>
+        axios.get(`${Endponit()}/api/getDocumentESN/`, {
+          headers: {
+            Authorization: `${token()}`,
+          },
+          params: {
+            esnId: id,
+          },
+        })
+      );
+
+      const responses = await Promise.all(promises);
+      const documentsMap = {};
+
+      responses.forEach((response, index) => {
+        const esnId = esnIds[index];
+        const hasDocuments = response.data.data.length > 0;
+        documentsMap[esnId] = hasDocuments;
+      });
+
+      setEsnsWithDocuments(documentsMap);
+    } catch (error) {
+      console.error("Error checking ESN documents:", error);
+      // Set all to false in case of error
+      const documentsMap = {};
+      esnIds.forEach((id) => (documentsMap[id] = false));
+      setEsnsWithDocuments(documentsMap);
+    }
+  };
+
+  // Modify this part of fetchCollaborators
   const fetchCollaborators = async (password) => {
     setLoading(true);
     try {
       const response = await axios.get(API_BASE_URL, {
         headers: {
           Authorization: `${token()}`,
-          // "X-Password": password, // Add password to headers
         },
       });
-      const formattedData = response.data.data.map((item) => ({
-        key: item.ID_ESN,
-        id: item.ID_ESN,
-        nom: item.Raison_sociale,
-        email: item.mail_Contact,
-        phone: item.Tel_Contact,
-        poste: "N/A",
-        status: item.Statut,
-        Raison_sociale: item.Raison_sociale,
-        SIRET: item.SIRET,
-        Pays: item.Pays,
-        Adresse: item.Adresse,
-        CP: item.CP,
-        Ville: item.Ville,
-        mail_Contact: item.mail_Contact,
-        IBAN: item.IBAN,
-        BIC: item.BIC,
-        Banque: item.Banque,
-      }));
+      const formattedData = response.data.data.map((item) => {
+        // Calculate profile completion
+        const completionPercentage = calculateProfileCompletion(item);
+
+        return {
+          key: item.ID_ESN,
+          id: item.ID_ESN,
+          nom: item.Raison_sociale,
+          email: item.mail_Contact,
+          phone: item.Tel_Contact,
+          poste: "N/A",
+          status: item.Statut,
+          Raison_sociale: item.Raison_sociale,
+          SIRET: item.SIRET,
+          Pays: item.Pays,
+          Adresse: item.Adresse,
+          CP: item.CP,
+          Ville: item.Ville,
+          mail_Contact: item.mail_Contact,
+          IBAN: item.IBAN,
+          BIC: item.BIC,
+          Banque: item.Banque,
+          completion: completionPercentage,
+        };
+      });
+
       setCollaborators(formattedData);
+
+      // After loading collaborators, check for documents
+      if (formattedData.length > 0) {
+        const esnIds = formattedData.map((esn) => esn.id);
+        checkEsnDocuments(esnIds);
+      }
     } catch (error) {
       message.error("Erreur lors du chargement des données");
       console.error("Fetch error:", error);
@@ -122,74 +201,290 @@ const CollaboratorList = () => {
     XLSX.writeFile(wb, "esn_export.xlsx");
   };
 
-  // Details Modal
-  const DetailsModal = ({ visible, collaborator, onClose }) => (
-    <Modal
-      title="Détails du collaborateur"
-      visible={visible}
-      onCancel={onClose}
-      footer={[
-        <Button key="close" onClick={onClose}>
-          Fermer
-        </Button>,
-      ]}
-      width={800}
-    >
-      {collaborator && (
-        <div className="space-y-4">
-          <Row gutter={[16, 16]}>
-            <Col span={12}>
-              <div className="font-semibold">Raison Sociale</div>
-              <div>{collaborator.nom}</div>
-            </Col>
-            <Col span={12}>
-              <div className="font-semibold">SIRET</div>
-              <div>{collaborator.SIRET}</div>
-            </Col>
-          </Row>
-          <Divider />
-          <Row gutter={[16, 16]}>
-            <Col span={8}>
-              <div className="font-semibold">Email</div>
-              <div>{collaborator.email}</div>
-            </Col>
-            <Col span={8}>
-              <div className="font-semibold">Téléphone</div>
-              <div>{collaborator.phone}</div>
-            </Col>
-            <Col span={8}>
-              <div className="font-semibold">Status</div>
-              <Tag color={collaborator.status === "actif" ? "green" : "red"}>
-                {collaborator.status === "actif" ? "Actif" : "Inactif"}
-              </Tag>
-            </Col>
-          </Row>
-          <Divider />
-          <Row gutter={[16, 16]}>
-            <Col span={24}>
-              <div className="font-semibold">Adresse</div>
-              <div>{`${collaborator.Adresse}, ${collaborator.CP} ${collaborator.Ville}, ${collaborator.Pays}`}</div>
-            </Col>
-          </Row>
-          <Divider />
-          <Row gutter={[16, 16]}>
-            <Col span={8}>
-              <div className="font-semibold">Banque</div>
-              <div>{collaborator.Banque}</div>
-            </Col>
-            <Col span={8}>
-              <div className="font-semibold">IBAN</div>
-              <div>{collaborator.IBAN}</div>
-            </Col>
-            <Col span={8}>
-              <div className="font-semibold">BIC</div>
-              <div>{collaborator.BIC}</div>
-            </Col>
-          </Row>
+  // Updated DetailsModal with modern styling and functionality
+  const DetailsModal = ({
+    visible,
+    collaborator,
+    onClose,
+    verificationIntent,
+  }) => {
+    const handleVerify = async () => {
+      try {
+        await axios.put(
+          `${Endponit()}/api/ESN/`,
+          {
+            ...collaborator,
+            Statut: "à signer",
+            statut: "à signer",
+            ID_ESN: collaborator.id,
+            password: null,
+          },
+          {
+            headers: {
+              Authorization: `${token()}`,
+            },
+          }
+        );
+        message.success("ESN marqué comme 'à signer'");
+        onClose(true); // Pass true to indicate the list should refresh
+      } catch (error) {
+        message.error("Erreur lors de la modification du statut");
+        console.error("Status change error:", error);
+      }
+    };
+
+    if (!collaborator) return null;
+
+    const hasDocuments = esnsWithDocuments[collaborator.id] || false;
+    const isEnabled = collaborator.completion >= 100 && hasDocuments;
+
+    return (
+      <Modal
+        title={
+          <div className="flex items-center justify-between">
+            <span className="text-xl font-semibold text-gray-800">
+              Détails de l'ESN
+            </span>
+            <Tag
+              className="text-base px-3 py-1"
+              color={
+                collaborator.status === "Draft"
+                  ? "orange"
+                  : collaborator.status === "à valider"
+                  ? "blue"
+                  : collaborator.status === "à signer"
+                  ? "purple"
+                  : collaborator.status === "Actif"
+                  ? "green"
+                  : "red"
+              }
+            >
+              {collaborator.status === "Draft"
+                ? "En cours de création"
+                : collaborator.status === "à valider"
+                ? "À valider"
+                : collaborator.status === "à signer"
+                ? "À signer"
+                : collaborator.status === "Actif"
+                ? "Actif"
+                : "Inactif"}
+            </Tag>
+          </div>
+        }
+        visible={visible}
+        onCancel={() => onClose(false)}
+        footer={[
+          <Button key="close" onClick={() => onClose(false)}>
+            Fermer
+          </Button>,
+          (verificationIntent || collaborator.status === "à valider") &&
+            isEnabled && (
+              <Button
+                key="verify"
+                type="primary"
+                onClick={handleVerify}
+                icon={<CheckCircleOutlined />}
+              >
+                Marquer comme "À signer"
+              </Button>
+            ),
+        ].filter(Boolean)}
+        width={800}
+        className="esn-details-modal"
+        bodyStyle={{ padding: "24px" }}
+      >
+        {/* Completion progress bar at the top */}
+        <div className="mb-6">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-gray-700 font-medium">
+              Complétude du profil
+            </span>
+            <span className="text-gray-700 font-medium">
+              {collaborator.completion}%
+            </span>
+          </div>
+          <div className="w-full bg-gray-200 rounded-full h-3">
+            <div
+              className={`h-3 rounded-full ${
+                collaborator.completion < 50
+                  ? "bg-red-500"
+                  : collaborator.completion < 80
+                  ? "bg-yellow-500"
+                  : "bg-green-500"
+              }`}
+              style={{ width: `${collaborator.completion}%` }}
+            />
+          </div>
         </div>
-      )}
-    </Modal>
-  );
+
+        <div className="bg-white rounded-lg shadow p-6">
+          {/* Informations générales */}
+          <div className="mb-6">
+            <div className="flex items-center mb-4">
+              <UserOutlined className="text-blue-500 text-xl mr-2" />
+              <h3 className="text-lg font-medium text-gray-800 m-0">
+                Informations générales
+              </h3>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-gray-50 p-3 rounded-md">
+                <p className="text-sm text-gray-500 mb-1">Raison sociale</p>
+                <p className="font-medium text-gray-800">
+                  {collaborator.nom || "Non spécifié"}
+                </p>
+              </div>
+              <div className="bg-gray-50 p-3 rounded-md">
+                <p className="text-sm text-gray-500 mb-1">SIRET</p>
+                <p className="font-medium text-gray-800">
+                  {collaborator.SIRET || "Non spécifié"}
+                </p>
+              </div>
+              <div className="bg-gray-50 p-3 rounded-md">
+                <p className="text-sm text-gray-500 mb-1">Email</p>
+                <p className="font-medium text-gray-800 flex items-center">
+                  <MailOutlined className="mr-2 text-gray-400" />
+                  {collaborator.email || "Non spécifié"}
+                </p>
+              </div>
+              <div className="bg-gray-50 p-3 rounded-md">
+                <p className="text-sm text-gray-500 mb-1">Téléphone</p>
+                <p className="font-medium text-gray-800 flex items-center">
+                  <PhoneOutlined className="mr-2 text-gray-400" />
+                  {collaborator.phone || "Non spécifié"}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Adresse */}
+          <div className="mb-6">
+            <div className="flex items-center mb-4">
+              <HomeOutlined className="text-green-500 text-xl mr-2" />
+              <h3 className="text-lg font-medium text-gray-800 m-0">Adresse</h3>
+            </div>
+
+            <div className="bg-gray-50 p-4 rounded-md">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <p className="text-sm text-gray-500 mb-1">Adresse</p>
+                  <p className="font-medium text-gray-800">
+                    {collaborator.Adresse || "Non spécifié"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500 mb-1">Code postal</p>
+                  <p className="font-medium text-gray-800">
+                    {collaborator.CP || "Non spécifié"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500 mb-1">Ville</p>
+                  <p className="font-medium text-gray-800">
+                    {collaborator.Ville || "Non spécifié"}
+                  </p>
+                </div>
+              </div>
+              <div className="mt-3">
+                <p className="text-sm text-gray-500 mb-1">Pays</p>
+                <p className="font-medium text-gray-800 flex items-center">
+                  <GlobalOutlined className="mr-2 text-gray-400" />
+                  {collaborator.Pays || "Non spécifié"}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Informations financières */}
+          <div className="mb-6">
+            <div className="flex items-center mb-4">
+              <BankOutlined className="text-purple-500 text-xl mr-2" />
+              <h3 className="text-lg font-medium text-gray-800 m-0">
+                Informations financières
+              </h3>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-gray-50 p-3 rounded-md">
+                <p className="text-sm text-gray-500 mb-1">Banque</p>
+                <p className="font-medium text-gray-800">
+                  {collaborator.Banque || "Non spécifié"}
+                </p>
+              </div>
+              <div className="bg-gray-50 p-3 rounded-md">
+                <p className="text-sm text-gray-500 mb-1">IBAN</p>
+                <p className="font-medium text-gray-800">
+                  {collaborator.IBAN || "Non spécifié"}
+                </p>
+              </div>
+              <div className="bg-gray-50 p-3 rounded-md">
+                <p className="text-sm text-gray-500 mb-1">BIC</p>
+                <p className="font-medium text-gray-800">
+                  {collaborator.BIC || "Non spécifié"}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Documents Section */}
+          <div>
+            <div className="flex items-center mb-4">
+              <FileOutlined className="text-orange-500 text-xl mr-2" />
+              <h3 className="text-lg font-medium text-gray-800 m-0">
+                Documents
+              </h3>
+            </div>
+
+            <div className="bg-gray-50 p-4 rounded-md">
+              <ESNDocumentViewer esnId={collaborator.id} />
+              {!hasDocuments && (
+                <div className="text-center py-3">
+                  <p className="text-gray-500">Aucun document disponible</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Status change notification */}
+        {isEnabled && collaborator.status === "Draft" && (
+          <div className="mt-6 bg-blue-50 p-4 rounded-lg border border-blue-200">
+            <div className="flex items-start">
+              <InfoCircleOutlined className="text-blue-500 text-lg mt-1 mr-3" />
+              <div>
+                <h4 className="font-medium text-blue-700 m-0">
+                  Profil complété à 100%
+                </h4>
+                <p className="text-blue-600 mt-1 mb-0">
+                  Ce profil est complet et peut être marqué comme "À signer"
+                  pour validation.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {!isEnabled && collaborator.status === "Draft" && (
+          <div className="mt-6 bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+            <div className="flex items-start">
+              <WarningOutlined className="text-yellow-500 text-lg mt-1 mr-3" />
+              <div>
+                <h4 className="font-medium text-yellow-700 m-0">
+                  Profil incomplet
+                </h4>
+                <p className="text-yellow-600 mt-1 mb-0">
+                  {collaborator.completion < 100
+                    ? "Complétez le profil à 100% "
+                    : "Ajoutez au moins un document "}
+                  pour pouvoir marquer ce profil comme "À signer".
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+      </Modal>
+    );
+  };
 
   const handlePostError = (response) => {
     const errors = response?.data?.errors;
@@ -201,16 +496,19 @@ const CollaboratorList = () => {
       message.error("Cette adresse email est déjà utilisée");
     }
   };
-  // Add Collaborator
-  // Add Collaborator
+
+  // Update in the handleAddCollaborator function
   const handleAddCollaborator = async (values) => {
     try {
-      const response = await axios.post(API_BASE_URL, values, {
-        headers: {
-          Authorization: `${token()}`,
-        },
-      });
-      console.log(response.data.status);
+      const response = await axios.post(
+        API_BASE_URL,
+        { ...values, Statut: "Draft" }, // New ESNs always start with "Draft" status
+        {
+          headers: {
+            Authorization: `${token()}`,
+          },
+        }
+      );
 
       if (response.data.status == true) {
         message.success("ESN créé avec succès");
@@ -329,16 +627,72 @@ const CollaboratorList = () => {
       title: "Statut",
       dataIndex: "status",
       key: "status",
-      render: (status) => (
-        <Tag color={status === "actif" ? "green" : "red"}>
-          {status === "actif" ? "Actif" : "Inactif"}
-        </Tag>
-      ),
+      render: (status) => {
+        let color;
+        let text;
+
+        switch (status) {
+          case "Draft":
+            color = "orange";
+            text = "En cours de création";
+            break;
+          case "à valider":
+            color = "blue";
+            text = "À valider";
+            break;
+          case "à signer":
+            color = "purple";
+            text = "À signer";
+            break;
+          case "Actif":
+            color = "green";
+            text = "Actif";
+            break;
+          case "Inactif":
+            color = "red";
+            text = "Inactif";
+            break;
+          default:
+            color = "default";
+            text = status;
+        }
+
+        return <Tag color={color}>{text}</Tag>;
+      },
       filters: [
-        { text: "Actif", value: "actif" },
-        { text: "Inactif", value: "inactif" },
+        { text: "En cours de création", value: "Draft" },
+        { text: "À valider", value: "à valider" },
+        { text: "À signer", value: "à signer" },
+        { text: "Actif", value: "Actif" },
+        { text: "Inactif", value: "Inactif" },
       ],
       onFilter: (value, record) => record.status === value,
+    },
+    {
+      title: "Complétude",
+      dataIndex: "completion",
+      key: "completion",
+      width: 120,
+      sorter: (a, b) => a.completion - b.completion,
+      render: (completion) => (
+        <Tooltip title={`${completion}% complet`}>
+          <div className="flex items-center">
+            <div className="w-full bg-gray-200 rounded-full h-2.5 mr-2">
+              <div
+                className={`h-2.5 rounded-full ${
+                  completion < 50
+                    ? "bg-red-500"
+                    : completion < 80
+                    ? "bg-yellow-500"
+                    : "bg-green-500"
+                }`}
+                style={{ width: `${completion}%` }}
+              />
+            </div>
+            <span className="text-center">{completion}%</span>
+          </div>
+        </Tooltip>
+      ),
     },
     {
       title: "Actions",
@@ -358,78 +712,201 @@ const CollaboratorList = () => {
     },
   ];
 
-  const ActionButtons = ({ record, handleDelete, onEdit, onViewDetails }) => (
-    <Space size="middle">
-      <Tooltip title="Modifier">
-        <Button type="text" icon={<EditOutlined />} onClick={onEdit} />
-      </Tooltip>
-      <Tooltip title="Supprimer">
-        <Button
-          type="text"
-          danger
-          icon={<DeleteOutlined />}
-          onClick={() => handleDelete(record)}
-        />
-      </Tooltip>
-      <Dropdown
-        menu={{
-          items: [
-            {
-              key: "1",
-              label: "Voir détails",
-              onClick: onViewDetails,
-            },
-          ],
-        }}
-      >
-        <Button type="text" icon={<MoreOutlined />} />
-      </Dropdown>
-    </Space>
-  );
+  // Update the ActionButtons component
+  const ActionButtons = ({ record, handleDelete, onEdit, onViewDetails }) => {
+    const hasDocuments = esnsWithDocuments[record.id] || false;
+    const isEnabled = record.completion >= 100 && hasDocuments;
 
-  const CardView = ({ data, handleDelete, onEdit, onViewDetails }) => (
-    <Row gutter={[16, 16]}>
-      {data.map((collaborator) => (
-        <Col xs={24} sm={12} md={8} lg={6} key={collaborator.key}>
-          <Card
-            hoverable
-            actions={[
-              <EditOutlined key="edit" onClick={() => onEdit(collaborator)} />,
-              <DeleteOutlined
-                key="delete"
-                onClick={() => handleDelete(collaborator)}
-              />,
-              <MoreOutlined
-                key="more"
-                onClick={() => onViewDetails(collaborator)}
-              />,
-            ]}
-          >
-            <Card.Meta
-              avatar={<Avatar icon={<UserOutlined />} size={64} />}
-              title={collaborator.nom}
-              description={
-                <Space direction="vertical" size="small">
-                  <Tag
-                    color={collaborator.status === "actif" ? "green" : "red"}
+    const getTooltipMessage = () => {
+      if (record.completion <= 0) {
+        return "Le profil doit être complet (100%)";
+      }
+      if (!hasDocuments) {
+        return "L'ESN doit avoir au moins un document";
+      }
+      return "Modifier";
+    };
+
+    // Modified to show details first before verifying
+    const handleVerifyWithDetails = () => {
+      onViewDetails(record, true); // Pass true to indicate verification intent
+    };
+
+    return (
+      <Space size="middle">
+        <Tooltip title={getTooltipMessage()}>
+          <Button
+            type="text"
+            icon={<EditOutlined />}
+            onClick={onEdit}
+            // disabled={!isEnabled}
+          />
+        </Tooltip>
+        <Tooltip
+          title={
+            isEnabled
+              ? "Validation de l'ESN"
+              : "Le profil doit être complet avec documents"
+          }
+        >
+          <Button
+            type="text"
+            icon={<CheckCircleOutlined />}
+            style={{ color: isEnabled ? "#52c41a" : undefined }}
+            onClick={isEnabled ? handleVerifyWithDetails : undefined}
+            disabled={!isEnabled}
+          />
+        </Tooltip>
+        <Tooltip title="Supprimer">
+          <Button
+            type="text"
+            danger
+            icon={<DeleteOutlined />}
+            onClick={() => handleDelete(record)}
+          />
+        </Tooltip>
+      </Space>
+    );
+  };
+
+  const CardView = ({ data, handleDelete, onEdit, onViewDetails }) => {
+    return (
+      <Row gutter={[16, 16]}>
+        {data.map((collaborator) => {
+          const hasDocuments = esnsWithDocuments[collaborator.id] || false;
+          const isEnabled = collaborator.completion >= 100 && hasDocuments;
+
+          const getTooltipMessage = () => {
+            if (collaborator.completion <= 0) {
+              return "Le profil doit être complet (100%)";
+            }
+            if (!hasDocuments) {
+              return "L'ESN doit avoir au moins un document";
+            }
+            return "Modifier";
+          };
+
+          // Modified to show details first before verifying
+          const handleVerifyWithDetails = () => {
+            onViewDetails(collaborator, true); // Pass true to indicate verification intent
+          };
+
+          return (
+            <Col xs={24} sm={12} md={8} lg={6} key={collaborator.key}>
+              <Card
+                hoverable
+                actions={[
+                  <Tooltip title={getTooltipMessage()} key="edit-tooltip">
+                    <span>
+                      <EditOutlined
+                        key="edit"
+                        onClick={
+                          isEnabled ? () => onEdit(collaborator) : undefined
+                        }
+                        style={{
+                          color: isEnabled ? undefined : "#d9d9d9",
+                          cursor: isEnabled ? "pointer" : "not-allowed",
+                        }}
+                      />
+                    </span>
+                  </Tooltip>,
+                  <Tooltip
+                    title={
+                      isEnabled
+                        ? "Marquer comme 'à signer'"
+                        : "Le profil doit être complet avec documents"
+                    }
+                    key="verify-tooltip"
                   >
-                    {collaborator.status === "actif" ? "Actif" : "Inactif"}
-                  </Tag>
-                  <Space>
-                    <MailOutlined /> {collaborator.email}
-                  </Space>
-                  <Space>
-                    <PhoneOutlined /> {collaborator.phone}
-                  </Space>
-                  <Space>{collaborator.poste}</Space>
-                </Space>
-              }
-            />
-          </Card>
-        </Col>
-      ))}
-    </Row>
-  );
+                    <span>
+                      <CheckCircleOutlined
+                        key="verify"
+                        onClick={
+                          isEnabled
+                            ? () => handleVerifyWithDetails()
+                            : undefined
+                        }
+                        style={{
+                          color: isEnabled ? "#52c41a" : "#d9d9d9",
+                          cursor: isEnabled ? "pointer" : "not-allowed",
+                        }}
+                      />
+                    </span>
+                  </Tooltip>,
+                  <Tooltip title="Supprimer" key="delete-tooltip">
+                    <DeleteOutlined
+                      key="delete"
+                      onClick={() => handleDelete(collaborator)}
+                    />
+                  </Tooltip>,
+                ]}
+              >
+                {/* Card.Meta content unchanged */}
+                <Card.Meta
+                  avatar={<Avatar icon={<UserOutlined />} size={64} />}
+                  title={
+                    <div className="flex justify-between items-center">
+                      <span>{collaborator.nom}</span>
+                      <Tag
+                        color={
+                          collaborator.completion < 50
+                            ? "red"
+                            : collaborator.completion < 80
+                            ? "orange"
+                            : collaborator.completion === 100
+                            ? "green"
+                            : "gold"
+                        }
+                      >
+                        {collaborator.completion}%
+                      </Tag>
+                    </div>
+                  }
+                  description={
+                    <Space direction="vertical" size="small">
+                      <Tag
+                        color={
+                          collaborator.status === "Draft"
+                            ? "orange"
+                            : collaborator.status === "à valider"
+                            ? "blue"
+                            : collaborator.status === "à signer"
+                            ? "purple"
+                            : collaborator.status === "Actif"
+                            ? "green"
+                            : "red"
+                        }
+                      >
+                        {collaborator.status === "Draft"
+                          ? "En cours de création"
+                          : collaborator.status === "à valider"
+                          ? "À valider"
+                          : collaborator.status === "à signer"
+                          ? "À signer"
+                          : collaborator.status === "Actif"
+                          ? "Actif"
+                          : "Inactif"}
+                      </Tag>
+                      <Space>
+                        <MailOutlined /> {collaborator.email}
+                      </Space>
+                      <Space>
+                        <PhoneOutlined /> {collaborator.phone}
+                      </Space>
+                      <Space>{collaborator.poste}</Space>
+                      {!hasDocuments && (
+                        <Tag color="orange">Aucun document</Tag>
+                      )}
+                    </Space>
+                  }
+                />
+              </Card>
+            </Col>
+          );
+        })}
+      </Row>
+    );
+  };
 
   const rowSelection = {
     selectedRowKeys,
@@ -836,29 +1313,27 @@ const AddCollaboratorModal = ({
               </Col>
             </Row>
             <Row gutter={16}>
-                  <Col span={8}>
-                    <Form.Item
-                      label={
-                        <span className="font-medium text-gray-700">
-                          Téléphone
-                        </span>
-                      }
-                      name="phone"
-                      rules={[
-                        {
-                          required: true,
-                          message: "Veuillez saisir le numéro de téléphone",
-                        },
-                      ]}
-                    >
-                      <Input
-                        prefix={<PhoneOutlined className="text-gray-400" />}
-                        placeholder="Numéro de téléphone"
-                        className="rounded-md"
-                      />
-                    </Form.Item>
-                  </Col>
-                </Row>
+              <Col span={8}>
+                <Form.Item
+                  label={
+                    <span className="font-medium text-gray-700">Téléphone</span>
+                  }
+                  name="phone"
+                  rules={[
+                    {
+                      required: true,
+                      message: "Veuillez saisir le numéro de téléphone",
+                    },
+                  ]}
+                >
+                  <Input
+                    prefix={<PhoneOutlined className="text-gray-400" />}
+                    placeholder="Numéro de téléphone"
+                    className="rounded-md"
+                  />
+                </Form.Item>
+              </Col>
+            </Row>
             <Row gutter={16}>
               <Col span={16}>
                 <Form.Item
@@ -897,7 +1372,6 @@ const AddCollaboratorModal = ({
                     className="rounded-md"
                   />
                 </Form.Item>
-               
               </Col>
               {!editingCollaborator ? (
                 <Col span={8}>
@@ -976,14 +1450,13 @@ const AddCollaboratorModal = ({
                     }
                     name="status"
                   >
-                    <Radio.Group>
-                      <Radio value="actif" className="mr-4">
-                        <span className="text-green-600">Actif</span>
-                      </Radio>
-                      <Radio value="inactif">
-                        <span className="text-red-600">Inactif</span>
-                      </Radio>
-                    </Radio.Group>
+                    <Select placeholder="Sélectionnez le statut">
+                      <Option value="Draft">En cours de création</Option>
+                      <Option value="à valider">À valider</Option>
+                      <Option value="à signer">À signer</Option>
+                      <Option value="Actif">Actif</Option>
+                      <Option value="Inactif">Inactif</Option>
+                    </Select>
                   </Form.Item>
                 </Col>
               </Row>

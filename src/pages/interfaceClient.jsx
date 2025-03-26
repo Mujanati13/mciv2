@@ -18,6 +18,7 @@ import {
   BuildOutlined,
   PartitionOutlined,
   CheckOutlined,
+  WarningOutlined,
 } from "@ant-design/icons";
 import {
   Menu,
@@ -29,6 +30,7 @@ import {
   Button,
   message,
   Badge,
+  Modal,
 } from "antd";
 // import { getMessaging, onMessage, getToken } from "firebase/messaging";
 // import { firebaseApp } from "../helper/firebase/config";
@@ -197,6 +199,42 @@ const ClientProfile = () => {
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
   const [update, setupdate] = useState("");
   const navigate = useNavigate();
+  const [esnStatus, setEsnStatus] = useState(null);
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [attemptedMenu, setAttemptedMenu] = useState("");
+
+  // Function to check ESN status
+  const checkEsnStatus = async () => {
+    try {
+      const response = await fetch(
+        Endponit() + "/api/getUserData/?clientId=" + localStorage.getItem("id")
+      );
+
+      if (!response.ok) {
+        throw new Error("Échec de la vérification du statut");
+      }
+
+      const data = await response.json();
+      setEsnStatus(
+        String(data.data[0].statut).toLowerCase() === "validé" || String(data.data[0].statut).toLowerCase() === "actif"
+      );
+      if (String(data.data.Statut).toLowerCase() !== "actif") {
+        // message.warning("Votre compte Client est inactif");
+      }
+    } catch (error) {
+      console.error("Erreur de vérification du statut ESN:", error);
+      message.error("Impossible de vérifier le statut du compte");
+    }
+  };
+  
+  const isMenuAllowed = (menuKey) => {
+    // Only profile and documents section are allowed for inactive accounts
+    return menuKey === "Mon-Profil" || menuKey === "documents";
+  };
+  
+  useEffect(() => {
+    checkEsnStatus();
+  }, []);
 
   const fetchNotifications = async () => {
     try {
@@ -241,34 +279,34 @@ const ClientProfile = () => {
         //     "BNr1YPHHD-jYLHyQcJUduQyVZA7BWGIx1q6e8m-bU442LV7Hu28P80AJyJNL998WF563PHdD97BLtZNpYJW-sSw", // Replace with your VAPID key
         // });
 
-        if (currentToken) {
-          console.log("FCM Token:", currentToken);
+        // if (currentToken) {
+        //   console.log("FCM Token:", currentToken);
 
-          // Send the token to your backend server
-          await fetch(
-            Endponit() +
-              "/api/update-token/?id=" +
-              localStorage.getItem("id") +
-              "&token=" +
-              currentToken +
-              "&type=client",
-            {
-              method: "PUT",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                id: localStorage.getItem("id"), // Replace with the user's ID
-                token: currentToken,
-                type: "client",
-              }),
-            }
-          );
+        //   // Send the token to your backend server
+        //   await fetch(
+        //     Endponit() +
+        //       "/api/update-token/?id=" +
+        //       localStorage.getItem("id") +
+        //       "&token=" +
+        //       currentToken +
+        //       "&type=client",
+        //     {
+        //       method: "PUT",
+        //       headers: {
+        //         "Content-Type": "application/json",
+        //       },
+        //       body: JSON.stringify({
+        //         id: localStorage.getItem("id"), // Replace with the user's ID
+        //         token: currentToken,
+        //         type: "client",
+        //       }),
+        //     }
+        //   );
 
-          console.log("FCM token sent to the server.");
-        } else {
-          console.log("No registration token available.");
-        }
+        //   console.log("FCM token sent to the server.");
+        // } else {
+        //   console.log("No registration token available.");
+        // }
       } else {
         console.log("Permission denied for notifications.");
       }
@@ -276,22 +314,6 @@ const ClientProfile = () => {
       console.error("Error retrieving FCM token:", error);
     }
   };
-
-  // onMessage(messaging, (payload) => {
-  //   console.log("Message received:", payload);
-
-  //   const newNotification = {
-  //     id: Date.now(),
-  //     type: "system",
-  //     title: payload.notification?.title || "New Notification",
-  //     content: payload.notification?.body || "You have a new notification",
-  //     timestamp: new Date().toISOString(),
-  //     read: false,
-  //   };
-
-  //   setNotifications((prev) => [newNotification, ...prev]);
-  //   setUnreadNotificationsCount((prev) => prev + 1);
-  // });
 
   useEffect(() => {
     const auth = isClientLoggedIn();
@@ -322,27 +344,6 @@ const ClientProfile = () => {
     retrieveFCMToken();
     fetchNotifications();
     checkPendingNotifications(); // Check for pending notifications on component mount
-
-    // Handle foreground messages
-    // const unsubscribe = onMessage(messaging, (payload) => {
-    //   console.log("Message received:", payload);
-
-    //   const newNotification = {
-    //     id: Date.now(),
-    //     type: "system",
-    //     title: payload.notification?.title || "New Notification",
-    //     content: payload.notification?.body || "You have a new notification",
-    //     timestamp: new Date().toISOString(),
-    //     read: false,
-    //   };
-
-    //   setNotifications((prev) => [newNotification, ...prev]);
-    //   setUnreadNotificationsCount((prev) => prev + 1);
-    // });
-
-    // return () => {
-    //   unsubscribe();
-    // };
   }, [navigate, update]);
 
   const handleNotificationsUpdate = (updatedNotifications) => {
@@ -515,17 +516,37 @@ const ClientProfile = () => {
   };
 
   const handleSelect = (value) => {
+    // Check if account is inactive and the selected menu is not allowed
+    if (esnStatus === false && !isMenuAllowed(value)) {
+      setAttemptedMenu(value);
+      setIsModalVisible(true);
+      return;
+    }
+    
     setCurrent(value);
     setSearchValue("");
     setBreadcrumbItems(findMenuPath(value));
   };
 
   const handleMenuClick = (e) => {
+    // Check if account is inactive and the selected menu is not allowed
+    if (esnStatus === false && !isMenuAllowed(e.key)) {
+      setAttemptedMenu(e.key);
+      setIsModalVisible(true);
+      return;
+    }
+    
     setCurrent(e.key);
     setBreadcrumbItems(findMenuPath(e.key));
   };
 
   const renderComponent = () => {
+    // If account is inactive and current menu is not allowed, redirect to profile
+    if (esnStatus === false && !isMenuAllowed(current) && current !== "dashboard") {
+      // Force redirect to profile if trying to access restricted areas
+      return <ClientPlusInfo />;
+    }
+    
     switch (current) {
       case "Mon-Profil":
         return <ClientPlusInfo />;
@@ -560,6 +581,42 @@ const ClientProfile = () => {
 
   return (
     <div className="w-full">
+      {/* Inactive Account Warning Modal */}
+      <Modal
+        title={
+          <div className="flex items-center text-amber-600">
+            <WarningOutlined className="mr-2" /> Compte prestataire Inactif
+          </div>
+        }
+        open={isModalVisible}
+        onCancel={() => setIsModalVisible(false)}
+        footer={[
+          <Button 
+            key="profile" 
+            type="primary" 
+            onClick={() => {
+              setCurrent("Mon-Profil");
+              setBreadcrumbItems(findMenuPath("Mon-Profil"));
+              setIsModalVisible(false);
+            }}
+          >
+            Accéder à mon profil
+          </Button>,
+          <Button 
+            key="cancel" 
+            onClick={() => setIsModalVisible(false)}
+          >
+            Fermer
+          </Button>
+        ]}
+      >
+        <div className="p-2">
+          <p className="text-base mb-3">Votre compte est actuellement inactif. Vous ne pouvez pas accéder à cette section.</p>
+          <p className="text-base mb-3">Pour activer votre compte, complétez toutes les informations requises dans votre profil.</p>
+          <p className="text-sm text-gray-500">Seule la section "Mon Profil Client" est accessible jusqu'à l'activation de votre compte.</p>
+        </div>
+      </Modal>
+
       <div className="fixed top-0 left-0 right-0 z-50 bg-white shadow-md">
         <div className="w-full flex items-center p-4 justify-between">
           <div className="flex items-center gap-4 flex-1">
@@ -585,7 +642,9 @@ const ClientProfile = () => {
                 suffix={<SearchOutlined className="text-gray-400" />}
               />
             </AutoComplete>
-            <Tag color="green">Espace client</Tag>
+            <Tag color={esnStatus ? "green" : "orange"}>
+              {!esnStatus ? "Compte Client inactif" : "Compte actif"}
+            </Tag>
             <LogoutOutlined
               onClick={() => {
                 logoutEsn();

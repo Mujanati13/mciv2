@@ -3,5 +3,5 @@ export const token = () => {
 };
 
 export const Endponit = (dev = false) => {
-  return dev ? "http://localhost:8000" : "http://51.38.99.75:4001";
+  return dev ? "http://localhost:8000" : "http://62.171.134.60:8000";
 };

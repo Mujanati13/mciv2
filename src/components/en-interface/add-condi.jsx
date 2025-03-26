@@ -38,6 +38,14 @@ const AppelDOffreInterface = () => {
   const [currentOffer, setCurrentOffer] = useState(null);
   const [applyForm] = Form.useForm();
   const [consultants, setConsultants] = useState([]);
+  const [nom_co, setNomCo] = useState("");
+
+  const handleSelect = (value, option) => {
+    // option.dataName contains the concatenated name
+    setNomCo(option.dataName);
+    console.log("Selected ID:", value);
+    console.log("Selected Name:", option.dataName);
+  };
 
   const fetchConsultants = async (id_project) => {
     const esnId = localStorage.getItem("id") || 3;
@@ -112,6 +120,7 @@ const AppelDOffreInterface = () => {
         tjm: values.tjm,
         date_disponibilite: values.date_disponibilite.format("YYYY-MM-DD"),
         commentaire: values.commentaire,
+        nom_cn: nom_co,
       };
 
       const res_data = await axios.post(
@@ -313,6 +322,7 @@ const AppelDOffreInterface = () => {
             <Select
               placeholder="Sélectionnez un consultant"
               optionFilterProp="children"
+              onSelect={handleSelect}
             >
               {consultants &&
                 consultants.map((consultant) =>
@@ -320,6 +330,7 @@ const AppelDOffreInterface = () => {
                     <Select.Option
                       key={consultant.ID_collab}
                       value={consultant.ID_collab}
+                      dataName={`${consultant.Prenom} ${consultant.Nom}`}
                     >
                       {consultant.Prenom} {consultant.Nom} - {consultant.Poste}
                     </Select.Option>

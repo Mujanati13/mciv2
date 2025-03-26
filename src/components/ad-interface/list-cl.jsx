@@ -8,7 +8,6 @@ import {
   Space,
   Tag,
   Tooltip,
-  Dropdown,
   Modal,
   message,
   Radio,
@@ -17,24 +16,32 @@ import {
   Avatar,
   Form,
   Select,
+  Divider,
+  Tabs,
 } from "antd";
 import {
   SearchOutlined,
   PlusOutlined,
   EditOutlined,
   DeleteOutlined,
-  MoreOutlined,
+  CheckOutlined,
   ExportOutlined,
   ReloadOutlined,
   UserOutlined,
   PhoneOutlined,
   MailOutlined,
   HomeOutlined,
-  EyeOutlined,
+  CloseOutlined,
+  CheckCircleOutlined,
+  FileOutlined,
+  GlobalOutlined,
+  InfoCircleOutlined,
+  WarningOutlined,
+  BankOutlined,
 } from "@ant-design/icons";
 import { Endponit, token } from "../../helper/enpoint";
 import * as XLSX from "xlsx";
-import { parseJSON } from "date-fns/fp";
+import ClientDocumentViewer from "./sub-compo/ClientDocumentViewer";
 
 const { Option } = Select;
 
@@ -46,11 +53,88 @@ export const ClientList = () => {
   const [clients, setClients] = useState([]);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editingClient, setEditingClient] = useState(null);
-  const [countries, setCountries] = useState([]);
-  const [cities, setCities] = useState([]);
-  const [selectedCountry, setSelectedCountry] = useState(null);
+  const [modalKey, setModalKey] = useState(0);
+  const [clientsWithDocuments, setClientsWithDocuments] = useState({});
 
-  // Fetch clients from API
+  // New states for verification modal
+  const [verifyingClient, setVerifyingClient] = useState(null);
+  const [isVerificationModalVisible, setIsVerificationModalVisible] =
+    useState(false);
+
+  // Open verification modal
+  const openVerificationModal = (client) => {
+    setVerifyingClient(client);
+    setIsVerificationModalVisible(true);
+  };
+
+  // Close verification modal
+  const closeVerificationModal = () => {
+    setVerifyingClient(null);
+    setIsVerificationModalVisible(false);
+  };
+
+  // Confirm verification and update status
+  const confirmVerification = () => {
+    if (verifyingClient) {
+      console.log(verifyingClient);
+      
+      handleStatusUpdate(verifyingClient.id, "à signer" , verifyingClient.email);
+      closeVerificationModal();
+    }
+  };
+
+  // Status update function
+  const handleStatusUpdate = async (clientId, newStatus , mail_Contact) => {
+    try {
+      await axios.put(
+        `${Endponit()}/api/client/${clientId}`,
+        { statut: newStatus , ID_clt :clientId , mail_contact: mail_Contact },
+        {
+          headers: { Authorization: `${token()}` },
+        }
+      );
+      message.success(`Statut du client mis à jour: ${newStatus}`);
+      fetchClients(); // Refresh the list after status update
+    } catch (error) {
+      message.error("Erreur lors de la mise à jour du statut");
+      console.error("Status update error:", error);
+    }
+  };
+
+  // Check for client documents
+  const checkClientDocuments = async (clientIds) => {
+    try {
+      const promises = clientIds.map((id) =>
+        axios.get(`${Endponit()}/api/getDocumentClient/`, {
+          headers: {
+            Authorization: `${token()}`,
+          },
+          params: {
+            ClientId: id,
+          },
+        })
+      );
+
+      const responses = await Promise.all(promises);
+      const documentsMap = {};
+
+      responses.forEach((response, index) => {
+        const clientId = clientIds[index];
+        const hasDocuments = response.data.data.length > 0;
+        documentsMap[clientId] = hasDocuments;
+      });
+
+      setClientsWithDocuments(documentsMap);
+    } catch (error) {
+      console.error("Error checking client documents:", error);
+      // Set all to false in case of error
+      const documentsMap = {};
+      clientIds.forEach((id) => (documentsMap[id] = false));
+      setClientsWithDocuments(documentsMap);
+    }
+  };
+
+  // Fetch clients data
   const fetchClients = async () => {
     setLoading(true);
     try {
@@ -59,26 +143,34 @@ export const ClientList = () => {
           Authorization: `${token()}`,
         },
       });
-      const formattedData = response.data.data.map((client) => ({
-        key: client.ID_clt,
-        id: client.ID_clt,
-        name: client.raison_sociale,
-        email: client.mail_contact,
-        phone: client.tel_contact,
-        status: client.statut,
-        address: `${client.adresse}, ${client.cp} ${client.ville}`,
-        created: client.date_validation,
-        siret: client.siret,
-        pays: client.pays,
-        province: client.province,
-        n_tva: client.n_tva,
-        iban: client.iban,
-        bic: client.bic,
-        banque: client.banque,
-        ville: client.ville,
-        cp: client.cp,
-      }));
+      const formattedData = response.data.data.map((client) => {
+        // Calculate profile completion
+        const completionPercentage = calculateProfileCompletion(client);
+
+        return {
+          key: client.ID_clt,
+          id: client.ID_clt,
+          name: client.raison_sociale,
+          email: client.mail_contact,
+          phone: client.tel_contact,
+          status: client.statut,
+          address: `${client.adresse}, ${client.cp} ${client.ville}`,
+          created: client.date_validation,
+          siret: client.siret,
+          pays: client.pays,
+          n_tva: client.n_tva,
+          ville: client.ville,
+          cp: client.cp,
+          completion: completionPercentage,
+        };
+      });
       setClients(formattedData);
+
+      // After loading clients, check for documents
+      if (formattedData.length > 0) {
+        const clientIds = formattedData.map((client) => client.id);
+        checkClientDocuments(clientIds);
+      }
     } catch (error) {
       message.error("Erreur lors du chargement des clients");
       console.error("Fetch error:", error);
@@ -87,30 +179,27 @@ export const ClientList = () => {
     }
   };
 
-  // Fetch countries
-  const fetchCountries = async () => {
-    try {
-      const response = await axios.get(`http://51.38.99.75:3100/api/countries`);
-      setCountries(response.data);
-    } catch (error) {
-      console.error("Error fetching countries:", error);
-    }
-  };
+  const calculateProfileCompletion = (client) => {
+    // Define required fields to check
+    const requiredFields = [
+      "raison_sociale",
+      "mail_contact",
+      "tel_contact",
+      "adresse",
+      "cp",
+      "ville",
+      "pays",
+      "siret",
+      "n_tva",
+    ];
 
-  // Fetch cities based on country
-  const fetchCities = async (countryId) => {
-    try {
-      const response = await axios.get(`http://51.38.99.75:3100/api/cities/${countryId}`);
-      setCities(response.data);
-    } catch (error) {
-      console.error("Error fetching cities:", error);
-    }
-  };
+    // Count filled fields
+    const filledFields = requiredFields.filter(
+      (field) => client[field] && client[field].toString().trim() !== ""
+    ).length;
 
-  // Handle country change
-  const handleCountryChange = (value) => {
-    setSelectedCountry(value);
-    fetchCities(value);
+    // Calculate percentage
+    return Math.round((filledFields / requiredFields.length) * 100);
   };
 
   // Export to Excel
@@ -121,55 +210,18 @@ export const ClientList = () => {
     XLSX.writeFile(wb, "clients.xlsx");
   };
 
-  const handlePostError = (response) => {
-    const errors = response?.data?.errors;
-    console.log("Errors:", errors);
-    
-    if (errors) {
-      if (errors.SIRET || errors.siret) {
-        message.error("Ce numéro SIRET est déjà utilisé");
-      }
-      if (errors.mail_Contact) {
-        message.error("Cette adresse email est déjà utilisée");
-      }
-    }
+  // Handle opening the modal
+  const openModal = (client = null) => {
+    setEditingClient(client);
+    setIsModalVisible(true);
+    // Force modal to reset by changing its key
+    setModalKey((prev) => prev + 1);
   };
 
-  // Add/Update client
-  const handleClientAction = async (values) => {
-    try {
-      if (editingClient) {
-        await axios.put(
-          `${Endponit()}/api/client/${editingClient.id}`,
-          { ...values, ID_clt: editingClient.id },
-          {
-            headers: { Authorization: `${token()}` },
-          }
-        );
-        message.success("Client mis à jour avec succès");
-      } else {
-        const res = await axios.post(`${Endponit()}/api/client/`, values, {
-          headers: { Authorization: `${token()}` },
-        });
-        if (res.data.status === true) {
-          message.success("Client ajouté avec succès");
-          // showPasswordPrompt(); // Refresh with password
-        } else {
-          handlePostError(res);
-        } //
-      }
-      fetchClients();
-      setIsModalVisible(false);
-      setEditingClient(null);
-    } catch (error) {
-      // message.error(
-      //   editingClient
-      //     ? "Erreur lors de la mise à jour du client"
-      //     : "Erreur lors de l'ajout du client"
-      // );
-      handlePostError(error.response);
-      console.error("Client action error:", error.response.data.data);
-    }
+  // Handle closing the modal
+  const closeModal = () => {
+    setIsModalVisible(false);
+    setEditingClient(null);
   };
 
   // Delete client
@@ -195,129 +247,41 @@ export const ClientList = () => {
     });
   };
 
-  // Client Modal Form
-  const ClientModalForm = () => {
-    const [form] = Form.useForm();
-
-    useEffect(() => {
+  // Add/Update client
+  const handleClientAction = async (values) => {
+    try {
       if (editingClient) {
-        form.setFieldsValue({
-          raison_sociale: editingClient.name,
-          siret: editingClient.siret,
-          mail_contact: editingClient.email,
-          tel_contact: editingClient.phone,
-          adresse: editingClient.address.split(",")[0].trim(),
-          cp: editingClient.cp,
-          ville: editingClient.ville,
-          pays: editingClient.pays,
-        });
-        if (editingClient.pays) {
-          handleCountryChange(editingClient.pays);
-        }
+        await axios.put(
+          `${Endponit()}/api/client/${editingClient.id}`,
+          { ...values, ID_clt: editingClient.id },
+          {
+            headers: { Authorization: `${token()}` },
+          }
+        );
+        message.success("Client mis à jour avec succès");
       } else {
-        form.resetFields();
+        const res = await axios.post(
+          `${Endponit()}/api/client/`,
+          { ...values, statut: "Draft" }, // New clients always start with "Draft" status
+          {
+            headers: { Authorization: `${token()}` },
+          }
+        );
+        if (res.data.status === true) {
+          message.success("Client ajouté avec succès");
+        } else {
+          message.error("Erreur lors de l'ajout du client");
+        }
       }
-    }, [editingClient, form]);
-
-    return (
-      <Modal
-        title={editingClient ? "Modifier le Client" : "Nouveau Client"}
-        visible={isModalVisible}
-        onCancel={() => {
-          setIsModalVisible(false);
-          setEditingClient(null);
-        }}
-        footer={null}
-      >
-        <Form form={form} layout="vertical" onFinish={handleClientAction}>
-          <Form.Item
-            name="raison_sociale"
-            label="Raison Sociale"
-            rules={[
-              { required: true, message: "Veuillez saisir la raison sociale" },
-            ]}
-          >
-            <Input />
-          </Form.Item>
-          <Form.Item
-            name="siret"
-            label="SIRET"
-            rules={[{ required: true, message: "Veuillez saisir le SIRET" }]}
-          >
-            <Input />
-          </Form.Item>
-          <Form.Item
-            name="mail_contact"
-            label="Email"
-            rules={[
-              { required: true, message: "Veuillez saisir l'email" },
-              { type: "email", message: "Veuillez saisir un email valide" },
-            ]}
-          >
-            <Input />
-          </Form.Item>
-          <Form.Item
-            name="tel_contact"
-            label="Téléphone"
-            rules={[
-              { required: true, message: "Veuillez saisir le téléphone" },
-            ]}
-          >
-            <Input />
-          </Form.Item>
-          <Form.Item
-            name="adresse"
-            label="Adresse"
-            rules={[{ required: true, message: "Veuillez saisir l'adresse" }]}
-          >
-            <Input />
-          </Form.Item>
-          {!editingClient && (
-            <Form.Item
-              name="password"
-              label="Mot de passe"
-              rules={[
-                { required: true, message: "Veuillez saisir le mot de passe" },
-              ]}
-            >
-              <Input.Password />
-            </Form.Item>
-          )}
-          <Form.Item
-            name="pays"
-            label="Pays"
-            rules={[
-              { required: true, message: "Veuillez sélectionner le pays" },
-            ]}
-          >
-            <Input />
-          </Form.Item>
-          <Form.Item
-            name="ville"
-            label="Ville"
-            rules={[
-              { required: true, message: "Veuillez sélectionner la ville" },
-            ]}
-          >
-            <Input />
-          </Form.Item>
-          <Form.Item
-            name="cp"
-            label="Code Postal"
-            rules={[
-              { required: true, message: "Veuillez saisir le code postal" },
-            ]}
-          >
-            <Input />
-          </Form.Item>
-          <Form.Item>
-            <Button type="primary" htmlType="submit" block>
-              {editingClient ? "Mettre à jour" : "Ajouter Client"}
-            </Button>
-          </Form.Item>
-        </Form>
-      </Modal>
-    );
+      fetchClients();
+      closeModal();
+    } catch (error) {
+      const errorMessage = error.response?.data?.errors
+        ? Object.values(error.response.data.errors).flat().join(", ")
+        : "Erreur lors de l'action sur le client";
+      message.error(errorMessage);
+      console.error("Client action error:", error.response?.data);
+    }
   };
 
   // Table columns
@@ -353,157 +317,649 @@ export const ClientList = () => {
       title: "Statut",
       dataIndex: "status",
       key: "status",
-      render: (status) => (
-        <Tag color={status === "validé" ? "green" : "red"}>
-          {status === "validé" ? "Validé" : "Non Validé"}
-        </Tag>
+      render: (status) => {
+        let color = getStatusColor(status);
+        let text = getStatusText(status);
+        return <Tag color={color}>{text}</Tag>;
+      },
+      filters: [
+        { text: "En cours de création", value: "Draft" },
+        { text: "À valider", value: "à valider" },
+        { text: "À signer", value: "à signer" },
+        { text: "Actif", value: "Actif" },
+        { text: "Inactif", value: "Inactif" },
+      ],
+      onFilter: (value, record) => record.status === value,
+    },
+    {
+      title: "Complétude",
+      dataIndex: "completion",
+      key: "completion",
+      width: 120,
+      sorter: (a, b) => a.completion - b.completion,
+      render: (completion) => (
+        <Tooltip title={`${completion}% complet`}>
+          <div className="flex items-center">
+            <div className="w-full bg-gray-200 rounded-full h-2.5 mr-2">
+              <div
+                className={`h-2.5 rounded-full ${
+                  completion < 50
+                    ? "bg-red-500"
+                    : completion < 80
+                    ? "bg-yellow-500"
+                    : "bg-green-500"
+                }`}
+                style={{ width: `${completion}%` }}
+              />
+            </div>
+            <span className="text-center">{completion}%</span>
+          </div>
+        </Tooltip>
       ),
     },
     {
       title: "Actions",
       key: "actions",
       width: 120,
-      render: (_, record) => (
-        <Space>
-          <Tooltip title="Modifier">
-            <Button
-              type="text"
-              icon={<EditOutlined />}
-              onClick={() => {
-                setEditingClient(record);
-                setIsModalVisible(true);
-              }}
-            />
-          </Tooltip>
-          <Tooltip title="Supprimer">
-            <Button
-              type="text"
-              danger
-              icon={<DeleteOutlined />}
-              onClick={() => handleDelete(record)}
-            />
-          </Tooltip>
-          <Tooltip title="Détails">
-            <Button
-              type="text"
-              icon={<EyeOutlined />}
-              onClick={() => {
-                Modal.info({
-                  title: "Détails du Client",
-                  content: (
-                    <div>
-                      <p>
-                        <strong>Raison Sociale:</strong> {record.name}
-                      </p>
-                      <p>
-                        <strong>Email:</strong> {record.email}
-                      </p>
-                      <p>
-                        <strong>Téléphone:</strong> {record.phone}
-                      </p>
-                      <p>
-                        <strong>Adresse:</strong> {record.address}
-                      </p>
-                      <p>
-                        <strong>SIRET:</strong> {record.siret}
-                      </p>
-                      <p>
-                        <strong>N° TVA:</strong> {record.n_tva}
-                      </p>
-                    </div>
-                  ),
-                  width: 520,
-                });
-              }}
-            />
-          </Tooltip>
-        </Space>
-      ),
+      render: (_, record) => {
+        const hasDocuments = clientsWithDocuments[record.id] || false;
+        const isEnabled = record.completion >= 100 && hasDocuments;
+
+        const getTooltipMessage = () => {
+          if (record.completion < 100) {
+            return "Le profil doit être complet (100%)";
+          }
+          if (!hasDocuments) {
+            return "Le client doit avoir au moins un document";
+          }
+          return "Modifier";
+        };
+
+        return (
+          <Space>
+            <Tooltip title={getTooltipMessage()}>
+              <Button
+                type="text"
+                icon={<EditOutlined />}
+                onClick={() => openModal(record)}
+                // disabled={!isEnabled}
+              />
+            </Tooltip>
+            <Tooltip title="Supprimer">
+              <Button
+                type="text"
+                danger
+                icon={<DeleteOutlined />}
+                onClick={() => handleDelete(record)}
+              />
+            </Tooltip>
+            <Tooltip title="Vérifier et signer">
+              <Button
+                type="text"
+                icon={<CheckCircleOutlined />}
+                onClick={() => openVerificationModal(record)}
+                style={{
+                  color: !isEnabled ? "#d9d9d9" : "green",
+                  cursor: !isEnabled ? "not-allowed" : "pointer",
+                }}
+                // disabled={!isEnabled}
+              />
+            </Tooltip>
+          </Space>
+        );
+      },
     },
   ];
 
-  // Card View Component
+  // Updated CardView component
   const CardView = ({ data }) => (
-    <Row gutter={[16, 16]}>
-      {data.map((client) => (
-        <Col xs={24} sm={12} md={8} lg={6} key={client.key}>
-          <Card
-            hoverable
-            actions={[
-              <EditOutlined
-                key="edit"
-                onClick={() => {
-                  setEditingClient(client);
-                  setIsModalVisible(true);
-                }}
-              />,
-              <DeleteOutlined
-                key="delete"
-                onClick={() => handleDelete(client)}
-              />,
-              <EyeOutlined
-                key="view"
-                onClick={() => {
-                  Modal.info({
-                    title: "Détails du Client",
-                    content: (
-                      <div>
-                        <p>
-                          <strong>Raison Sociale:</strong> {client.name}
-                        </p>
-                        <p>
-                          <strong>Email:</strong> {client.email}
-                        </p>
-                        <p>
-                          <strong>Téléphone:</strong> {client.phone}
-                        </p>
-                        <p>
-                          <strong>Adresse:</strong> {client.address}
-                        </p>
-                        <p>
-                          <strong>SIRET:</strong> {client.siret}
-                        </p>
-                        <p>
-                          <strong>N° TVA:</strong> {client.n_tva}
-                        </p>
-                      </div>
-                    ),
-                    width: 520,
-                  });
-                }}
-              />,
-            ]}
-          >
-            <Card.Meta
-              avatar={<Avatar icon={<UserOutlined />} />}
-              title={client.name}
-              description={
-                <Space direction="vertical">
-                  <Tag color={client.status === "validé" ? "green" : "red"}>
-                    {client.status === "validé" ? "Validé" : "Non Validé"}
+    <Row gutter={[24, 24]}>
+      {data.map((client) => {
+        const hasDocuments = clientsWithDocuments[client.id] || false;
+        const isEnabled = client.completion >= 100 && hasDocuments;
+
+        const getTooltipMessage = () => {
+          if (client.completion < 100) {
+            return "Le profil doit être complet (100%)";
+          }
+          if (!hasDocuments) {
+            return "Le client doit avoir au moins un document";
+          }
+          return "Modifier";
+        };
+
+        return (
+          <Col xs={24} sm={12} md={8} lg={6} key={client.key}>
+            <Card
+              hoverable
+              className="client-card h-full"
+              style={{
+                borderRadius: "8px",
+                overflow: "hidden",
+                boxShadow: "0 4px 12px rgba(0, 0, 0, 0.08)",
+              }}
+              actions={[
+                <Tooltip title={getTooltipMessage()} key="edit-tooltip">
+                  <span>
+                    <EditOutlined
+                      key="edit"
+                      onClick={isEnabled ? () => openModal(client) : undefined}
+                      style={{
+                        color: !isEnabled ? "#d9d9d9" : "#1890ff",
+                        cursor: !isEnabled ? "not-allowed" : "pointer",
+                      }}
+                    />
+                  </span>
+                </Tooltip>,
+                <Tooltip title="Supprimer" key="delete-tooltip">
+                  <DeleteOutlined
+                    key="delete"
+                    onClick={() => handleDelete(client)}
+                    style={{ color: "#ff4d4f" }}
+                  />
+                </Tooltip>,
+                <Tooltip title="Vérifier et signer" key="verify-tooltip">
+                  <span>
+                    <CheckOutlined
+                      key="verify"
+                      onClick={() => openVerificationModal(client)}
+                      style={{
+                        color: !isEnabled ? "#d9d9d9" : "green",
+                        cursor: !isEnabled ? "not-allowed" : "pointer",
+                      }}
+                    />
+                  </span>
+                </Tooltip>,
+              ]}
+            >
+              <div className="flex justify-between items-center mb-3">
+                <Tag
+                  color={getStatusColor(client.status)}
+                  style={{ fontSize: "12px", padding: "2px 8px" }}
+                >
+                  {getStatusText(client.status)}
+                </Tag>
+                <Tooltip title={`${client.completion}% complet`}>
+                  <div className="flex items-center">
+                    <div className="w-16 bg-gray-200 rounded-full h-2 mr-1">
+                      <div
+                        className={`h-2 rounded-full ${
+                          client.completion < 50
+                            ? "bg-red-500"
+                            : client.completion < 80
+                            ? "bg-yellow-500"
+                            : "bg-green-500"
+                        }`}
+                        style={{ width: `${client.completion}%` }}
+                      />
+                    </div>
+                    <span className="text-xs">{client.completion}%</span>
+                  </div>
+                </Tooltip>
+              </div>
+
+              <Card.Meta
+                avatar={
+                  <Avatar
+                    icon={<UserOutlined />}
+                    style={{
+                      backgroundColor:
+                        client.status === "Actif" ? "#52c41a" : "#f5f5f5",
+                      color: client.status === "Actif" ? "white" : "#999",
+                    }}
+                    size="large"
+                  />
+                }
+                title={
+                  <div className="font-semibold text-lg mb-2">
+                    {client.name}
+                  </div>
+                }
+                style={{ marginBottom: "16px" }}
+              />
+
+              <div className="mt-3">
+                <div className="grid grid-cols-[20px_1fr] gap-2 mb-2">
+                  <MailOutlined className="text-gray-500" />
+                  <div className="text-sm truncate">{client.email}</div>
+                </div>
+
+                <div className="grid grid-cols-[20px_1fr] gap-2 mb-2">
+                  <PhoneOutlined className="text-gray-500" />
+                  <div className="text-sm">{client.phone}</div>
+                </div>
+
+                <div className="grid grid-cols-[20px_1fr] gap-2">
+                  <HomeOutlined className="text-gray-500" />
+                  <div className="text-sm truncate">{client.address}</div>
+                </div>
+              </div>
+
+              <div className="mt-4 flex flex-wrap gap-1">
+                {!hasDocuments && (
+                  <Tag color="orange" style={{ marginRight: 0 }}>
+                    Aucun document
                   </Tag>
-                  <Space>
-                    <MailOutlined /> {client.email}
-                  </Space>
-                  <Space>
-                    <PhoneOutlined /> {client.phone}
-                  </Space>
-                  <Space>
-                    <HomeOutlined /> {client.address}
-                  </Space>
-                </Space>
-              }
-            />
-          </Card>
-        </Col>
-      ))}
+                )}
+                {client.siret && (
+                  <Tag color="blue" style={{ marginRight: 0 }}>
+                    SIRET: {client.siret.substring(0, 8)}...
+                  </Tag>
+                )}
+              </div>
+            </Card>
+          </Col>
+        );
+      })}
     </Row>
   );
+
+  // Replace the existing ClientVerificationModal component
+  const ClientVerificationModal = ({
+    client,
+    visible,
+    onCancel,
+    onConfirm,
+  }) => {
+    const [activeTab, setActiveTab] = useState("info");
+    const hasDocuments = clientsWithDocuments[client?.id] || false;
+    const isEnabled = client?.completion >= 100 && hasDocuments;
+
+    return (
+      <Modal
+        title={
+          <div className="flex items-center justify-between">
+            <span className="text-xl font-semibold text-gray-800">
+              Détails du client
+            </span>
+            <Tag
+              className="text-base px-3 py-1"
+              color={getStatusColor(client?.status)}
+            >
+              {getStatusText(client?.status)}
+            </Tag>
+          </div>
+        }
+        open={visible}
+        onCancel={onCancel}
+        footer={[
+          <Button key="close" onClick={onCancel}>
+            Fermer
+          </Button>,
+          <Button
+            key="confirm"
+            type="primary"
+            onClick={onConfirm}
+            icon={<CheckCircleOutlined />}
+            disabled={!isEnabled}
+          >
+            Valider
+          </Button>,
+        ]}
+        width={800}
+        className="client-details-modal"
+        bodyStyle={{ padding: "24px" }}
+      >
+        {/* Completion progress bar at the top */}
+        <div className="mb-6">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-gray-700 font-medium">
+              Complétude du profil
+            </span>
+            <span className="text-gray-700 font-medium">
+              {client?.completion}%
+            </span>
+          </div>
+          <div className="w-full bg-gray-200 rounded-full h-3">
+            <div
+              className={`h-3 rounded-full ${
+                client?.completion < 50
+                  ? "bg-red-500"
+                  : client?.completion < 80
+                  ? "bg-yellow-500"
+                  : "bg-green-500"
+              }`}
+              style={{ width: `${client?.completion}%` }}
+            />
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow p-6">
+          {/* Informations générales */}
+          <div className="mb-6">
+            <div className="flex items-center mb-4">
+              <UserOutlined className="text-blue-500 text-xl mr-2" />
+              <h3 className="text-lg font-medium text-gray-800 m-0">
+                Informations générales
+              </h3>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-gray-50 p-3 rounded-md">
+                <p className="text-sm text-gray-500 mb-1">Raison sociale</p>
+                <p className="font-medium text-gray-800">
+                  {client?.name || "Non spécifié"}
+                </p>
+              </div>
+              <div className="bg-gray-50 p-3 rounded-md">
+                <p className="text-sm text-gray-500 mb-1">SIRET</p>
+                <p className="font-medium text-gray-800">
+                  {client?.siret || "Non spécifié"}
+                </p>
+              </div>
+              <div className="bg-gray-50 p-3 rounded-md">
+                <p className="text-sm text-gray-500 mb-1">Email</p>
+                <p className="font-medium text-gray-800 flex items-center">
+                  <MailOutlined className="mr-2 text-gray-400" />
+                  {client?.email || "Non spécifié"}
+                </p>
+              </div>
+              <div className="bg-gray-50 p-3 rounded-md">
+                <p className="text-sm text-gray-500 mb-1">Téléphone</p>
+                <p className="font-medium text-gray-800 flex items-center">
+                  <PhoneOutlined className="mr-2 text-gray-400" />
+                  {client?.phone || "Non spécifié"}
+                </p>
+              </div>
+              <div className="bg-gray-50 p-3 rounded-md">
+                <p className="text-sm text-gray-500 mb-1">N° TVA</p>
+                <p className="font-medium text-gray-800">
+                  {client?.n_tva || "Non spécifié"}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Adresse */}
+          <div className="mb-6">
+            <div className="flex items-center mb-4">
+              <HomeOutlined className="text-green-500 text-xl mr-2" />
+              <h3 className="text-lg font-medium text-gray-800 m-0">Adresse</h3>
+            </div>
+
+            <div className="bg-gray-50 p-4 rounded-md">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <p className="text-sm text-gray-500 mb-1">Adresse</p>
+                  <p className="font-medium text-gray-800">
+                    {client?.address?.split(",")[0] || "Non spécifié"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500 mb-1">Code postal</p>
+                  <p className="font-medium text-gray-800">
+                    {client?.cp || "Non spécifié"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500 mb-1">Ville</p>
+                  <p className="font-medium text-gray-800">
+                    {client?.ville || "Non spécifié"}
+                  </p>
+                </div>
+              </div>
+              <div className="mt-3">
+                <p className="text-sm text-gray-500 mb-1">Pays</p>
+                <p className="font-medium text-gray-800 flex items-center">
+                  <GlobalOutlined className="mr-2 text-gray-400" />
+                  {client?.pays || "Non spécifié"}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Documents Section */}
+          <div>
+            <div className="flex items-center mb-4">
+              <FileOutlined className="text-orange-500 text-xl mr-2" />
+              <h3 className="text-lg font-medium text-gray-800 m-0">
+                Documents
+              </h3>
+            </div>
+
+            <div className="bg-gray-50 p-4 rounded-md">
+              {client ? (
+                <ClientDocumentViewer clientId={client.id} />
+              ) : (
+                <div className="text-center py-3">
+                  <p className="text-gray-500">Chargement des documents...</p>
+                </div>
+              )}
+
+              {!hasDocuments && (
+                <div className="text-center py-3">
+                  <p className="text-gray-500">Aucun document disponible</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Status change notification */}
+        {isEnabled && client?.status === "Draft" && (
+          <div className="mt-6 bg-blue-50 p-4 rounded-lg border border-blue-200">
+            <div className="flex items-start">
+              <InfoCircleOutlined className="text-blue-500 text-lg mt-1 mr-3" />
+              <div>
+                <h4 className="font-medium text-blue-700 m-0">
+                  Profil complété à 100%
+                </h4>
+                <p className="text-blue-600 mt-1 mb-0">
+                  Ce profil est complet et peut être marqué comme "À signer"
+                  pour validation.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {!isEnabled && (
+          <div className="mt-6 bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+            <div className="flex items-start">
+              <WarningOutlined className="text-yellow-500 text-lg mt-1 mr-3" />
+              <div>
+                <h4 className="font-medium text-yellow-700 m-0">
+                  Profil incomplet
+                </h4>
+                <p className="text-yellow-600 mt-1 mb-0">
+                  {client?.completion < 100
+                    ? "Complétez le profil à 100% "
+                    : "Ajoutez au moins un document "}
+                  pour pouvoir marquer ce profil comme "À signer".
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+      </Modal>
+    );
+  };
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case "Draft":
+        return "orange";
+      case "à valider":
+        return "blue";
+      case "à signer":
+        return "purple";
+      case "Actif":
+        return "green";
+      case "Inactif":
+        return "red";
+      default:
+        return "default";
+    }
+  };
+
+  const getStatusText = (status) => {
+    switch (status) {
+      case "Draft":
+        return "En cours de création";
+      case "à valider":
+        return "À valider";
+      case "à signer":
+        return "À signer";
+      case "Actif":
+        return "Actif";
+      case "Inactif":
+        return "Inactif";
+      default:
+        return status;
+    }
+  };
+
+  // Client Modal Form Component
+  const ClientModalForm = () => {
+    const [form] = Form.useForm();
+
+    useEffect(() => {
+      if (editingClient) {
+        form.setFieldsValue({
+          raison_sociale: editingClient.name,
+          siret: editingClient.siret,
+          mail_contact: editingClient.email,
+          tel_contact: editingClient.phone,
+          adresse: editingClient.address.split(",")[0].trim(),
+          cp: editingClient.cp,
+          ville: editingClient.ville,
+          pays: editingClient.pays,
+          statut: editingClient.status,
+        });
+      } else {
+        form.resetFields();
+      }
+    }, [editingClient, form]);
+
+    return (
+      <Modal
+        key={`client-modal-${modalKey}`}
+        title={editingClient ? "Modifier le Client" : "Nouveau Client"}
+        open={isModalVisible}
+        onCancel={closeModal}
+        footer={null}
+        closeIcon={<CloseOutlined />}
+        destroyOnClose
+      >
+        <Form
+          form={form}
+          layout="vertical"
+          onFinish={handleClientAction}
+          preserve={false}
+        >
+          <Form.Item
+            name="raison_sociale"
+            label="Raison Sociale"
+            rules={[
+              { required: true, message: "Veuillez saisir la raison sociale" },
+            ]}
+          >
+            <Input placeholder="Nom de l'entreprise" />
+          </Form.Item>
+          <Form.Item
+            name="siret"
+            label="SIRET"
+            rules={[{ required: true, message: "Veuillez saisir le SIRET" }]}
+          >
+            <Input placeholder="Numéro SIRET" />
+          </Form.Item>
+          <Form.Item
+            name="mail_contact"
+            label="Email"
+            rules={[
+              { required: true, message: "Veuillez saisir l'email" },
+              { type: "email", message: "Veuillez saisir un email valide" },
+            ]}
+          >
+            <Input placeholder="Adresse email de contact" />
+          </Form.Item>
+          <Form.Item
+            name="tel_contact"
+            label="Téléphone"
+            rules={[
+              { required: true, message: "Veuillez saisir le téléphone" },
+            ]}
+          >
+            <Input placeholder="Numéro de téléphone" />
+          </Form.Item>
+          <Form.Item
+            name="adresse"
+            label="Adresse"
+            rules={[{ required: true, message: "Veuillez saisir l'adresse" }]}
+          >
+            <Input placeholder="Adresse complète" />
+          </Form.Item>
+          {!editingClient && (
+            <Form.Item
+              name="password"
+              label="Mot de passe"
+              rules={[
+                { required: true, message: "Veuillez saisir le mot de passe" },
+                {
+                  min: 8,
+                  message:
+                    "Le mot de passe doit contenir au moins 8 caractères",
+                },
+              ]}
+            >
+              <Input.Password placeholder="Mot de passe" />
+            </Form.Item>
+          )}
+          <Form.Item
+            name="pays"
+            label="Pays"
+            rules={[
+              { required: true, message: "Veuillez sélectionner le pays" },
+            ]}
+          >
+            <Input placeholder="Pays" />
+          </Form.Item>
+          <Form.Item
+            name="ville"
+            label="Ville"
+            rules={[
+              { required: true, message: "Veuillez sélectionner la ville" },
+            ]}
+          >
+            <Input placeholder="Ville" />
+          </Form.Item>
+          <Form.Item
+            name="cp"
+            label="Code Postal"
+            rules={[
+              { required: true, message: "Veuillez saisir le code postal" },
+            ]}
+          >
+            <Input placeholder="Code postal" />
+          </Form.Item>
+          <Form.Item
+            name="statut"
+            label="Statut"
+            rules={[
+              { required: true, message: "Veuillez sélectionner le statut" },
+            ]}
+          >
+            <Select placeholder="Sélectionnez le statut">
+              <Option value="Draft">En cours de création</Option>
+              <Option value="à valider">À valider</Option>
+              <Option value="à signer">À signer</Option>
+              <Option value="Actif">Actif</Option>
+              <Option value="Inactif">Inactif</Option>
+            </Select>
+          </Form.Item>
+          <Form.Item>
+            <Button type="primary" htmlType="submit" block loading={loading}>
+              {editingClient ? "Mettre à jour" : "Ajouter Client"}
+            </Button>
+          </Form.Item>
+        </Form>
+      </Modal>
+    );
+  };
 
   // Initialize data
   useEffect(() => {
     fetchClients();
-    fetchCountries();
   }, []);
 
   // Row selection configuration
@@ -535,10 +991,7 @@ export const ClientList = () => {
           <Button
             type="primary"
             icon={<PlusOutlined />}
-            onClick={() => {
-              setEditingClient(null);
-              setIsModalVisible(true);
-            }}
+            onClick={() => openModal()}
           >
             Nouveau Client
           </Button>
@@ -578,6 +1031,14 @@ export const ClientList = () => {
         <CardView data={clients} />
       )}
       <ClientModalForm />
+      {verifyingClient && (
+        <ClientVerificationModal
+          client={verifyingClient}
+          visible={isVerificationModalVisible}
+          onCancel={closeVerificationModal}
+          onConfirm={confirmVerification}
+        />
+      )}
     </Card>
   );
 };

@@ -181,7 +181,14 @@ const BonDeCommandeInterface = () => {
       const response = await axios.get(
         `${Endponit()}/api/get_bon_de_commande_by_esn/?esn_id=${clientId}`
       );
-      setPurchaseOrders(response.data.data);
+      const data = response.data.data.filter(
+        (po) =>
+          po.statut == "pending_esn" ||
+          po.statut == "Actif" ||
+          po.statut == "rejected_esn" || 
+          po.statut == "accepted_esn"
+      ).sort((a, b) => b.id_bdc - a.id_bdc);;
+      setPurchaseOrders(data);
     } catch (error) {
       message.error("Échec de la récupération des bons de commande");
     } finally {
@@ -271,6 +278,19 @@ const BonDeCommandeInterface = () => {
     }
   };
 
+  const handleUpdateStatus = async (record, newStatus) => {
+    try {
+      await axios.put(`${Endponit()}/api/Bondecommande/${record.id_bdc}`, {
+        ...record,
+        statut: newStatus
+        });
+      fetchPurchaseOrders();
+      message.success("Statut mis à jour avec succès");
+    } catch (error) {
+      message.error("Échec de la mise à jour du statut");
+    }
+  };
+
   const columns = [
     {
       title: "Numéro",
@@ -304,8 +324,8 @@ const BonDeCommandeInterface = () => {
       ),
     },
     {
-      title: 'Actions',
-      key: 'actions',
+      title: "Actions",
+      key: "actions",
       render: (_, record) => (
         <Space size="small">
           <Tooltip title="Voir les détails">
@@ -317,14 +337,14 @@ const BonDeCommandeInterface = () => {
               }}
             />
           </Tooltip>
-          <Tooltip title="Télécharger BDC">
+          {/* <Tooltip title="Télécharger BDC">
             <Button
               icon={<DownloadOutlined />}
               onClick={() => handleDownload(record)}
               loading={downloadLoading[record.id_bdc]}
             />
-          </Tooltip>
-          {record.has_contract && (
+          </Tooltip> */}
+          {/* {record.has_contract && (
             <Tooltip title="Télécharger le contrat">
               <Button
                 icon={<DownloadOutlined />}
@@ -334,25 +354,46 @@ const BonDeCommandeInterface = () => {
                 Contrat
               </Button>
             </Tooltip>
-          )}
-          {record.statut !== 'accepted_esn' && (
+          )} */}
+          {/* {record.statut !== 'accepted_esn' && (
             <Button 
               type="primary" 
               icon={<EditOutlined />} 
               onClick={() => handleEdit(record)}
               title="Modifier"
             />
+          )} */}
+
+          {record.statut === "pending_esn" && (
+            <>
+              <Button
+                type="primary"
+                onClick={() =>
+                  handleUpdateStatus(record, "accepted_esn")
+                }
+              >
+                Accepter
+              </Button>
+              <Button
+                danger
+                onClick={() =>
+                  handleUpdateStatus(record, "rejected_esn")
+                }
+              >
+                Refuser
+              </Button>
+            </>
           )}
-          <Button 
-            danger 
-            icon={<DeleteOutlined />} 
+          {/* <Button
+            danger
+            icon={<DeleteOutlined />}
             onClick={() => handleDelete(record.id_bdc)}
-            disabled={record.statut === 'accepted_esn'}
+            disabled={record.statut === "accepted_esn"}
             title="Supprimer"
-          />
+          /> */}
         </Space>
-      )
-    }
+      ),
+    },
   ];
 
   const handleAdd = () => {
@@ -423,9 +464,9 @@ const BonDeCommandeInterface = () => {
             prefix={<SearchOutlined />}
             className="w-64"
           />
-          <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
+          {/* <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
             Nouveau bon de commande
-          </Button>
+          </Button> */}
         </div>
       </div>
 

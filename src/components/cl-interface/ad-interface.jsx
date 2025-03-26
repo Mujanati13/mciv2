@@ -11,11 +11,13 @@ import {
   Col,
   Select,
   DatePicker,
+  Checkbox,
 } from "antd";
 import { EditOutlined, DeleteOutlined, PlusOutlined } from "@ant-design/icons";
 import axios from "axios";
 import moment from "moment";
 import { Endponit } from "../../helper/enpoint";
+import { calc } from "antd/es/theme/internal";
 
 const API_BASE_URL = Endponit() + "/api";
 
@@ -75,8 +77,44 @@ const AppelDOffreInterface = () => {
       publication_date: moment(record.publication_date),
       deadline: moment(record.deadline),
       start_date: moment(record.start_date),
+      workingdayes: calculateWorkingDays(
+        moment(record.start_date),
+        moment(record.deadline)
+      ),
     });
     setIsModalVisible(true);
+  };
+
+  const calculateWorkingDays = (
+    startDate,
+    endDate,
+    includeWeekends = false
+  ) => {
+    if (!startDate || !endDate) return 0;
+
+    const start = moment(startDate).startOf("day");
+    const end = moment(endDate).startOf("day");
+
+    if (start.isAfter(end)) return 0;
+
+    let count = 0;
+    let current = start.clone();
+
+    while (current.isSameOrBefore(end)) {
+      const dayOfWeek = current.day();
+
+      if (includeWeekends) {
+        count++;
+      } else {
+        if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+          count++;
+        }
+      }
+
+      current.add(1, "day");
+    }
+
+    return count;
   };
 
   const handleDelete = async (id) => {
@@ -103,6 +141,7 @@ const AppelDOffreInterface = () => {
         date_limite: values.deadline.format("YYYY-MM-DD"),
         date_debut: values.start_date.format("YYYY-MM-DD"),
         statut: values.status === "Ouvert" ? "1" : "0",
+        jours: values.workingdayes,
       };
 
       if (editingId) {
@@ -234,6 +273,20 @@ const AppelDOffreInterface = () => {
     },
   ];
 
+  const handleDateChange = () => {
+    const startDate = form.getFieldValue("start_date");
+    const deadline = form.getFieldValue("deadline");
+    const includeWeekends = form.getFieldValue("include_weekends") || false;
+
+    if (startDate && deadline) {
+      const days = calculateWorkingDays(
+        new Date(startDate),
+        new Date(deadline),
+        includeWeekends
+      );
+      form.setFieldsValue({ workingdayes: days });
+    }
+  };
   return (
     <div style={{ padding: 0 }}>
       <div
@@ -344,7 +397,11 @@ const AppelDOffreInterface = () => {
                   { required: true, message: "Veuillez sélectionner une date" },
                 ]}
               >
-                <DatePicker style={{ width: "100%" }} format="DD/MM/YYYY" />
+                <DatePicker
+                  style={{ width: "100%" }}
+                  format="DD/MM/YYYY"
+                  onChange={handleDateChange}
+                />
               </Form.Item>
             </Col>
             <Col span={8}>
@@ -355,11 +412,50 @@ const AppelDOffreInterface = () => {
                   { required: true, message: "Veuillez sélectionner une date" },
                 ]}
               >
-                <DatePicker style={{ width: "100%" }} format="DD/MM/YYYY" />
+                <DatePicker
+                  style={{ width: "100%" }}
+                  format="DD/MM/YYYY"
+                  onChange={handleDateChange}
+                />
               </Form.Item>
             </Col>
-          </Row>
+            <Form.Item
+              name="workingdayes"
+              label="Jours ouvrés"
+              rules={[
+                { required: true, message: "Champ requis" },
+                ({ getFieldValue }) => ({
+                  validator(_, value) {
+                    const startDate = getFieldValue("start_date");
+                    const deadline = getFieldValue("deadline");
+                    const maxWorkingDays = calculateWorkingDays(
+                      new Date(startDate),
+                      new Date(deadline)
+                    );
 
+                    if (
+                      !value ||
+                      (Number(value) >= 0 && Number(value) <= maxWorkingDays)
+                    ) {
+                      return Promise.resolve();
+                    }
+                    return Promise.reject(
+                      new Error(
+                        `Le nombre doit être entre 1 et ${maxWorkingDays}`
+                      )
+                    );
+                  },
+                }),
+              ]}
+            >
+              <Input type="number" />
+            </Form.Item>
+          </Row>
+          <Form.Item name="include_weekends" valuePropName="checked">
+            <Checkbox onChange={handleDateChange}>
+              Inclure les week-ends dans le calcul des jours
+            </Checkbox>
+          </Form.Item>
           <Form.Item
             name="status"
             label="Statut"

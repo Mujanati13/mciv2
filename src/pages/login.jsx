@@ -121,13 +121,13 @@ const LoginPage = () => {
               value="client"
               style={{ width: "50%", textAlign: "center" }}
             >
-              Client
+              Client final
             </Radio.Button>
             <Radio.Button
               value="societe"
               style={{ width: "50%", textAlign: "center" }}
             >
-              Société
+              Prestataire de service
             </Radio.Button>
           </Radio.Group>
         </div>
@@ -202,7 +202,7 @@ const LoginPage = () => {
                 Vous n'avez pas de compte ?{" "}
                 <Link
                   onClick={() => {
-                    navigate("/register");
+                    navigate("/regester");
                   }}
                 >
                   S'inscrire

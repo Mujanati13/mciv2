@@ -14,6 +14,9 @@ import {
   Alert,
   Form,
   DatePicker,
+  Select,
+  Divider,
+  notification,
 } from "antd";
 import {
   SearchOutlined,
@@ -26,6 +29,16 @@ import {
   FileTextOutlined,
   DownloadOutlined,
   FileAddOutlined,
+  DollarOutlined,
+  PlusOutlined,
+  UserOutlined,
+  EuroOutlined,
+  CalendarOutlined,
+  LinkedinOutlined,
+  EnvironmentOutlined,
+  PhoneOutlined,
+  MailOutlined,
+  GlobalOutlined,
 } from "@ant-design/icons";
 import axios from "axios";
 import { format } from "date-fns";
@@ -33,9 +46,11 @@ import { fr } from "date-fns/locale";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 import { Endponit } from "../../helper/enpoint";
+import moment from "moment";
 
 const { Text } = Typography;
 const { confirm } = Modal;
+const { TextArea } = Input;
 
 const OrderInterface = () => {
   const [purchaseOrders, setPurchaseOrders] = useState([]);
@@ -46,9 +61,134 @@ const OrderInterface = () => {
   const [selectedPO, setSelectedPO] = useState(null);
   const [loading, setLoading] = useState(true);
   const [downloadLoading, setDownloadLoading] = useState({});
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [currentPurchaseOrder, setCurrentPurchaseOrder] = useState(null);
+  const [form] = Form.useForm();
+  const [candidatesLoading, setCandidatesLoading] = useState(false);
+  const [candidates, setCandidates] = useState([]);
+  const [projects, SetProjects] = useState([]);
+  const [bdcNumber, setBdcNumber] = useState("");
+  const [tjm, setTjm] = useState(0);
+  const [description, setdescription] = useState(0);
+  const [jours, setJours] = useState(0);
+  const [collaboratorInfo, setCollaboratorInfo] = useState(null);
+  const [isEditModalVisible, setIsEditModalVisible] = useState(false);
+  const [editForm] = Form.useForm();
+  const [recordToEdit, setRecordToEdit] = useState(null);
+
+  const generateBDCNumber = () => {
+    return `BDC-${Date.now()}`;
+  };
+
+  const fetchCollaboratorInfo = async (candidatureId) => {
+    try {
+      const response = await axios.get(
+        `${Endponit()}/api/get_collaborateur_by_id/${candidatureId}`
+      );
+      setCollaboratorInfo(response.data.data);
+
+      // Update description field with collaborator info
+      const description = `${response.data.data.Poste} - ${
+        response.data.data.Nom
+      } ${response.data.data.Prenom}
+Experience professionnelle: ${moment().diff(
+        moment(response.data.data.date_debut_activ),
+        "years"
+      )} ans
+Mobilité: ${response.data.data.Mobilité}
+Disponibilité: ${moment(response.data.data.Disponibilité).format(
+        "DD/MM/YYYY"
+      )}`;
+
+      form.setFieldValue("description", description);
+      setdescription(description);
+
+      // Show collaborator info notification
+      notification.info({
+        message: "Informations du Collaborateur",
+        description: (
+          <div className="space-y-2">
+            <div className="flex items-center space-x-2">
+              <UserOutlined className="text-blue-500" />
+              <span>{`${response.data.data.Nom} ${response.data.data.Prenom}`}</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <CalendarOutlined className="text-green-500" />
+              <span>
+                Né(e) le{" "}
+                {moment(response.data.data.Date_naissance).format("DD/MM/YYYY")}
+              </span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <EnvironmentOutlined className="text-red-500" />
+              <span>Mobilité: {response.data.data.Mobilité}</span>
+            </div>
+            {response.data.data.LinkedIN && (
+              <div className="flex items-center space-x-2">
+                <LinkedinOutlined className="text-blue-600" />
+                <a
+                  href={response.data.data.LinkedIN}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Profil LinkedIn
+                </a>
+              </div>
+            )}
+          </div>
+        ),
+        duration: 0,
+        placement: "topRight",
+        className: "custom-notification",
+      });
+    } catch (error) {
+      message.error(
+        "Erreur lors de la récupération des informations du collaborateur"
+      );
+    }
+  };
+
+  useEffect(() => {
+    if (!bdcNumber) {
+      console.log("Generating BDC number");
+      setBdcNumber(generateBDCNumber());
+    }
+  }, []);
+
+  const fetchCandidates = async () => {
+    setCandidatesLoading(true);
+    try {
+      const clientId = localStorage.getItem("id");
+      const response = await axios.get(
+        `${Endponit()}/api/get_candidatures_by_client/?client_id=${clientId}`
+      );
+      const selectedCandidates = response.data.data.filter(
+        (candidate) => candidate.statut === "Accepté"
+      );
+      setCandidates(selectedCandidates);
+    } catch (error) {
+      message.error("Échec de la récupération des candidatures");
+    } finally {
+      setCandidatesLoading(false);
+    }
+  };
+
+  const fetchProjects = async () => {
+    setCandidatesLoading(true);
+    try {
+      const response = await axios.get(`${Endponit()}/api/appelOffre`);
+      SetProjects(response.data.data);
+    } catch (error) {
+      message.error("Échec de la récupération des appel Offre");
+    } finally {
+      setCandidatesLoading(false);
+    }
+  };
 
   useEffect(() => {
     fetchPurchaseOrders();
+    fetchCandidates();
+    fetchProjects();
   }, []);
 
   const fetchPurchaseOrders = async () => {
@@ -64,9 +204,25 @@ const OrderInterface = () => {
       );
       setPurchaseOrders(response.data.data);
     } catch (error) {
+
       message.error("Échec de la récupération des bons de commande");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleCandidateSelect = async (candidateId) => {
+    const selectedCandidate = candidates.find((c) => c.id_cd === candidateId);
+    const project = projects.find((p) => p.id === selectedCandidate.AO_id);
+
+    if (selectedCandidate) {
+      const tjmValue = Number(selectedCandidate.tjm.replace("€", "").trim());
+      form.setFieldValue("tjm", tjmValue);
+      form.setFieldValue("jours", project.jours);
+      form.setFieldValue("montant_total", tjmValue * project.jours);
+      setJours(project.jours);
+
+      await fetchCollaboratorInfo(selectedCandidate.id_consultant);
     }
   };
 
@@ -219,19 +375,30 @@ const OrderInterface = () => {
   // Status Helpers
   const getStatusLabel = (status) => {
     const statusMap = {
-      pending_esn: "En attente",
+      pending_client: "En attente",
       accepted_esn: "Soumis",
       rejected_esn: "Refusé",
+      pending_esn: "EN attente ESN",
     };
     return statusMap[status] || status;
   };
 
   const getStatusTag = (status) => {
     const statusConfig = {
-      pending_esn: {
+      pending_client: {
         color: "processing",
         icon: <ClockCircleOutlined />,
         text: "En cours",
+      },
+      pending_admin: {
+        color: "processing",
+        icon: <ClockCircleOutlined />,
+        text: "En attente de validation par l'Administrateur.",
+      },
+      pending_esn: {
+        color: "processing",
+        icon: <ClockCircleOutlined />,
+        text: "En attente de validation par l'ESN.",
       },
       accepted_esn: {
         color: "success",
@@ -244,7 +411,7 @@ const OrderInterface = () => {
         text: "Refusé",
       },
     };
-    const config = statusConfig[status] || statusConfig["pending_esn"];
+    const config = statusConfig[status] || statusConfig["pending_client"];
 
     return (
       <Tag icon={config.icon} color={config.color}>
@@ -257,10 +424,12 @@ const OrderInterface = () => {
     try {
       await axios.put(`${Endponit()}/api/Bondecommande/${id}`, {
         ...bdc,
-        statut: "accepted_esn",
+        statut: "pending_admin",
+        numero_bdc : bdcNumber
       });
       message.success("Bon de commande accepté avec succès");
       await fetchPurchaseOrders();
+      setIsEditModalVisible(false);
     } catch (error) {
       message.error("Échec de l'acceptation du bon de commande");
     }
@@ -280,17 +449,14 @@ const OrderInterface = () => {
   };
 
   const showAcceptConfirm = (record) => {
-    confirm({
-      title: "Accepter le bon de commande",
-      icon: <CheckCircleOutlined className="text-green-500" />,
-      content: `Êtes-vous sûr de vouloir accepter le bon de commande n°${record.numero_bdc} ?`,
-      okText: "Accepter",
-      okType: "primary",
-      cancelText: "Annuler",
-      onOk() {
-        handleAccept(record.id_bdc, record);
-      },
+    setRecordToEdit(record);
+    editForm.setFieldsValue({
+      description: record.description,
+      montant_total: record.montant_total,
+      tjm: record.TJM,
+      jours: record.jours,
     });
+    setIsEditModalVisible(true);
   };
 
   const showRejectConfirm = (record) => {
@@ -408,14 +574,14 @@ const OrderInterface = () => {
               }}
             />
           </Tooltip>
-          <Tooltip title="Télécharger BDC PDF">
+          {/* <Tooltip title="Télécharger BDC PDF">
             <Button
               icon={<DownloadOutlined />}
               onClick={() => handleDownload(record)}
               loading={downloadLoading[record.id_bdc]}
             />
-          </Tooltip>
-          {record.statut === "pending_esn" && (
+          </Tooltip> */}
+          {record.statut === "pending_client" && (
             <>
               <Tooltip title="Accepter">
                 <Button
@@ -434,7 +600,7 @@ const OrderInterface = () => {
               </Tooltip>
             </>
           )}
-          {record.statut === "accepted_esn" && !record.has_contract && (
+          {/* {record.statut === "accepted_esn" && !record.has_contract && (
             <Tooltip title="Créer un contrat">
               <Button
                 type="primary"
@@ -447,8 +613,8 @@ const OrderInterface = () => {
                 Créer un contrat
               </Button>
             </Tooltip>
-          )}
-          {record.has_contract && (
+          )} */}
+          {/* {record.has_contract && (
             <Tooltip title="Télécharger le contrat">
               <Button
                 icon={<DownloadOutlined />}
@@ -458,16 +624,424 @@ const OrderInterface = () => {
                 Télécharger le contrat
               </Button>
             </Tooltip>
-          )}
+          )} */}
         </Space>
       ),
     },
   ];
+  const handleSubmit = async (values) => {
+    try {
+      const clientId = localStorage.getItem("id");
+      const formattedValues = {
+        ...values,
+        date_creation: format(new Date(), "yyyy-MM-dd"),
+        client_id: clientId,
+        date_debut: format(new Date(values.date_debut), "yyyy-MM-dd"),
+        date_fin: format(new Date(values.date_fin), "yyyy-MM-dd"),
+        numero_bdc: bdcNumber,
+      };
+
+      if (currentPurchaseOrder) {
+        await axios.put(`${Endponit()}/api/Bondecommande/`, {
+          ...formattedValues,
+          id_bdc: currentPurchaseOrder.id_bdc,
+        });
+        message.success("Bon de commande mis à jour avec succès");
+      } else {
+        await axios.post(`${Endponit()}/api/Bondecommande/`, {
+          ...formattedValues,
+          statut: "pending_admin",
+        });
+        message.success("Nouveau bon de commande créé avec succès");
+      }
+      setIsModalVisible(false);
+      fetchPurchaseOrders();
+    } catch (error) {
+      console.log("Error:", error);
+      message.error("Échec de la soumission du bon de commande");
+    }
+  };
+
+  const handleAdd = () => {
+    form.resetFields();
+    setCurrentPurchaseOrder(null);
+    setIsModalVisible(true);
+  };
+
+  const calculateWorkingDays = (startDate, endDate) => {
+    if (!startDate || !endDate) return 0; // Return 0 if either date is missing
+
+    const start = moment(startDate).startOf("day");
+    const end = moment(endDate).startOf("day");
+    console.log(start, end);
+
+    if (start.isAfter(end)) return 0; // Return 0 if start date is after end date
+
+    let count = 0;
+    let current = start.clone();
+
+    while (current.isSameOrBefore(end)) {
+      const dayOfWeek = current.day();
+      if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+        count++; // Count only if it's a weekday (Monday - Friday)
+      }
+      current.add(1, "day");
+    }
+
+    return count;
+  };
 
   return (
     <Card className="shadow-sm">
+      <Modal
+        title={
+          <Space>
+            <CheckCircleOutlined className="text-green-500" />
+            Valider et modifier le bon de commande
+          </Space>
+        }
+        open={isEditModalVisible}
+        onCancel={() => setIsEditModalVisible(false)}
+        footer={[
+          <Button key="cancel" onClick={() => setIsEditModalVisible(false)}>
+            Annuler
+          </Button>,
+          <Button
+            key="submit"
+            type="primary"
+            className="bg-green-500"
+            onClick={() => handleAccept(recordToEdit?.id_bdc, recordToEdit)}
+          >
+            Soumettre à l'administrateur
+          </Button>,
+        ]}
+        width={700}
+      >
+        <Alert
+          message="Validation du bon de commande"
+          description="Vous pouvez modifier les détails du bon de commande avant de le soumettre à l'administrateur pour validation finale."
+          type="info"
+          showIcon
+          className="mb-4"
+        />
+
+        <Form form={editForm} layout="vertical">
+          <Form.Item
+            label={
+              <span className="flex items-center">
+                <FileTextOutlined className="mr-2" />
+                Description
+              </span>
+            }
+            name="description"
+            rules={[{ required: true, message: "La description est requise" }]}
+          >
+            <TextArea rows={4} />
+          </Form.Item>
+
+          <div className="grid grid-cols-2 gap-4">
+            <Form.Item
+              label={
+                <span className="flex items-center">
+                  <DollarOutlined className="mr-2" />
+                  TJM (€)
+                </span>
+              }
+              name="tjm"
+              rules={[{ required: true, message: "Le TJM est requis" }]}
+            >
+              <Input type="number" prefix="€" />
+            </Form.Item>
+
+            <Form.Item
+              label={
+                <span className="flex items-center">
+                  <CalendarOutlined className="mr-2" />
+                  Jours
+                </span>
+              }
+              name="jours"
+              rules={[
+                { required: true, message: "Le nombre de jours est requis" },
+              ]}
+            >
+              <Input type="number" />
+            </Form.Item>
+
+            <Form.Item
+              label={
+                <span className="flex items-center">
+                  <EuroOutlined className="mr-2" />
+                  Montant total
+                </span>
+              }
+              name="montant_total"
+              rules={[
+                { required: true, message: "Le montant total est requis" },
+              ]}
+            >
+              <Input type="number" prefix="€" disabled />
+            </Form.Item>
+          </div>
+        </Form>
+      </Modal>
+
+      <Modal
+        title={
+          <div className="flex items-center">
+            <FileTextOutlined className="mr-2" />
+            {currentPurchaseOrder
+              ? "Modifier le bon de commande"
+              : `Créer un bon de commande n°${bdcNumber} - ${format(
+                  new Date(),
+                  "dd MMMM yyyy",
+                  { locale: fr }
+                )}`}
+          </div>
+        }
+        open={isModalVisible}
+        onCancel={() => setIsModalVisible(false)}
+        footer={null}
+        width={800}
+      >
+        <Form form={form} layout="vertical" onFinish={handleSubmit}>
+          {!currentPurchaseOrder && (
+            <Form.Item
+              label="Sélectionner une candidature"
+              name="candidature_id"
+              rules={[
+                {
+                  required: true,
+                  message: "Veuillez sélectionner une candidature",
+                },
+              ]}
+            >
+              <Select
+                loading={candidatesLoading}
+                onChange={handleCandidateSelect}
+                placeholder="Sélectionner une candidature"
+              >
+                {candidates.map((candidate) => {
+                  const matchedProject = projects.find(
+                    (project) => project.id === candidate.AO_id
+                  );
+                  const appelOfferName = matchedProject
+                    ? matchedProject.titre
+                    : "N/A";
+                  // setTjm(candidate.tjm)
+                  return (
+                    <Option key={candidate.id_cd} value={candidate.id_cd}>
+                      <Space>
+                        <UserOutlined />
+                        {`${candidate.nom_cn} - TJM: ${
+                          candidate.tjm
+                        }€ - Disponible le: ${format(
+                          new Date(candidate.date_disponibilite),
+                          "dd/MM/yyyy"
+                        )} - Appel Offres: `}
+                        <Tag color="green" style={{ fontSize: 14 }}>
+                          {appelOfferName}
+                        </Tag>
+                      </Space>
+                    </Option>
+                  );
+                })}
+              </Select>
+            </Form.Item>
+          )}
+          <Form.Item
+            label={
+              <span className="font-semibold text-gray-700">
+                <FileTextOutlined className="mr-2" />
+                Profile de consultant
+              </span>
+            }
+            name="description"
+            initialValue={description}
+            rules={[
+              {
+                required: true,
+                message: "Veuillez fournir le profile du consultant",
+              },
+            ]}
+          >
+            <TextArea
+              rows={4}
+              value={description}
+              placeholder="Décrivez le profile, les compétences et l'expérience du consultant..."
+              className="rounded-lg border-2 border-gray-300 focus:border-blue-500 
+               hover:border-blue-400 transition-colors duration-200
+               p-4 text-gray-700 text-base leading-relaxed
+               resize-none shadow-sm"
+              style={{ minHeight: "120px" }}
+            />
+          </Form.Item>
+
+          <div className="grid grid-cols-2 gap-4">
+            <Form.Item
+              label="Date de debut"
+              name="date_debut"
+              rules={[
+                { required: true, message: "Veuillez sélectionner une date" },
+              ]}
+            >
+              <DatePicker
+                className="w-full"
+                format="YYYY-MM-DD"
+                onChange={(date) => {
+                  const calculatedDays = calculateWorkingDays(
+                    date,
+                    form.getFieldValue("date_fin")
+                  );
+                  form.setFieldsValue({
+                    jours: calculatedDays,
+                    montant_total: calculatedDays * tjm,
+                  });
+                  setJours(calculatedDays);
+                }}
+              />
+            </Form.Item>
+
+            <Form.Item
+              label="Date de fin"
+              name="date_fin"
+              rules={[
+                { required: true, message: "Veuillez sélectionner une date" },
+              ]}
+            >
+              <DatePicker
+                className="w-full"
+                format="YYYY-MM-DD"
+                onChange={(date) => {
+                  const calculatedDays = calculateWorkingDays(
+                    form.getFieldValue("date_debut"),
+                    date
+                  );
+                  form.setFieldsValue({
+                    jours: calculatedDays,
+                    montant_total: calculatedDays * tjm,
+                  });
+                  setJours(calculatedDays);
+                }}
+              />
+            </Form.Item>
+            <Form.Item
+              label="Jours ouvrés"
+              name="jours"
+              initialValue={jours}
+              rules={[
+                { required: true, message: "Veuillez entrer les jours ouvrés" },
+                () => ({
+                  validator(_, value) {
+                    const calculatedDays = calculateWorkingDays(
+                      new Date(form.getFieldValue("date_debut")),
+                      new Date(form.getFieldValue("date_fin"))
+                    );
+                    if (!value) {
+                      return Promise.resolve();
+                    }
+                    if (value > calculatedDays) {
+                      return Promise.reject(
+                        `Le nombre de jours saisi (${value}) ne peut pas être supérieur aux jours calculés (${calculatedDays})`
+                      );
+                    }
+                    // Update total amount when days change
+                    const tjm = form.getFieldValue("tjm") || 0;
+                    form.setFieldsValue({ montant_total: tjm * value });
+                    return Promise.resolve();
+                  },
+                }),
+              ]}
+              help={`Jours calculés: ${calculateWorkingDays(
+                new Date(form.getFieldValue("date_debut")),
+                new Date(form.getFieldValue("date_fin"))
+              )}`}
+            >
+              <Input
+                type="number"
+                min={1}
+                max={calculateWorkingDays(
+                  new Date(form.getFieldValue("date_debut")),
+                  new Date(form.getFieldValue("date_fin"))
+                )}
+                onChange={(e) => {
+                  const days = parseInt(e.target.value) || 0;
+                  const tjm = form.getFieldValue("tjm") || 0;
+                  form.setFieldsValue({ montant_total: tjm * days });
+                }}
+              />
+            </Form.Item>
+
+            <Form.Item
+              label="TJM"
+              name="TJM"
+              dependencies={["candidature_id"]}
+              initialValue={tjm}
+              // rules={[
+              //   { required: true, message: "Veuillez entrer le TJM" },
+              //   {
+              //     type: "number",
+              //     min: 1,
+              //     message: "Le TJM doit être supérieur à 0",
+              //   },
+              // ]}
+              // help="Taux Journalier Moyen en euros"
+            >
+              <Input
+                prefix={<EuroOutlined style={{ color: "#1890ff" }} />}
+                type="number"
+                min={1}
+                value={tjm}
+                style={{ width: "100%" }}
+                onChange={(e) => {
+                  const newValue = Math.max(1, parseInt(e.target.value) || 0);
+                  setTjm(newValue);
+                  const currentDays = form.getFieldValue("jours") || 0;
+                  form.setFieldsValue({
+                    tjm: newValue,
+                    montant_total: newValue * currentDays,
+                  });
+                }}
+                onBlur={(e) => {
+                  const value = e.target.value;
+                  if (!value || value < 1) {
+                    form.setFieldsValue({ tjm: 1 });
+                  }
+                }}
+              />
+            </Form.Item>
+
+            <Form.Item
+              label="Montant Total (€)"
+              name="montant_total"
+              rules={[
+                { required: true, message: "Le montant total est requis" },
+              ]}
+              help={`Calculé automatiquement: TJM (${
+                form.getFieldValue("tjm") || 0
+              }€) × Jours (${form.getFieldValue("jours") || 0})`}
+            >
+              <Input
+                type="number"
+                disabled
+                prefix="€"
+                style={{ width: "100%", color: "#1890ff", fontWeight: "bold" }}
+              />
+            </Form.Item>
+          </div>
+
+          <Divider />
+
+          <div className="flex justify-end space-x-2">
+            <Button onClick={() => setIsModalVisible(false)}>Annuler</Button>
+            <Button type="primary" htmlType="submit">
+              {currentPurchaseOrder ? "Mettre à jour" : "Créer"}
+            </Button>
+          </div>
+        </Form>
+      </Modal>
       <div className="mb-4">
-        <div className="mt-4 mb-2">
+        <div className="mt-4 mb-2 flex items-center justify-between">
           <Input
             placeholder="Rechercher par numéro ou description..."
             prefix={<SearchOutlined />}
@@ -475,14 +1049,18 @@ const OrderInterface = () => {
             onChange={(e) => setSearchText(e.target.value)}
             className="max-w-md"
           />
+          <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
+            Nouveau bon de commande
+          </Button>
         </div>
 
-        {purchaseOrders?.filter((po) => po.statut === "pending_esn").length >
+        {purchaseOrders?.filter((po) => po.statut === "pending_client").length >
           0 && (
           <Alert
             message="Bons de commande en attente"
             description={`Vous avez ${
-              purchaseOrders?.filter((po) => po.statut === "pending_esn").length
+              purchaseOrders?.filter((po) => po.statut === "pending_client")
+                .length
             } bon(s) de commande en attente de validation.`}
             type="info"
             showIcon
@@ -519,18 +1097,18 @@ const OrderInterface = () => {
         open={isDetailsModalVisible}
         onCancel={() => setIsDetailsModalVisible(false)}
         footer={[
-          <Button
-            key="download"
-            icon={<DownloadOutlined />}
-            onClick={() => handleDownload(selectedPO)}
-            loading={downloadLoading[selectedPO?.id_bdc]}
-          >
-            Télécharger
-          </Button>,
+          // <Button
+          //   key="download"
+          //   icon={<DownloadOutlined />}
+          //   onClick={() => handleDownload(selectedPO)}
+          //   loading={downloadLoading[selectedPO?.id_bdc]}
+          // >
+          //   Télécharger
+          // </Button>,
           <Button key="close" onClick={() => setIsDetailsModalVisible(false)}>
             Fermer
           </Button>,
-          selectedPO?.statut === "pending_esn" && (
+          selectedPO?.statut === "pending_client" && (
             <>
               <Button
                 key="accept"

@@ -89,10 +89,7 @@ const CandidatureInterface = () => {
       // Calculate the duration in days between project start and end dates
       const startDate = new Date(selectedProject.date_debut);
       const endDate = new Date(selectedProject.date_limite);
-      const durationInDays = Math.ceil(
-        (endDate - startDate) / (1000 * 60 * 60 * 24)
-      );
-      const workingDays = Math.min(durationInDays * 0.7, 20);
+      const workingDays =selectedProject.jours
 
       const bonDeCommandeData = {
         candidature_id: candidate.id_cd,
@@ -102,6 +99,9 @@ const CandidatureInterface = () => {
         description: `Bon de commande pour ${selectedProject.titre} - Candidat: ${candidate.responsable_compte}
         Durée: ${workingDays} jours
         TJM: ${candidate.tjm}€`,
+        TJM: candidate.tjm,
+        date_debut: startDate,
+        date_fin: endDate,
       };
 
       const response = await fetch(`${Endponit()}/api/Bondecommande/`, {

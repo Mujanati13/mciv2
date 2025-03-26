@@ -1,4 +1,4 @@
-import React, { useState , useEffect} from "react";
+import React, { useState, useEffect } from "react";
 import {
   AppstoreOutlined,
   RiseOutlined,
@@ -16,6 +16,7 @@ import ContractStats from "../components/ad-interface/list-contract";
 import ClientDocument from "../components/cl-interface/document";
 import CollaboratorList from "../components/ad-interface/list-ens";
 import { isAdminLoggedIn } from "../helper/db";
+import BDCManagement from "../components/ad-interface/bdc-validateur";
 
 const items = [
   {
@@ -38,6 +39,11 @@ const items = [
     key: "Contrats",
     // icon: <UsergroupAddOutlined />,
   },
+  {
+    label: "Bon de commande",
+    key: "bdc",
+    // icon: <UsergroupAddOutlined />,
+  },
   // Previous commented-out menu items remain the same
 ];
 
@@ -46,11 +52,11 @@ const InterfaceAd = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-      const auth = isAdminLoggedIn();
-      if (auth === false) {
-        navigate("/LoginAdmin");
-      }
-    }, [navigate]);
+    const auth = isAdminLoggedIn();
+    if (auth === false) {
+      navigate("/LoginAdmin");
+    }
+  }, [navigate]);
 
   const onClick = (e) => {
     console.log("click ", e);
@@ -77,8 +83,10 @@ const InterfaceAd = () => {
         return <ClientList />;
       case "documents":
         return <ClientDocument />;
-        case "Contrats":
-          return <ContractStats />;
+      case "Contrats":
+        return <ContractStats />;
+      case "bdc":
+        return <BDCManagement />;
       default:
         return null;
     }
