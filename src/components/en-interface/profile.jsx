@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   Card,
   Typography,
@@ -20,6 +20,7 @@ import {
   Select,
   Modal,
   Checkbox,
+  Spin,
 } from "antd";
 import {
   BuildOutlined,
@@ -94,10 +95,81 @@ const ESNProfilePageFrancais = () => {
   const [contractCheckbox, setContractCheckbox] = useState(false);
   const [pdfGenerated, setPdfGenerated] = useState(false);
   const pdfRef = useRef(null);
+  const [countries, setCountries] = useState([]);
+  const [countriesLoading, setCountriesLoading] = useState(true);
+  const [cities, setCities] = useState([]);
+  const [citiesLoading, setCitiesLoading] = useState(false);
+  const baseApiUrl = Endponit(); // Store base URL to reuse
 
-  // Add this useEffect after your other useEffects
+  // Add country fetching function
+  const fetchCountries = useCallback(async () => {
+    try {
+      setCountriesLoading(true);
+      const response = await axios.get(
+        `http://51.38.99.75:3100/api/countries`,
+        axiosConfig
+      );
+
+      if (response.data.success) {
+        setCountries(response.data.data);
+      } else {
+        message.error("Impossible de charger la liste des pays");
+      }
+    } catch (error) {
+      console.error("Failed to fetch countries:", error);
+      message.error("Erreur lors du chargement des pays");
+    } finally {
+      setCountriesLoading(false);
+    }
+  }, [baseApiUrl]);
+
+  // Add city fetching function
+  const fetchCities = useCallback(
+    async (country) => {
+      if (!country) {
+        setCities([]);
+        return;
+      }
+
+      try {
+        setCitiesLoading(true);
+        const response = await axios.get(
+          `http://51.38.99.75:3100/api/cities/${country}`,
+          axiosConfig
+        );
+
+        if (response.data.success) {
+          setCities(response.data.data || []);
+        } else {
+          message.warning(`Aucune ville disponible pour ${country}`);
+          setCities([]);
+        }
+      } catch (error) {
+        console.error(`Failed to fetch cities for ${country}:`, error);
+        message.error(`Erreur lors du chargement des villes pour ${country}`);
+        setCities([]);
+      } finally {
+        setCitiesLoading(false);
+      }
+    },
+    [baseApiUrl]
+  );
+
+  const handleCountryChange = (value) => {
+    // Clear city when country changes
+    form.setFieldsValue({ Ville: undefined });
+
+    // Fetch cities for the selected country
+    fetchCities(value);
+  };
+
+  // Load countries on mount
   useEffect(() => {
-    // Show a notification when component mounts if contract needs to be signed
+    fetchCountries();
+  }, [fetchCountries]);
+
+  // Show notification for contract signing if needed
+  useEffect(() => {
     if (profileData?.Statut === "à signer") {
       message.info({
         content:
@@ -107,6 +179,13 @@ const ESNProfilePageFrancais = () => {
       });
     }
   }, [profileData?.Statut]);
+
+  // Effect to load cities when editing starts and country is already selected
+  useEffect(() => {
+    if (isEditing && profileData?.Pays) {
+      fetchCities(profileData.Pays);
+    }
+  }, [isEditing, profileData?.Pays, fetchCities]);
 
   // Handle opening contract modal
   const showContractModal = () => {
@@ -132,7 +211,7 @@ const ESNProfilePageFrancais = () => {
       };
 
       const response = await axios.put(
-        `${Endponit()}/api/ESN/`,
+        `${baseApiUrl}/api/ESN/`,
         updatePayload,
         axiosConfig
       );
@@ -175,7 +254,7 @@ const ESNProfilePageFrancais = () => {
       };
 
       const response = await axios.put(
-        `${Endponit()}/api/ESN/updateStatus`,
+        `${baseApiUrl}/api/ESN/updateStatus`,
         updatePayload,
         axiosConfig
       );
@@ -201,7 +280,6 @@ const ESNProfilePageFrancais = () => {
     }
   };
 
-  // Generate PDF with ESN information and contract
   // Generate PDF with ESN information and contract
   const generatePDF = () => {
     if (!profileData) return;
@@ -275,7 +353,7 @@ const ESNProfilePageFrancais = () => {
       );
       doc.text(
         `Représentée par ${
-          profileData.Responsible || "[Représentant]"
+          profileData.responsible || "[Représentant]"
         }, dûment habilité au titre des présentes,`,
         20,
         161
@@ -551,18 +629,7 @@ const ESNProfilePageFrancais = () => {
       doc.setFontSize(13);
       doc.setFont(undefined, "bold");
 
-      // // Final clause
-      // doc.setFontSize(10);
-      // doc.text(
-      //   [
-      //     "Le présent contrat est établi électroniquement et la signature électronique des parties lui confère",
-      //     "pleine validité juridique conformément aux dispositions légales en vigueur.",
-      //   ],
-      //   20,
-      //   140
-      // );
-
-      // Replace the electronic acceptance text (around line 620-630)
+      // Replace the electronic acceptance text
       doc.setFontSize(12);
       doc.text(
         [
@@ -602,9 +669,7 @@ const ESNProfilePageFrancais = () => {
       SIRET: { weight: 10, filled: !!data.SIRET },
       CP: { weight: 5, filled: !!data.CP },
       Ville: { weight: 5, filled: !!data.Ville },
-      // Tel_Contact: { weight: 5, filled: !!data.Tel_Contact },
       N_TVA: { weight: 5, filled: !!data.N_TVA },
-      // Province: { weight: 3, filled: !!data.Province },
     };
 
     const additionalFields = {
@@ -665,7 +730,7 @@ const ESNProfilePageFrancais = () => {
       };
 
       const response = await axios.put(
-        `${Endponit()}/api/ESN/`,
+        `${baseApiUrl}/api/ESN/`,
         updatePayload,
         axiosConfig
       );
@@ -694,7 +759,7 @@ const ESNProfilePageFrancais = () => {
           throw new Error("ESN ID not found in localStorage");
         }
         const response = await axios.get(
-          `${Endponit()}/api/getEsnData/?esnId=${esnId}`
+          `${baseApiUrl}/api/getEsnData/?esnId=${esnId}`
         );
         if (response.data && response.data.data) {
           const data = response.data.data[0] || response.data.data;
@@ -716,30 +781,39 @@ const ESNProfilePageFrancais = () => {
     };
 
     fetchESNData();
-  }, []);
+  }, [baseApiUrl]);
+
+  const startEditing = () => {
+    // Set initial form values when starting edit mode
+    form.setFieldsValue(profileData);
+    setIsEditing(true);
+
+    // Pre-load cities if country is already selected
+    if (profileData?.Pays) {
+      fetchCities(profileData.Pays);
+    }
+  };
 
   const handleUpdate = async (values) => {
     try {
       setLoading(true);
       const esnId = localStorage.getItem("id");
 
+      // Get form values directly to ensure we have the latest values
+      const formValues = form.getFieldsValue(true);
+
       // Create update payload with form values
       let updatePayload = {
-        ...values,
+        ...profileData, // Keep existing data
+        ...formValues, // Overwrite with new form values
         ID_ESN: esnId,
-        password: null,
-        Date_validation: values.Date_validation
-          ? values.Date_validation.format("YYYY-MM-DD")
+        password: null, // Don't send password
+        Date_validation: formValues.Date_validation
+          ? formValues.Date_validation.format("YYYY-MM-DD")
           : null,
       };
 
-      // Check profile completion to determine if status should change to "à valider"
-      const updatedData = {
-        ...profileData,
-        ...values,
-      };
-
-      // Calculate completion with temporary updated data
+      // Calculate completion with updated data
       let tempCompletion = 0;
       const requiredFields = [
         "Raison_sociale",
@@ -750,8 +824,9 @@ const ESNProfilePageFrancais = () => {
         "Ville",
         "Tel_Contact",
       ];
+
       const allFieldsFilled = requiredFields.every(
-        (field) => updatedData[field]
+        (field) => updatePayload[field]
       );
 
       // If profile is complete and status isn't already set to higher level, update to "à valider"
@@ -764,22 +839,37 @@ const ESNProfilePageFrancais = () => {
         updatePayload.Statut = "à valider";
       }
 
+      console.log("Sending update payload:", updatePayload);
+
       const response = await axios.put(
-        `${Endponit()}/api/ESN/`,
+        `${baseApiUrl}/api/ESN/`,
         updatePayload,
         axiosConfig
       );
 
       if (response.data) {
-        const updatedData = {
-          ...profileData,
-          ...updatePayload,
-          Date_validation: values.Date_validation, // Keep as dayjs object for UI display
-        };
-        setProfileData(updatedData);
-        calculateProfileCompletion(updatedData);
+        // Refresh data from server to ensure we have the latest state
+        const refreshResponse = await axios.get(
+          `${baseApiUrl}/api/getEsnData/?esnId=${esnId}`,
+          axiosConfig
+        );
 
-        // Show specific message if status was updated to "à valider"
+        if (refreshResponse.data && refreshResponse.data.data) {
+          const refreshedData =
+            refreshResponse.data.data[0] || refreshResponse.data.data;
+          // Convert Date_validation to dayjs if it exists
+          if (refreshedData.Date_validation) {
+            refreshedData.Date_validation = dayjs(
+              refreshedData.Date_validation
+            );
+          }
+
+          // Update local state with refreshed data
+          setProfileData(refreshedData);
+          calculateProfileCompletion(refreshedData);
+        }
+
+        // Show specific message based on status
         if (updatePayload.Statut === "à valider") {
           message.success("Profil complété et soumis pour validation!");
         } else {
@@ -854,6 +944,7 @@ const ESNProfilePageFrancais = () => {
                     Informations de l'Entreprise
                   </Space>
                 }
+                bordered={false}
               >
                 <Row gutter={16}>
                   <Col span={24} md={8}>
@@ -884,7 +975,6 @@ const ESNProfilePageFrancais = () => {
                       <Input
                         prefix={<UserOutlined />}
                         placeholder="Nom du responsable"
-                        className="rounded-lg"
                       />
                     </Form.Item>
                   </Col>
@@ -894,15 +984,57 @@ const ESNProfilePageFrancais = () => {
                     </Form.Item>
                   </Col>
                   <Col span={24} md={12}>
-                    <Form.Item name="Pays" label="Pays">
-                      <Select placeholder="Sélectionner un Pays">
-                        <Option value="France">France</Option>
-                        <Option value="Belgique">Belgique</Option>
-                        <Option value="Suisse">Suisse</Option>
-                        <Option value="Canada">Canada</Option>
-                        <Option value="Maroc">Maroc</Option>
-                        <Option value="Other">Autre</Option>
-                      </Select>
+                    <Form.Item
+                      name="Pays"
+                      label="Pays"
+                      rules={[
+                        {
+                          required: true,
+                          message: "Veuillez sélectionner un pays",
+                        },
+                      ]}
+                    >
+                      <div style={{ position: "relative" }}>
+                        {countriesLoading && (
+                          <div
+                            style={{
+                              position: "absolute",
+                              right: "10px",
+                              top: "50%",
+                              transform: "translateY(-50%)",
+                              zIndex: 1,
+                            }}
+                          >
+                            <Spin size="small" />
+                          </div>
+                        )}
+                        <select
+                          className="ant-input"
+                          style={{
+                            width: "100%",
+                            height: "32px",
+                            padding: "4px 11px",
+                            color: "rgba(0, 0, 0, 0.85)",
+                            border: "1px solid #d9d9d9",
+                            borderRadius: "2px",
+                            backgroundColor: "#fff",
+                          }}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            form.setFieldsValue({ Pays: value });
+                            handleCountryChange(value);
+                          }}
+                          disabled={countriesLoading}
+                          value={form.getFieldValue("Pays") || ""}
+                        >
+                          <option value="">Sélectionnez votre pays</option>
+                          {countries.map((country) => (
+                            <option key={country} value={country}>
+                              {country}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
                     </Form.Item>
                   </Col>
                 </Row>
@@ -918,6 +1050,7 @@ const ESNProfilePageFrancais = () => {
                     Coordonnées de Contact
                   </Space>
                 }
+                bordered={false}
               >
                 <Row gutter={16}>
                   <Col span={24} md={6}>
@@ -965,7 +1098,10 @@ const ESNProfilePageFrancais = () => {
                       label="Ville"
                       rules={[{ required: true, message: "Champ requis" }]}
                     >
-                      <Input prefix={<EnvironmentOutlined />} />
+                      <Input
+                        prefix={<EnvironmentOutlined />}
+                        placeholder="Ville"
+                      />
                     </Form.Item>
                   </Col>
                   <Col span={24} md={4}>
@@ -986,6 +1122,7 @@ const ESNProfilePageFrancais = () => {
                     Informations Bancaires
                   </Space>
                 }
+                bordered={false}
               >
                 <Row gutter={16}>
                   <Col span={24} md={8}>
@@ -1032,10 +1169,7 @@ const ESNProfilePageFrancais = () => {
         {/* Profile Completion Progress Section */}
         <Row gutter={[16, 16]} className="mb-6">
           <Col span={24}>
-            <Card
-              className="rounded-2xl shadow-md hover:shadow-xl transition-shadow duration-300"
-              bordered={false}
-            >
+            <Card bordered={false}>
               <div className="flex flex-col md:flex-row justify-between items-center mb-4">
                 <div className="mb-4 md:mb-0 w-full">
                   <div className="flex items-center mb-2">
@@ -1047,8 +1181,7 @@ const ESNProfilePageFrancais = () => {
                 <Button
                   type="primary"
                   icon={<EditOutlined />}
-                  onClick={() => setIsEditing(true)}
-                  className="transition-transform hover:scale-105"
+                  onClick={startEditing}
                 >
                   Modifier le Profil
                 </Button>
@@ -1082,11 +1215,6 @@ const ESNProfilePageFrancais = () => {
 
         <Row gutter={[16, 16]}>
           <Col span={24} className="text-center">
-            {/* <Avatar
-              size={120}
-              icon={<BuildOutlined />}
-              className="mb-4 border-4 border-blue-500 shadow-lg"
-            /> */}
             <div className="mt-4">
               <Tag
                 color={isAccountActive ? "success" : "warning"}
@@ -1106,10 +1234,7 @@ const ESNProfilePageFrancais = () => {
 
           {/* Contract Status and Buttons */}
           <Col span={24}>
-            <Card
-              className="rounded-2xl shadow-md hover:shadow-xl transition-shadow duration-300"
-              bordered={false}
-            >
+            <Card bordered={false}>
               <div className="flex flex-col md:flex-row justify-between items-center">
                 <div>
                   <h3 className="text-lg font-semibold text-blue-900 mb-2">
@@ -1146,24 +1271,12 @@ const ESNProfilePageFrancais = () => {
                       onClick={showContractModal}
                       className="orange-pulse-animation mr-2"
                       style={{
-                        boxShadow: "0 0 8px #ff8c00",
                         borderColor: "#ff8c00",
                       }}
                     >
                       Accepter le contrat
                     </Button>
                   )}
-                  {/* {(contractAccepted || profileData.Statut === "ready") &&
-                    profileData.Statut !== "actif" && (
-                      <Button
-                        type="primary"
-                        icon={<CheckCircleOutlined />}
-                        onClick={activateESNAccount}
-                        className="mr-2"
-                      >
-                        Activer mon compte ESN
-                      </Button>
-                    )} */}
                   {(contractAccepted || profileData.Statut === "Actif") && (
                     <Button
                       type="default"
@@ -1186,22 +1299,19 @@ const ESNProfilePageFrancais = () => {
               </Space>
             </Divider>
 
-            <Card
-              className="rounded-2xl shadow-md hover:shadow-xl transition-shadow duration-300"
-              bordered={false}
-            >
+            <Card bordered={false}>
               <Descriptions
                 layout="vertical"
                 bordered
                 column={{ xs: 1, sm: 2, md: 3 }}
-                className="bg-white rounded-2xl p-4"
+                className="bg-white p-4"
               >
                 <Descriptions.Item label="Raison Sociale">
                   <Text strong>{profileData.Raison_sociale}</Text>
                 </Descriptions.Item>
                 <Descriptions.Item label="Responsable">
                   <Text strong>
-                    {profileData.Responsible || "Non spécifié"}
+                    {profileData.responsible || "Non spécifié"}
                   </Text>
                 </Descriptions.Item>
                 <Descriptions.Item label="Numéro SIRET">
@@ -1229,15 +1339,12 @@ const ESNProfilePageFrancais = () => {
               </Space>
             </Divider>
 
-            <Card
-              className="rounded-2xl shadow-md hover:shadow-xl transition-shadow duration-300"
-              bordered={false}
-            >
+            <Card bordered={false}>
               <Descriptions
                 layout="vertical"
                 bordered
                 column={{ xs: 1, sm: 2, md: 3 }}
-                className="bg-white rounded-2xl p-4"
+                className="bg-white p-4"
               >
                 <Descriptions.Item label="Adresse" span={2}>
                   <Paragraph copyable className="mb-0 text-base">
@@ -1246,7 +1353,8 @@ const ESNProfilePageFrancais = () => {
                 </Descriptions.Item>
                 <Descriptions.Item label="Province/Région">
                   <Space>
-                    <EnvironmentOutlined /> {profileData.Province}
+                    <EnvironmentOutlined />{" "}
+                    {profileData.Province || "Non spécifié"}
                   </Space>
                 </Descriptions.Item>
                 <Descriptions.Item label="E-mail">
@@ -1256,7 +1364,8 @@ const ESNProfilePageFrancais = () => {
                 </Descriptions.Item>
                 <Descriptions.Item label="Téléphone">
                   <Space>
-                    <PhoneOutlined /> {profileData.Tel_Contact}
+                    <PhoneOutlined />{" "}
+                    {profileData.Tel_Contact || "Non spécifié"}
                   </Space>
                 </Descriptions.Item>
               </Descriptions>
@@ -1272,15 +1381,12 @@ const ESNProfilePageFrancais = () => {
               </Space>
             </Divider>
 
-            <Card
-              className="rounded-2xl shadow-md hover:shadow-xl transition-shadow duration-300"
-              bordered={false}
-            >
+            <Card bordered={false}>
               <Descriptions
                 layout="vertical"
                 bordered
                 column={{ xs: 1, sm: 2, md: 3 }}
-                className="bg-white rounded-2xl p-4"
+                className="bg-white p-4"
               >
                 <Descriptions.Item label="Banque">
                   {profileData.Banque || "Non spécifié"}
@@ -1304,8 +1410,6 @@ const ESNProfilePageFrancais = () => {
     );
   };
 
-  // Add this before the return statement
-
   // Contract modal content
   const contractModal = (
     <Modal
@@ -1314,7 +1418,7 @@ const ESNProfilePageFrancais = () => {
           <FileProtectOutlined /> Contrat d'Adhésion ESN
         </div>
       }
-      visible={contractModalVisible}
+      open={contractModalVisible}
       onCancel={() => setContractModalVisible(false)}
       footer={[
         <Button key="back" onClick={() => setContractModalVisible(false)}>
@@ -1409,10 +1513,7 @@ const ESNProfilePageFrancais = () => {
   return (
     <div className="min-h-screen p-6">
       <style>{pulseAnimationStyle}</style>
-      <Card
-        className="max-w-6xl mx-auto rounded-3xl overflow-hidden transform transition-all duration-300 hover:scale-[1.01]"
-        bordered={false}
-      >
+      <Card className="max-w-6xl mx-auto" bordered={false}>
         {renderContent()}
       </Card>
       {contractModal}

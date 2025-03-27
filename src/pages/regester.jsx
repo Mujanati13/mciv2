@@ -74,6 +74,7 @@ const SignupPage = () => {
   const [citiesLoading, setCitiesLoading] = useState(false);
 
   const termsPdfUrl = "../../public/MAGHREB CONNECT IT SOCIÉTÉ.pdf";
+  const baseApiUrl = Endponit();
 
   // Fetch countries from API
   useEffect(() => {
@@ -81,10 +82,15 @@ const SignupPage = () => {
       try {
         setCountriesLoading(true);
         const response = await axios.get(
-          "http://51.38.99.75:3100/api/countries"
+          `http://51.38.99.75:3100/api/countries`
         );
         if (response.data.success) {
           setCountries(response.data.data);
+        } else {
+          notification.error({
+            message: "Erreur",
+            description: "Impossible de charger la liste des pays.",
+          });
         }
       } catch (error) {
         console.error("Failed to fetch countries:", error);
@@ -98,19 +104,29 @@ const SignupPage = () => {
     };
 
     fetchCountries();
-  }, []);
+  }, [baseApiUrl]);
 
   // Fetch cities when country changes
   const fetchCities = async (country) => {
-    if (!country) return;
+    if (!country) {
+      setCities([]);
+      return;
+    }
 
-    setCitiesLoading(true);
     try {
+      setCitiesLoading(true);
       const response = await axios.get(
         `http://51.38.99.75:3100/api/cities/${country}`
       );
       if (response.data.success) {
+        setCities([])
         setCities(response.data.data || []);
+      } else {
+        notification.warning({
+          message: "Avertissement",
+          description: `Impossible de charger les villes pour ${country}.`,
+        });
+        setCities([]);
       }
     } catch (error) {
       console.error(`Failed to fetch cities for ${country}:`, error);
@@ -200,7 +216,7 @@ const SignupPage = () => {
 
       // Send registration request
       const response = await axios.post(
-        Endponit() + endpoint,
+        baseApiUrl + endpoint,
         registrationData
       );
 
@@ -324,6 +340,7 @@ const SignupPage = () => {
             onChange={(e) => {
               setUserType(e.target.value);
               form.resetFields();
+              setCities([]); // Reset cities when user type changes
             }}
             buttonStyle="solid"
             style={{ width: "100%" }}
@@ -363,7 +380,6 @@ const SignupPage = () => {
               >
                 <Input prefix={<UserOutlined />} placeholder="Raison sociale" />
               </Form.Item>
-
               <Form.Item
                 name="mail_contact"
                 rules={[
@@ -376,7 +392,6 @@ const SignupPage = () => {
                   placeholder="Email de contact"
                 />
               </Form.Item>
-
               <Form.Item
                 name="tel_contact"
                 rules={[
@@ -391,7 +406,6 @@ const SignupPage = () => {
                   placeholder="Téléphone de contact"
                 />
               </Form.Item>
-
               <Form.Item
                 name="siret"
                 // rules={[
@@ -403,7 +417,6 @@ const SignupPage = () => {
               >
                 <Input prefix={<IdcardOutlined />} placeholder="Numéro SIRET" />
               </Form.Item>
-
               <Space style={{ width: "100%" }} size="middle">
                 <Form.Item name="rce" style={{ width: "50%" }}>
                   <Input placeholder="RCE" />
@@ -413,7 +426,6 @@ const SignupPage = () => {
                   <Input placeholder="Numéro de TVA" />
                 </Form.Item>
               </Space>
-
               <Space style={{ width: "100%" }} size="middle">
                 <Form.Item
                   name="password"
@@ -453,7 +465,6 @@ const SignupPage = () => {
                   />
                 </Form.Item>
               </Space>
-
               <Form.Item
                 name="adresse"
                 rules={[
@@ -462,7 +473,6 @@ const SignupPage = () => {
               >
                 <Input prefix={<EnvironmentOutlined />} placeholder="Adresse" />
               </Form.Item>
-
               <Space style={{ width: "100%" }} size="middle">
                 <Form.Item name="cp" style={{ width: "30%" }}>
                   <Input placeholder="Code postal" />
@@ -472,7 +482,6 @@ const SignupPage = () => {
                   <Input placeholder="Province" />
                 </Form.Item>
               </Space>
-
               <Form.Item
                 name="pays"
                 rules={[
@@ -482,25 +491,43 @@ const SignupPage = () => {
                   },
                 ]}
               >
-                <Select
-                  placeholder="Sélectionnez votre pays"
-                  loading={countriesLoading}
-                  showSearch
-                  filterOption={(input, option) =>
-                    option.children
-                      .toLowerCase()
-                      .indexOf(input.toLowerCase()) >= 0
-                  }
-                  onChange={handleCountryChange}
-                >
-                  {countries.map((country) => (
-                    <Option key={country} value={country}>
-                      {country}
-                    </Option>
-                  ))}
-                </Select>
+                <div style={{ position: "relative" }}>
+                  {countriesLoading && (
+                    <div
+                      style={{
+                        position: "absolute",
+                        right: "10px",
+                        top: "50%",
+                        transform: "translateY(-50%)",
+                        zIndex: 1,
+                      }}
+                    >
+                      <Spin size="small" />
+                    </div>
+                  )}
+                  <select
+                    className="ant-input"
+                    style={{
+                      width: "100%",
+                      height: "32px",
+                      padding: "4px 11px",
+                      color: "rgba(0, 0, 0, 0.85)",
+                      border: "1px solid #d9d9d9",
+                      borderRadius: "2px",
+                      backgroundColor: "#fff",
+                    }}
+                    onChange={(e) => handleCountryChange(e.target.value)}
+                    disabled={countriesLoading}
+                  >
+                    <option value="">Sélectionnez votre pays</option>
+                    {countries.map((country) => (
+                      <option key={country} value={country}>
+                        {country}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </Form.Item>
-
               <Form.Item
                 name="ville"
                 rules={[
@@ -510,23 +537,49 @@ const SignupPage = () => {
                   },
                 ]}
               >
-                <Select
-                  placeholder="Sélectionnez votre ville"
-                  loading={citiesLoading}
-                  showSearch
-                  filterOption={(input, option) =>
-                    option.children
-                      .toLowerCase()
-                      .indexOf(input.toLowerCase()) >= 0
-                  }
-                  disabled={!form.getFieldValue("pays") || citiesLoading}
-                >
-                  {cities.map((city) => (
-                    <Option key={city} value={city}>
-                      {city}
-                    </Option>
-                  ))}
-                </Select>
+                <div style={{ position: "relative" }}>
+                  {citiesLoading && (
+                    <div
+                      style={{
+                        position: "absolute",
+                        right: "10px",
+                        top: "50%",
+                        transform: "translateY(-50%)",
+                        zIndex: 1,
+                      }}
+                    >
+                      <Spin size="small" />
+                    </div>
+                  )}
+                  <select
+                    className="ant-input"
+                    style={{
+                      width: "100%",
+                      height: "32px",
+                      padding: "4px 11px",
+                      color: "rgba(0, 0, 0, 0.85)",
+                      border: "1px solid #d9d9d9",
+                      borderRadius: "2px",
+                      backgroundColor: "#fff",
+                    }}
+                    disabled={!form.getFieldValue("pays") || citiesLoading}
+                  >
+                    <option value="">
+                      {!form.getFieldValue("pays")
+                        ? "Veuillez d'abord sélectionner un pays"
+                        : citiesLoading
+                        ? "Chargement des villes..."
+                        : cities.length === 0
+                        ? "Aucune ville disponible pour ce pays"
+                        : "Sélectionnez votre ville"}
+                    </option>
+                    {cities.map((city) => (
+                      <option key={city} value={city}>
+                        {city}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </Form.Item>
             </>
           ) : (
@@ -639,6 +692,9 @@ const SignupPage = () => {
                       .indexOf(input.toLowerCase()) >= 0
                   }
                   onChange={handleCountryChange}
+                  notFoundContent={
+                    countriesLoading ? <Spin size="small" /> : null
+                  }
                 >
                   {countries.map((country) => (
                     <Option key={country} value={country}>
@@ -666,7 +722,14 @@ const SignupPage = () => {
                       .toLowerCase()
                       .indexOf(input.toLowerCase()) >= 0
                   }
-                  disabled={!form.getFieldValue("pays") || citiesLoading}
+                  disabled={!form.getFieldValue("pays")}
+                  notFoundContent={
+                    citiesLoading ? (
+                      <Spin size="small" />
+                    ) : (
+                      cities.length === 0 && "Aucune ville disponible"
+                    )
+                  }
                 >
                   {cities.map((city) => (
                     <Option key={city} value={city}>

@@ -18,9 +18,6 @@ services:
     environment:
       NODE_OPTIONS: "--max-old-space-size=1006"
     volumes:
-      - .:/usr/src/app
-      - /usr/src/app/node_modules
+      - .:/usr/src/app  
+      - /home/debian/storage:/usr/src/app/storage  
     command: ["npm", "start"]
-
-volumes:
-  node_modules:
