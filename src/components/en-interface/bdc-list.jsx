@@ -181,13 +181,15 @@ const BonDeCommandeInterface = () => {
       const response = await axios.get(
         `${Endponit()}/api/get_bon_de_commande_by_esn/?esn_id=${clientId}`
       );
-      const data = response.data.data.filter(
-        (po) =>
-          po.statut == "pending_esn" ||
-          po.statut == "Actif" ||
-          po.statut == "rejected_esn" || 
-          po.statut == "accepted_esn"
-      ).sort((a, b) => b.id_bdc - a.id_bdc);;
+      const data = response.data.data
+        .filter(
+          (po) =>
+            po.statut == "pending_esn" ||
+            po.statut == "Actif" ||
+            po.statut == "rejected_esn" ||
+            po.statut == "accepted_esn"
+        )
+        .sort((a, b) => b.id_bdc - a.id_bdc);
       setPurchaseOrders(data);
     } catch (error) {
       message.error("Échec de la récupération des bons de commande");
@@ -282,8 +284,8 @@ const BonDeCommandeInterface = () => {
     try {
       await axios.put(`${Endponit()}/api/Bondecommande/${record.id_bdc}`, {
         ...record,
-        statut: newStatus
-        });
+        statut: newStatus,
+      });
       fetchPurchaseOrders();
       message.success("Statut mis à jour avec succès");
     } catch (error) {
@@ -368,17 +370,13 @@ const BonDeCommandeInterface = () => {
             <>
               <Button
                 type="primary"
-                onClick={() =>
-                  handleUpdateStatus(record, "accepted_esn")
-                }
+                onClick={() => handleUpdateStatus(record, "accepted_esn")}
               >
                 Accepter
               </Button>
               <Button
                 danger
-                onClick={() =>
-                  handleUpdateStatus(record, "rejected_esn")
-                }
+                onClick={() => handleUpdateStatus(record, "rejected_esn")}
               >
                 Refuser
               </Button>

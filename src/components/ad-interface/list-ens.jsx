@@ -728,14 +728,14 @@ const CollaboratorList = () => {
 
     return (
       <Space size="middle">
-        <Tooltip title={getTooltipMessage()}>
+        {/* <Tooltip title={getTooltipMessage()}>
           <Button
             type="text"
             icon={<EditOutlined />}
             onClick={onEdit}
             // disabled={!isEnabled}
           />
-        </Tooltip>
+        </Tooltip> */}
         <Tooltip
           title={
             isEnabled ? "Validation de l'ESN" : "Profil incomplet" // Updated message here
@@ -786,20 +786,20 @@ const CollaboratorList = () => {
               <Card
                 hoverable
                 actions={[
-                  <Tooltip title={getTooltipMessage()} key="edit-tooltip">
-                    <span>
-                      <EditOutlined
-                        key="edit"
-                        onClick={
-                          isEnabled ? () => onEdit(collaborator) : undefined
-                        }
-                        style={{
-                          color: isEnabled ? undefined : "#d9d9d9",
-                          cursor: isEnabled ? "pointer" : "not-allowed",
-                        }}
-                      />
-                    </span>
-                  </Tooltip>,
+                  // <Tooltip title={getTooltipMessage()} key="edit-tooltip">
+                  //   <span>
+                  //     <EditOutlined
+                  //       key="edit"
+                  //       onClick={
+                  //         isEnabled ? () => onEdit(collaborator) : undefined
+                  //       }
+                  //       style={{
+                  //         color: isEnabled ? undefined : "#d9d9d9",
+                  //         cursor: isEnabled ? "pointer" : "not-allowed",
+                  //       }}
+                  //     />
+                  //   </span>
+                  // </Tooltip>,
                   <Tooltip
                     title={
                       isEnabled

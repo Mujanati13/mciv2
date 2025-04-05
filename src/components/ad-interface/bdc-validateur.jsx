@@ -169,30 +169,85 @@ const DetailsModal = ({ bdc, visible, onClose }) => {
 const UpdateBDCModal = ({ bdc, visible, onClose, onSuccess }) => {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
-  const [montantTotal, setMontantTotal] = useState(bdc?.montant_total || 0);
-  const [percentage, setPercentage] = useState(bdc?.percentage || 0);
+  const [montantTotal, setMontantTotal] = useState(0);
+  const [percentage, setPercentage] = useState(0);
+  const [benefitAmount, setBenefitAmount] = useState(0);
+  const [netAmount, setNetAmount] = useState(0);
 
-  const calculateNetAmount = (montant, perc) => {
-    console.log("====================================");
-    console.log(bdc?.montant_total, perc);
-    console.log("====================================");
-    const reduction = (bdc?.montant_total * perc) / 100;
-    return bdc?.montant_total - reduction;
+  // Initialize values when BDC changes
+  useEffect(() => {
+    if (bdc) {
+      const totalAmount = bdc.montant_total || 0;
+      const bdc_percentage = bdc.percentage || 0;
+      const benefit = (totalAmount * bdc_percentage) / 100;
+      const net = totalAmount - benefit;
+
+      setMontantTotal(totalAmount);
+      setPercentage(bdc_percentage);
+      setBenefitAmount(benefit);
+      setNetAmount(net);
+
+      // Set form values
+      form.setFieldsValue({
+        ...bdc,
+        montant_total: totalAmount,
+        percentage: bdc_percentage,
+        benefit: benefit,
+        date_emission: bdc.date_emission ? dayjs(bdc.date_emission) : null,
+        date_debut_mission: bdc.date_debut_mission ? dayjs(bdc.date_debut_mission) : null,
+        date_fin_mission: bdc.date_fin_mission ? dayjs(bdc.date_fin_mission) : null,
+        statut: bdc.statut || "pending_esn"
+      });
+    }
+  }, [bdc, form]);
+
+  // Update calculations when percentage changes
+  const handlePercentageChange = (value) => {
+    if (value === null || isNaN(value)) value = 0;
+    
+    const newPercentage = parseFloat(value);
+    const newBenefit = (montantTotal * newPercentage) / 100;
+    const newNetAmount = montantTotal - newBenefit;
+    
+    setPercentage(newPercentage);
+    setBenefitAmount(newBenefit);
+    setNetAmount(newNetAmount);
+    
+    form.setFieldsValue({
+      benefit: newBenefit,
+    });
+  };
+
+  // Update calculations when benefit amount changes
+  const handleBenefitChange = (value) => {
+    if (value === null || isNaN(value)) value = 0;
+    
+    const newBenefit = parseFloat(value);
+    const newPercentage = montantTotal > 0 ? (newBenefit / montantTotal) * 100 : 0;
+    const newNetAmount = montantTotal - newBenefit;
+    
+    setBenefitAmount(newBenefit);
+    setPercentage(newPercentage);
+    setNetAmount(newNetAmount);
+    
+    form.setFieldsValue({
+      percentage: newPercentage,
+    });
   };
 
   const handleSubmit = async (values) => {
     try {
       setLoading(true);
-      const netAmount = calculateNetAmount(
-        values.montant_total,
-        values.percentage
-      );
+      
+      // Prepare data for submission
       const transformedValues = {
         ...bdc,
         ...values,
         id_bdc: bdc.id,
-        benefit: bdc.montant_total - netAmount,
-        montant_total: netAmount,
+        montant_total: montantTotal,           // Original gross amount
+        percentage: percentage,                 // Fee percentage
+        benefit: benefitAmount,                 // Fee amount
+        montant_net: netAmount,                 // Net amount after fee
       };
 
       await axios.put(
@@ -209,17 +264,6 @@ const UpdateBDCModal = ({ bdc, visible, onClose, onSuccess }) => {
       setLoading(false);
     }
   };
-
-  const initialValues = bdc
-    ? {
-        ...bdc,
-        date_emission: dayjs(bdc.date_emission),
-        date_debut_mission: dayjs(bdc.date_debut_mission),
-        date_fin_mission: dayjs(bdc.date_fin_mission),
-        percentage: bdc.percentage || 0,
-        statut: "pending_esn" // Set default status
-      }
-    : {};
 
   return (
     <Modal
@@ -238,7 +282,6 @@ const UpdateBDCModal = ({ bdc, visible, onClose, onSuccess }) => {
         form={form}
         layout="vertical"
         onFinish={handleSubmit}
-        initialValues={initialValues}
       >
         <Row gutter={16}>
           <Col span={12}>
@@ -254,12 +297,10 @@ const UpdateBDCModal = ({ bdc, visible, onClose, onSuccess }) => {
           <Col span={12}>
             <Form.Item
               name="statut"
-              
               label="Statut"
-              initialValue={"pending_esn"}
               rules={[{ required: true, message: "Champ requis" }]}
             >
-              <Select defaultOpen="Accepté par Admin" defaultValue={"pending_esn"} placeholder="Sélectionner un statut">
+              <Select placeholder="Sélectionner un statut">
                 <Option value="pending_esn">Accepté par Admin</Option>
                 <Option value="cancelled">Refusé par Admin</Option>
                 <Option value="cancelled">Annulé</Option>
@@ -278,7 +319,8 @@ const UpdateBDCModal = ({ bdc, visible, onClose, onSuccess }) => {
               <InputNumber
                 prefix={<DollarOutlined />}
                 style={{ width: "100%" }}
-                onChange={(value) => setMontantTotal(value)}
+                formatter={(value) => `${value}€`}
+                parser={(value) => value.replace('€', '')}
                 disabled
               />
             </Form.Item>
@@ -287,7 +329,7 @@ const UpdateBDCModal = ({ bdc, visible, onClose, onSuccess }) => {
           <Col span={8}>
             <Form.Item
               name="percentage"
-              label="Pourcentage"
+              label="Pourcentage de commission"
               rules={[{ required: true, message: "Champ requis" }]}
             >
               <InputNumber
@@ -295,34 +337,41 @@ const UpdateBDCModal = ({ bdc, visible, onClose, onSuccess }) => {
                 style={{ width: "100%" }}
                 min={0}
                 max={100}
-                onChange={(value) => setPercentage(value)}
+                formatter={(value) => `${value}%`}
+                parser={(value) => value.replace('%', '')}
+                onChange={handlePercentageChange}
               />
             </Form.Item>
           </Col>
-          <Col span={6}>
+          
+          <Col span={8}>
             <Form.Item
               name="benefit"
-              label="Bénéfice"
+              label="Montant de la commission"
               rules={[{ required: true, message: "Champ requis" }]}
             >
               <InputNumber
                 prefix={<DollarOutlined />}
                 style={{ width: "100%" }}
                 min={0}
-                onChange={(value) => {
-                  const newPercentage = (value / montantTotal) * 100;
-                  setPercentage(newPercentage);
-                  form.setFieldsValue({ percentage: newPercentage });
-                }}
+                max={montantTotal}
+                formatter={(value) => `${value}€`}
+                parser={(value) => value.replace('€', '')}
+                onChange={handleBenefitChange}
               />
             </Form.Item>
           </Col>
+        </Row>
+        
+        <Row gutter={16}>
           <Col span={8}>
             <Form.Item label="Montant total net">
               <InputNumber
                 prefix={<DollarOutlined />}
                 style={{ width: "100%" }}
-                value={calculateNetAmount(montantTotal, percentage)}
+                value={netAmount}
+                formatter={(value) => `${value}€`}
+                parser={(value) => value.replace('€', '')}
                 disabled
               />
             </Form.Item>
@@ -331,17 +380,17 @@ const UpdateBDCModal = ({ bdc, visible, onClose, onSuccess }) => {
 
         <Divider>Commentaire</Divider>
 
-        {/* <Form.Item
-        name="esn_comment"
-        label="Commentaire pour l'ESN"
-      >
-        <Input.TextArea 
-          rows={4} 
-          placeholder="Ajoutez un commentaire ou des instructions pour l'ESN..."
-          showCount
-          maxLength={500}
-        />
-      </Form.Item> */}
+        <Form.Item
+          name="admin_comment"
+          label="Commentaire administratif"
+        >
+          <Input.TextArea 
+            rows={4} 
+            placeholder="Ajoutez un commentaire ou des instructions..."
+            showCount
+            maxLength={500}
+          />
+        </Form.Item>
 
         <Form.Item>
           <Space style={{ width: "100%", justifyContent: "flex-end" }}>

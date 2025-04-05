@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, {
+  useState,
+  useEffect,
+  useMemo,
+  createContext,
+  useContext,
+} from "react";
 import {
   LogoutOutlined,
   UserOutlined,
@@ -19,7 +25,9 @@ import {
   PartitionOutlined,
   CheckOutlined,
   WarningOutlined,
-  MenuOutlined, // Hamburger icon for mobile
+  MenuOutlined,
+  GlobalOutlined,
+  MoreOutlined,
 } from "@ant-design/icons";
 import {
   Menu,
@@ -34,6 +42,8 @@ import {
   Modal,
   Tooltip,
   Drawer,
+  Select,
+  ConfigProvider,
 } from "antd";
 import { Endponit } from "../helper/enpoint";
 
@@ -49,10 +59,113 @@ import ConsultantManagement from "../components/cl-interface/list-consultant";
 import { isClientLoggedIn, logoutEsn } from "../helper/db";
 import { useNavigate } from "react-router-dom";
 
+// Language Context
+const LanguageContext = createContext();
+
+export const useLanguage = () => {
+  return useContext(LanguageContext);
+};
+
+// Translations
+const translations = {
+  fr: {
+    dashboard: "Tableau de Bord",
+    mySpace: "Mon Espace",
+    myProfile: "Mon Profil Client",
+    providers: "Prestataires",
+    esnPartners: "ESN Partenaires",
+    consultants: "Consultants",
+    partnerships: "Partenariats",
+    tenders: "Appels d'Offres",
+    myOffers: "Mes offres",
+    applications: "Candidatures",
+    purchaseOrders: "Bons de Commande",
+    contracts: "Contrats",
+    documents: "Mes Documents",
+    documentManagement: " Gestion Documentaire",
+    notifications: "Notifications",
+    inactiveAccount: "Compte prestataire Inactif",
+    inactiveWarning:
+      "Votre compte est actuellement inactif. L'accès aux fonctionnalités est limité.",
+    completeProfile:
+      "Pour activer votre compte, complétez toutes les informations requises dans votre profil.",
+    limitedAccess:
+      "Sections accessibles: Tableau de Bord, Mon Profil Client et Gestion Documentaire",
+    restrictedSections:
+      "Sections restreintes: Prestataires, Appels d'Offres et Notifications",
+    accessProfile: "Accéder à mon profil",
+    close: "Fermer",
+    inactiveClientAccount: "Compte Client inactif",
+    activeAccount: "Compte actif",
+    menu: "Menu",
+    search: "Rechercher une interface...",
+    disconnect: "Déconnexion",
+    accountManagement: "Gestion du Compte",
+    serviceManagement: "Gestion des Services",
+    commercialManagement: "Gestion Commerciale",
+    documentation: "Documentation",
+    markAllAsRead: "Tout marquer comme lu",
+    markAsRead: "marquer comme lu",
+    welcomeMessage: "Bienvenue sur votre espace client",
+    profileIncomplete: "Votre profil est incomplet",
+    completeYourProfile:
+      "Complétez votre profil pour accéder à toutes les fonctionnalités",
+    goToProfile: "Aller au profil",
+    languageFr: "Français",
+    languageEn: "English",
+  },
+  en: {
+    dashboard: "Dashboard",
+    mySpace: "My Space",
+    myProfile: "My Client Profile",
+    providers: "Providers",
+    esnPartners: "ESN Partners",
+    consultants: "Consultants",
+    partnerships: "Partnerships",
+    tenders: "Tenders",
+    myOffers: "My Offers",
+    applications: "Applications",
+    purchaseOrders: "Purchase Orders",
+    contracts: "Contracts",
+    documents: "Documents",
+    documentManagement: "Document Management",
+    notifications: "Notifications",
+    inactiveAccount: "Inactive Provider Account",
+    inactiveWarning:
+      "Your account is currently inactive. Access to features is limited.",
+    completeProfile:
+      "To activate your account, complete all required information in your profile.",
+    limitedAccess:
+      "Accessible sections: Dashboard, My Client Profile and Document Management",
+    restrictedSections:
+      "Restricted sections: Providers, Tenders and Notifications",
+    accessProfile: "Access my profile",
+    close: "Close",
+    inactiveClientAccount: "Inactive Client Account",
+    activeAccount: "Active Account",
+    menu: "Menu",
+    search: "Search for an interface...",
+    disconnect: "Logout",
+    accountManagement: "Account Management",
+    serviceManagement: "Service Management",
+    commercialManagement: "Commercial Management",
+    documentation: "Mes documents",
+    markAllAsRead: "Mark all as read",
+    markAsRead: "Mark as read",
+    welcomeMessage: "Welcome to your client portal",
+    profileIncomplete: "Your profile is incomplete",
+    completeYourProfile: "Complete your profile to access all features",
+    goToProfile: "Go to profile",
+    languageFr: "Français",
+    languageEn: "English",
+  },
+};
+
 const NotificationInterface = ({
   notifications,
   onNotificationsUpdate,
   setupdate,
+  t,
 }) => {
   const [loading, setLoading] = useState(false);
 
@@ -130,7 +243,7 @@ const NotificationInterface = ({
           loading={loading}
           disabled={!notifications.some((n) => !n.read)}
         >
-          Tout marquer comme lu
+          {t.markAllAsRead}
         </Button>
       </div>
       <List
@@ -150,7 +263,7 @@ const NotificationInterface = ({
                   onClick={() => markAsRead(item)}
                   loading={loading}
                 >
-                  marquer comme lu
+                  {t.markAsRead}
                 </Button>
               ),
             ]}
@@ -159,13 +272,7 @@ const NotificationInterface = ({
               className="pl-4"
               title={
                 <div className="flex items-center">
-                  {!item.read && (
-                    <Badge
-                      status="processing"
-                      className="mr-2"
-                      style={{ opacity: 0.5 }}
-                    />
-                  )}
+                  {!item.read && <Badge status="processing" className="mr-2" />}
                   <span>{item.title}</span>
                 </div>
               }
@@ -185,10 +292,97 @@ const NotificationInterface = ({
   );
 };
 
+// Dashboard component for the homepage
+const Dashboard = ({ clientStatus, t, language, handleMenuClick }) => {
+  return (
+    <div className="w-full">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Welcome Card */}
+        <div className="col-span-1 lg:col-span-2">
+          <div className="bg-gradient-to-r from-green-500 to-green-700 rounded-lg p-6 text-white shadow-lg">
+            <h1 className="text-2xl md:text-3xl font-bold mb-3">
+              {t.welcomeMessage}
+            </h1>
+            {!clientStatus && (
+              <div className="mt-4 bg-white bg-opacity-20 p-3 rounded-md">
+                <div className="flex items-start">
+                  <WarningOutlined className="text-yellow-300 text-lg mt-1 mr-2" />
+                  <div>
+                    <h3 className="text-lg font-semibold">
+                      {t.profileIncomplete}
+                    </h3>
+                    <p className="mb-2">{t.completeYourProfile}</p>
+                    <Button
+                      type="primary"
+                      ghost
+                      onClick={() => handleMenuClick({ key: "Mon-Profil" })}
+                    >
+                      {t.goToProfile}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Quick Links */}
+        <div className="col-span-1">
+          <div className="bg-white p-6 rounded-lg shadow-md h-full">
+            <h2 className="text-lg font-semibold mb-4 border-b pb-2">
+              {language === "fr" ? "Accès rapides" : "Quick Access"}
+            </h2>
+            <div className="grid grid-cols-2 gap-3">
+              <Button
+                type="default"
+                icon={<UserOutlined />}
+                className="flex items-center justify-center"
+                onClick={() => handleMenuClick({ key: "Mon-Profil" })}
+              >
+                {t.myProfile}
+              </Button>
+              <Button
+                type="default"
+                icon={<FileOutlined />}
+                className="flex items-center justify-center"
+                onClick={() => handleMenuClick({ key: "documents" })}
+              >
+                {t.documents}
+              </Button>
+              {clientStatus && (
+                <>
+                  <Button
+                    type="default"
+                    icon={<BankOutlined />}
+                    className="flex items-center justify-center"
+                    onClick={() =>
+                      handleMenuClick({ key: "Entreprise-de-Services" })
+                    }
+                  >
+                    {t.esnPartners}
+                  </Button>
+                  <Button
+                    type="default"
+                    icon={<ProjectOutlined />}
+                    className="flex items-center justify-center"
+                    onClick={() => handleMenuClick({ key: "Appel-d'offres" })}
+                  >
+                    {t.tenders}
+                  </Button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const ClientProfile = () => {
   const [current, setCurrent] = useState("dashboard");
   const [searchValue, setSearchValue] = useState("");
-  const [breadcrumbItems, setBreadcrumbItems] = useState(["Tableau de Bord"]);
+  const [breadcrumbItems, setBreadcrumbItems] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
   const [update, setupdate] = useState("");
@@ -197,14 +391,54 @@ const ClientProfile = () => {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [attemptedMenu, setAttemptedMenu] = useState("");
 
-  // Responsive states for mobile view
+  // Language state
+  const [language, setLanguage] = useState(() => {
+    const savedLanguage = localStorage.getItem("language");
+    return savedLanguage || "fr"; // Default to French
+  });
+
+  const t = translations[language] || translations.fr;
+
+  // Save language preference to localStorage when it changes
+  useEffect(() => {
+    localStorage.setItem("language", language);
+  }, [language]);
+
+  // Function to change language
+  const changeLanguage = (lang) => {
+    setLanguage(lang);
+    // Update breadcrumbs when language changes
+    const path = findMenuPath(current);
+    if (path) {
+      setBreadcrumbItems(path);
+    }
+  };
+
+  // Responsive states
+  const [screenSize, setScreenSize] = useState({
+    width: window.innerWidth,
+    height: window.innerHeight,
+  });
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [isTablet, setIsTablet] = useState(
+    window.innerWidth >= 768 && window.innerWidth < 1024
+  );
   const [drawerVisible, setDrawerVisible] = useState(false);
+
+  // Update breadcrumb items with the correct language
+  useEffect(() => {
+    setBreadcrumbItems([t.dashboard]);
+  }, [language, t.dashboard]);
 
   // Detect window resize for responsiveness
   useEffect(() => {
     const handleResize = () => {
-      setIsMobile(window.innerWidth < 768);
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+
+      setScreenSize({ width, height });
+      setIsMobile(width < 768);
+      setIsTablet(width >= 768 && width < 1024);
     };
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
@@ -234,7 +468,11 @@ const ClientProfile = () => {
 
   const isMenuAllowed = (menuKey) => {
     // Only "Mon-Profil" and "documents" sections are allowed for inactive accounts
-    return menuKey === "Mon-Profil" || menuKey === "documents";
+    return (
+      menuKey === "Mon-Profil" ||
+      menuKey === "documents" ||
+      menuKey === "dashboard"
+    );
   };
 
   useEffect(() => {
@@ -322,114 +560,119 @@ const ClientProfile = () => {
     setUnreadNotificationsCount(unreadCount);
   };
 
-  const menuItems = [
-    {
-      label: "Tableau de Bord",
-      key: "dashboard",
-      icon: <DashboardOutlined />,
-    },
-    {
-      label: "Mon Espace",
-      key: "mon-espace",
-      icon: <UserOutlined />,
-      group: "Gestion du Compte",
-      children: [
-        {
-          label: "Mon Profil Client",
-          key: "Mon-Profil",
-          icon: <ProfileOutlined />,
-        },
-      ],
-    },
-    {
-      label: "Prestataires",
-      key: "prestataires",
-      icon: <BuildOutlined />,
-      group: "Gestion des Services",
-      disabled: !esnStatus,
-      children: [
-        {
-          label: "ESN Partenaires",
-          key: "Entreprise-de-Services",
-          icon: <BankOutlined />,
-          disabled: !esnStatus,
-        },
-        {
-          label: "Consultants",
-          key: "consultant",
-          icon: <TeamOutlined />,
-          disabled: !esnStatus,
-        },
-        {
-          label: "Partenariats",
-          key: "Partenariat",
-          icon: <PartitionOutlined />,
-          disabled: !esnStatus,
-        },
-      ],
-    },
-    {
-      label: "Appels d'Offres",
-      key: "appels-offres",
-      icon: <ProjectOutlined />,
-      group: "Gestion Commerciale",
-      disabled: !esnStatus,
-      children: [
-        {
-          label: "Mes offers",
-          key: "Appel-d'offres",
-          icon: <FileSearchOutlined />,
-          disabled: !esnStatus,
-        },
-        {
-          label: "Candidatures",
-          key: "Liste-Candidature",
-          icon: <UsergroupAddOutlined />,
-          disabled: !esnStatus,
-        },
-        {
-          label: "Bons de Commande",
-          key: "Liste-BDC",
-          icon: <ShoppingOutlined />,
-          disabled: !esnStatus,
-        },
-        {
-          label: "Contrats",
-          key: "Contart",
-          icon: <FileDoneOutlined />,
-          disabled: !esnStatus,
-        },
-      ],
-    },
-    {
-      label: "Documents",
-      key: "documents-section",
-      icon: <FileOutlined />,
-      group: "Documentation",
-      children: [
-        {
-          label: "Gestion Documentaire",
-          key: "documents",
-          icon: <SolutionOutlined />,
-        },
-      ],
-    },
-    {
-      label: (
-        <Badge
-          maxCount={9}
-          overflowCount={9}
-          style={{ opacity: 1, position: "relative", left: 0 }}
-          count={unreadNotificationsCount}
-        >
-          Notifications
-        </Badge>
-      ),
-      key: "notification",
-      icon: <NotificationOutlined />,
-      disabled: !esnStatus,
-    },
-  ];
+  // Function to get menu items with current language
+  // Function to get menu items with current language
+  const getMenuItems = () => {
+    return [
+      {
+        label: t.dashboard,
+        key: "dashboard",
+        icon: <DashboardOutlined />,
+      },
+      {
+        label: t.mySpace,
+        key: "mon-espace",
+        icon: <UserOutlined />,
+        children: [
+          {
+            label: t.myProfile,
+            key: "Mon-Profil",
+            icon: <ProfileOutlined />,
+          },
+        ],
+      },
+      {
+        label: t.documents,
+        key: "documents",
+        icon: <FileOutlined />,
+        // children: [
+        //   {
+        //     label: t.documentManagement,
+        //     key: "documents",
+        //     icon: <SolutionOutlined />,
+        //   },
+        // ],
+      },
+      {
+        label: t.providers,
+        key: "providers-group",
+        icon: <BuildOutlined />,
+        disabled: !esnStatus,
+        children: [
+          {
+            label: t.esnPartners,
+            key: "Entreprise-de-Services",
+            icon: <BankOutlined />,
+            disabled: !esnStatus,
+          },
+          {
+            label: t.consultants,
+            key: "consultant",
+            icon: <TeamOutlined />,
+            disabled: !esnStatus,
+          },
+          {
+            label: t.partnerships,
+            key: "Partenariat",
+            icon: <PartitionOutlined />,
+            disabled: !esnStatus,
+          },
+        ],
+      },
+      {
+        label: t.commercialManagement,
+        key: "commercial-management",
+        icon: <ShoppingOutlined />,
+        disabled: !esnStatus,
+        children: [
+          {
+            label: t.tenders,
+            key: "Appel-d'offres",
+            icon: <ProjectOutlined />,
+            disabled: !esnStatus,
+          },
+          {
+            label: t.applications,
+            key: "Liste-Candidature",
+            icon: <UsergroupAddOutlined />,
+            disabled: !esnStatus,
+          },
+          {
+            label: t.purchaseOrders,
+            key: "Liste-BDC",
+            icon: <ShoppingOutlined />,
+            disabled: !esnStatus,
+          },
+          {
+            label: t.contracts,
+            key: "Contart",
+            icon: <FileDoneOutlined />,
+            disabled: !esnStatus,
+          },
+        ],
+      },
+      {
+        label: (
+          <Badge
+            maxCount={9}
+            overflowCount={9}
+            style={{ opacity: 1, position: "relative", left: 0 }}
+            count={unreadNotificationsCount}
+          >
+            {t.notifications}
+          </Badge>
+        ),
+        key: "notification",
+        icon: <NotificationOutlined />,
+        disabled: !esnStatus,
+      },
+    ];
+  };
+
+  const menuItems = useMemo(
+    () => getMenuItems(),
+    [t, unreadNotificationsCount, esnStatus]
+  );
 
   const groupedMenuItems = useMemo(() => {
     const mainItems = menuItems
@@ -438,11 +681,7 @@ const ClientProfile = () => {
         if (item.disabled) {
           return {
             ...item,
-            label: (
-              <Tooltip title="Compte inactif: Veuillez compléter votre profil pour accéder à cette section">
-                {item.label}
-              </Tooltip>
-            ),
+            label: <Tooltip title={t.inactiveWarning}>{item.label}</Tooltip>,
           };
         }
         return item;
@@ -456,9 +695,7 @@ const ClientProfile = () => {
             const childItem = { ...i, group: undefined };
             if (childItem.disabled) {
               childItem.label = (
-                <Tooltip title="Compte inactif: Veuillez compléter votre profil pour accéder à cette section">
-                  {childItem.label}
-                </Tooltip>
+                <Tooltip title={t.inactiveWarning}>{childItem.label}</Tooltip>
               );
             }
             return childItem;
@@ -474,7 +711,7 @@ const ClientProfile = () => {
     }, []);
 
     return [...mainItems, ...groupedItems];
-  }, [menuItems, unreadNotificationsCount, esnStatus]);
+  }, [menuItems, t.inactiveWarning]);
 
   const findMenuPath = (key) => {
     for (const item of menuItems) {
@@ -488,7 +725,7 @@ const ClientProfile = () => {
         }
       }
     }
-    return ["Tableau de Bord"];
+    return [t.dashboard];
   };
 
   const getSearchOptions = (searchText) => {
@@ -501,9 +738,7 @@ const ClientProfile = () => {
       return [...acc, item];
     }, []);
     return flattenedItems
-      .filter((item) =>
-        item.label?.toString().toLowerCase().includes(search)
-      )
+      .filter((item) => item.label?.toString().toLowerCase().includes(search))
       .map((item) => ({
         value: item.key,
         label: (
@@ -520,7 +755,7 @@ const ClientProfile = () => {
   };
 
   const handleSelect = (value) => {
-    if (esnStatus === false && !["Mon-Profil", "documents"].includes(value)) {
+    if (esnStatus === false && !isMenuAllowed(value)) {
       setAttemptedMenu(value);
       setIsModalVisible(true);
       return;
@@ -531,7 +766,7 @@ const ClientProfile = () => {
   };
 
   const handleMenuClick = (e) => {
-    if (esnStatus === false && !["Mon-Profil", "documents"].includes(e.key)) {
+    if (esnStatus === false && !isMenuAllowed(e.key)) {
       setAttemptedMenu(e.key);
       setIsModalVisible(true);
       return;
@@ -548,11 +783,20 @@ const ClientProfile = () => {
     if (
       esnStatus === false &&
       current !== "dashboard" &&
-      !["Mon-Profil", "documents"].includes(current)
+      !isMenuAllowed(current)
     ) {
       return <ClientPlusInfo />;
     }
     switch (current) {
+      case "dashboard":
+        return (
+          <Dashboard
+            clientStatus={esnStatus}
+            t={t}
+            language={language}
+            handleMenuClick={handleMenuClick}
+          />
+        );
       case "Mon-Profil":
         return <ClientPlusInfo />;
       case "Entreprise-de-Services":
@@ -571,6 +815,7 @@ const ClientProfile = () => {
             notifications={notifications}
             onNotificationsUpdate={handleNotificationsUpdate}
             setupdate={setupdate}
+            t={t}
           />
         );
       case "Contart":
@@ -585,150 +830,244 @@ const ClientProfile = () => {
   };
 
   return (
-    <div className="w-full">
-      {/* Inactive Account Warning Modal */}
-      <Modal
-        title={
-          <div className="flex items-center text-amber-600">
-            <WarningOutlined className="mr-2" /> Compte prestataire Inactif
-          </div>
-        }
-        open={isModalVisible}
-        onCancel={() => setIsModalVisible(false)}
-        footer={[
-          <Button
-            key="profile"
-            type="primary"
-            onClick={() => {
-              setCurrent("Mon-Profil");
-              setBreadcrumbItems(findMenuPath("Mon-Profil"));
-              setIsModalVisible(false);
-            }}
-          >
-            Accéder à mon profil
-          </Button>,
-          <Button key="cancel" onClick={() => setIsModalVisible(false)}>
-            Fermer
-          </Button>,
-        ]}
-      >
-        <div className="p-2">
-          <p className="text-base mb-3">
-            Votre compte est actuellement inactif. L'accès aux fonctionnalités
-            est limité.
-          </p>
-          <p className="text-base mb-3">
-            Pour activer votre compte, complétez toutes les informations requises
-            dans votre profil.
-          </p>
-          <p className="text-sm text-gray-500">
-            Sections accessibles: Tableau de Bord, Mon Profil Client et Gestion
-            Documentaire
-          </p>
-          <p className="text-sm text-gray-500">
-            Sections restreintes: Prestataires, Appels d'Offres et Notifications
-          </p>
-        </div>
-      </Modal>
-
-      <div className="fixed top-0 left-0 right-0 z-50 bg-white shadow-md">
-        <div className="w-full flex items-center p-4 justify-between">
-          <div className="flex items-center gap-4 flex-1">
-            {isMobile ? (
-              <>
-                <Button type="text" icon={<MenuOutlined />} onClick={toggleDrawer} />
-                <Drawer
-                  title="Menu"
-                  placement="left"
-                  onClose={toggleDrawer}
-                  visible={drawerVisible}
-                >
-                  <Menu
-                    onClick={(e) => {
-                      handleMenuClick(e);
-                      toggleDrawer();
-                    }}
-                    selectedKeys={[current]}
-                    mode="vertical"
-                    items={groupedMenuItems}
-                  />
-                  <div className="mt-4">
-                    <AutoComplete
-                      value={searchValue}
-                      options={getSearchOptions(searchValue)}
-                      onSelect={handleSelect}
-                      onChange={handleSearch}
-                      style={{ width: "100%" }}
-                    >
-                      <Input
-                        placeholder="Rechercher une interface..."
-                        suffix={<SearchOutlined />}
-                      />
-                    </AutoComplete>
-                  </div>
-                </Drawer>
-              </>
-            ) : (
-              <Menu
-                onClick={handleMenuClick}
-                selectedKeys={[current]}
-                mode="horizontal"
-                items={groupedMenuItems}
-                className="border-none flex-1"
-              />
-            )}
-          </div>
-          {isMobile ? (
-            <div className="flex space-x-4 items-center">
-              <LogoutOutlined
+    <ConfigProvider
+      theme={{
+        token: {
+          colorPrimary: "#10b981", // Green theme for client interface
+          borderRadius: 6,
+        },
+        components: {
+          Menu: {
+            itemSelectedColor: "#10b981",
+            itemSelectedBg: "#ecfdf5",
+          },
+        },
+      }}
+    >
+      <LanguageContext.Provider value={{ language, changeLanguage, t }}>
+        <div className="w-full min-h-screen bg-gray-50">
+          {/* Inactive Account Warning Modal */}
+          <Modal
+            title={
+              <div className="flex items-center text-amber-600">
+                <WarningOutlined className="mr-2" /> {t.inactiveAccount}
+              </div>
+            }
+            open={isModalVisible}
+            onCancel={() => setIsModalVisible(false)}
+            footer={[
+              <Button
+                key="profile"
+                type="primary"
                 onClick={() => {
-                  logoutEsn();
-                  navigate("/Login");
+                  setCurrent("Mon-Profil");
+                  setBreadcrumbItems(findMenuPath("Mon-Profil"));
+                  setIsModalVisible(false);
                 }}
-                className="text-red-500 cursor-pointer text-base hover:text-red-600"
-                title="Déconnexion"
-              />
-            </div>
-          ) : (
-            <div className="flex space-x-6 items-center">
-              <AutoComplete
-                value={searchValue}
-                options={getSearchOptions(searchValue)}
-                onSelect={handleSelect}
-                onChange={handleSearch}
-                className="w-64"
               >
-                <Input
-                  className="w-full rounded-lg border border-gray-200 focus:outline-none focus:border-blue-500"
-                  placeholder="Rechercher une interface..."
-                  suffix={<SearchOutlined className="text-gray-400" />}
-                />
-              </AutoComplete>
-              <Tag color={esnStatus ? "green" : "orange"}>
-                {!esnStatus ? "Compte Client inactif" : "Compte actif"}
-              </Tag>
-              <LogoutOutlined
-                onClick={() => {
-                  logoutEsn();
-                  navigate("/Login");
-                }}
-                className="text-red-500 cursor-pointer text-base hover:text-red-600"
-                title="Déconnexion"
-              />
+                {t.accessProfile}
+              </Button>,
+              <Button key="cancel" onClick={() => setIsModalVisible(false)}>
+                {t.close}
+              </Button>,
+            ]}
+          >
+            <div className="p-2">
+              <p className="text-base mb-3">{t.inactiveWarning}</p>
+              <p className="text-base mb-3">{t.completeProfile}</p>
+              <p className="text-sm text-gray-500">{t.limitedAccess}</p>
+              <p className="text-sm text-gray-500">{t.restrictedSections}</p>
             </div>
-          )}
-        </div>
-      </div>
+          </Modal>
 
-      <div className="pt-20 px-5 mt-5">
-        <Breadcrumb className="mb-4">
-          {breadcrumbItems.map((item, index) => (
-            <Breadcrumb.Item key={index}>{item}</Breadcrumb.Item>
-          ))}
-        </Breadcrumb>
-        <div className="mt-3">{renderComponent()}</div>
-      </div>
-    </div>
+          {/* Header */}
+          <div className="fixed top-0 left-0 right-0 z-50 bg-white shadow-md">
+            <div className="w-full flex items-center justify-between p-4">
+              {isMobile || isTablet ? (
+                <>
+                  <div className="flex items-center">
+                    <Button
+                      type="text"
+                      icon={<MenuOutlined />}
+                      onClick={toggleDrawer}
+                      aria-label="Toggle menu"
+                    />
+                    <Tag
+                      color={esnStatus ? "green" : "orange"}
+                      className="ml-3"
+                    >
+                      {!esnStatus ? t.inactiveClientAccount : t.activeAccount}
+                    </Tag>
+                  </div>
+                  <Drawer
+                    title={
+                      <div className="flex justify-between items-center">
+                        <span>{t.menu}</span>
+                        <Select
+                          value={language}
+                          onChange={changeLanguage}
+                          bordered={false}
+                          dropdownMatchSelectWidth={false}
+                          style={{ width: 80 }}
+                          size="small"
+                        >
+                          <Select.Option value="fr">
+                            <div className="flex items-center">
+                              <span className="mr-2">🇫🇷</span>
+                              FR
+                            </div>
+                          </Select.Option>
+                          <Select.Option value="en">
+                            <div className="flex items-center">
+                              <span className="mr-2">🇬🇧</span>
+                              EN
+                            </div>
+                          </Select.Option>
+                        </Select>
+                      </div>
+                    }
+                    placement="left"
+                    onClose={toggleDrawer}
+                    open={drawerVisible}
+                    width={screenSize.width < 400 ? "85%" : 320}
+                    bodyStyle={{ padding: "12px" }}
+                  >
+                    <div className="mb-4">
+                      <AutoComplete
+                        value={searchValue}
+                        options={getSearchOptions(searchValue)}
+                        onSelect={(value) => {
+                          handleSelect(value);
+                          toggleDrawer();
+                        }}
+                        onChange={handleSearch}
+                        style={{ width: "100%" }}
+                      >
+                        <Input
+                          placeholder={t.search}
+                          suffix={<SearchOutlined />}
+                          size={screenSize.width < 400 ? "middle" : "large"}
+                        />
+                      </AutoComplete>
+                    </div>
+                    <Menu
+                      onClick={(e) => {
+                        handleMenuClick(e);
+                        toggleDrawer();
+                      }}
+                      selectedKeys={[current]}
+                      mode="vertical"
+                      items={groupedMenuItems}
+                      className="border-none"
+                      style={{
+                        overflowY: "auto",
+                        maxHeight: "calc(100vh - 180px)",
+                      }}
+                    />
+                    <div className="absolute bottom-4 left-0 right-0 px-6 flex flex-col space-y-2">
+                      <Button
+                        danger
+                        block
+                        icon={<LogoutOutlined />}
+                        onClick={() => {
+                          logoutEsn();
+                          navigate("/Login");
+                        }}
+                      >
+                        {t.disconnect}
+                      </Button>
+                    </div>
+                  </Drawer>
+                </>
+              ) : (
+                <div className="flex items-center flex-grow overflow-hidden">
+                  <Menu
+                    onClick={handleMenuClick}
+                    selectedKeys={[current]}
+                    mode="horizontal"
+                    items={groupedMenuItems}
+                    className="border-none flex-grow"
+                    overflowedIndicator={
+                      <MoreOutlined style={{ fontSize: "18px" }} />
+                    }
+                  />
+                  <AutoComplete
+                    value={searchValue}
+                    options={getSearchOptions(searchValue)}
+                    onSelect={handleSelect}
+                    onChange={handleSearch}
+                    className="ml-4 w-64 flex-shrink-0"
+                  >
+                    <Input
+                      className="rounded-lg border border-gray-200 focus:outline-none focus:border-green-500"
+                      placeholder={t.search}
+                      suffix={<SearchOutlined className="text-gray-400" />}
+                    />
+                  </AutoComplete>
+                </div>
+              )}
+              <div
+                className={`flex space-x-2 items-center ${
+                  isMobile || isTablet ? "" : "ml-4"
+                } flex-shrink-0`}
+              >
+                {!isMobile && !isTablet && (
+                  <>
+                    <Select
+                      value={language}
+                      onChange={changeLanguage}
+                      bordered={false}
+                      dropdownMatchSelectWidth={false}
+                      style={{ width: 100 }}
+                    >
+                      <Select.Option value="fr">
+                        <div className="flex items-center">
+                          <span className="mr-2">🇫🇷</span>
+                          FR
+                        </div>
+                      </Select.Option>
+                      <Select.Option value="en">
+                        <div className="flex items-center">
+                          <span className="mr-2">🇬🇧</span>
+                          EN
+                        </div>
+                      </Select.Option>
+                    </Select>
+                    <Tag color={esnStatus ? "green" : "orange"}>
+                      {!esnStatus ? t.inactiveClientAccount : t.activeAccount}
+                    </Tag>
+                  </>
+                )}
+                <Tooltip title={t.disconnect}>
+                  <Button
+                    type="text"
+                    danger
+                    icon={<LogoutOutlined />}
+                    onClick={() => {
+                      logoutEsn();
+                      navigate("/Login");
+                    }}
+                    aria-label="Logout"
+                  />
+                </Tooltip>
+              </div>
+            </div>
+          </div>
+
+          {/* Main Content */}
+          <div
+            className={`pt-20 ${isMobile ? "px-3" : "px-5"} mt-3 md:mt-5 pb-8`}
+          >
+            <Breadcrumb className="mb-4">
+              {breadcrumbItems.map((item, index) => (
+                <Breadcrumb.Item key={index}>{item}</Breadcrumb.Item>
+              ))}
+            </Breadcrumb>
+            <div className="mt-2 md:mt-4">{renderComponent()}</div>
+          </div>
+        </div>
+      </LanguageContext.Provider>
+    </ConfigProvider>
   );
 };
 

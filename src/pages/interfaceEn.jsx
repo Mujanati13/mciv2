@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, {
+  useState,
+  useEffect,
+  useMemo,
+  createContext,
+  useContext,
+} from "react";
 import {
   LogoutOutlined,
   MacCommandOutlined,
@@ -20,7 +26,8 @@ import {
   CheckOutlined,
   WarningOutlined,
   MoreOutlined,
-  MenuOutlined, // Added for mobile hamburger icon
+  MenuOutlined,
+  GlobalOutlined,
 } from "@ant-design/icons";
 import {
   Menu,
@@ -34,7 +41,8 @@ import {
   Tag,
   Modal,
   Tooltip,
-  Drawer, // Import Drawer for mobile menu
+  Drawer,
+  Select,
 } from "antd";
 
 import { Endponit } from "../helper/enpoint";
@@ -53,10 +61,94 @@ import ESNProfilePageFrancais from "../components/en-interface/profile";
 // import { messaging } from "../helper/firebase/config";
 // import { onMessage, getToken } from "firebase/messaging";
 
+// Language Context
+const LanguageContext = createContext();
+
+export const useLanguage = () => {
+  return useContext(LanguageContext);
+};
+
+// Translations
+const translations = {
+  fr: {
+    dashboard: "Tableau de Bord",
+    administration: "Administration",
+    profile: "Mon Profil ESN",
+    collaborators: "Gestion des Collaborateurs",
+    clientManagement: "Mes Clients",
+    clientDirectory: "Répertoire Clients",
+    partnerships: "Partenariats",
+    commercialManagement: "Gestion Commerciale",
+    tenders: "Appels d'Offres",
+    applications: "Mes Candidatures",
+    purchaseOrders: "Bons de Commande",
+    contracts: "Contrats",
+    documentation: "Mes Documents",
+    clientDocuments: "Documents",
+    notifications: "Notifications",
+    disconnect: "Déconnexion",
+    markAllAsRead: "Marquer tout comme lu",
+    markAsRead: "Marquer comme lu",
+    search: "Rechercher dans le menu...",
+    inactiveAccount: "Compte ESN Inactif",
+    inactiveWarning:
+      "Votre compte ESN est actuellement inactif. Vous ne pouvez pas accéder à cette section.",
+    completeProfile:
+      "Pour activer votre compte, complétez toutes les informations requises dans votre profil ESN.",
+    limitedAccess:
+      "Seule la section \"Mon Profil ESN\" est accessible jusqu'à l'activation de votre compte.",
+    accessProfile: "Accéder à mon profil ESN",
+    close: "Fermer",
+    inactiveProvider: "Compte prestataire inactif",
+    activeAccount: "Compte actif",
+    menu: "Menu",
+    languageFr: "Français",
+    languageEn: "English",
+    breadcrumbHome: "Accueil",
+  },
+  en: {
+    dashboard: "Dashboard",
+    administration: "Administration",
+    profile: "My ESN Profile",
+    collaborators: "Collaborator Management",
+    clientManagement: "Client Management",
+    clientDirectory: "Client Directory",
+    partnerships: "Partnerships",
+    commercialManagement: "Commercial Management",
+    tenders: "Tenders",
+    applications: "My Applications",
+    purchaseOrders: "Purchase Orders",
+    contracts: "Contracts",
+    documentation: "Documentation",
+    clientDocuments: "Client Documents",
+    notifications: "Notifications",
+    disconnect: "Logout",
+    markAllAsRead: "Mark all as read",
+    markAsRead: "Mark as read",
+    search: "Search in menu...",
+    inactiveAccount: "Inactive ESN Account",
+    inactiveWarning:
+      "Your ESN account is currently inactive. You cannot access this section.",
+    completeProfile:
+      "To activate your account, please complete all required information in your ESN profile.",
+    limitedAccess:
+      'Only the "My ESN Profile" section is accessible until your account is activated.',
+    accessProfile: "Access my ESN profile",
+    close: "Close",
+    inactiveProvider: "Inactive provider account",
+    activeAccount: "Active account",
+    menu: "Menu",
+    languageFr: "Français",
+    languageEn: "English",
+    breadcrumbHome: "Home",
+  },
+};
+
 const NotificationInterface = ({
   notifications,
   onNotificationsUpdate,
   setupdate,
+  t,
 }) => {
   const [loading, setLoading] = useState(false);
 
@@ -140,7 +232,7 @@ const NotificationInterface = ({
           loading={loading}
           disabled={!notifications.some((n) => !n.read)}
         >
-          Marquer tout comme lu
+          {t.markAllAsRead}
         </Button>
       </div>
       <List
@@ -160,7 +252,7 @@ const NotificationInterface = ({
                   onClick={() => markAsRead(item)}
                   loading={loading}
                 >
-                  Marquer comme lu
+                  {t.markAsRead}
                 </Button>
               ),
             ]}
@@ -198,7 +290,7 @@ const NotificationInterface = ({
 const InterfaceEn = () => {
   const [current, setCurrent] = useState("dashboard");
   const [searchValue, setSearchValue] = useState("");
-  const [breadcrumbItems, setBreadcrumbItems] = useState(["Tableau de Bord"]);
+  const [breadcrumbItems, setBreadcrumbItems] = useState([]);
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
   const [notifications, setNotifications] = useState([]);
   const [update, setupdate] = useState([]);
@@ -206,6 +298,28 @@ const InterfaceEn = () => {
   const [esnStatus, setEsnStatus] = useState(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [attemptedMenu, setAttemptedMenu] = useState("");
+
+  // Language state
+  const [language, setLanguage] = useState(() => {
+    const savedLanguage = localStorage.getItem("language");
+    return savedLanguage || "fr"; // Default to French
+  });
+  const t = translations[language] || translations.fr;
+
+  // Save language preference to localStorage when it changes
+  useEffect(() => {
+    localStorage.setItem("language", language);
+  }, [language]);
+
+  // Function to change language
+  const changeLanguage = (lang) => {
+    setLanguage(lang);
+    // Update breadcrumbs when language changes
+    const path = findMenuPath(current, getMenuItems());
+    if (path) {
+      setBreadcrumbItems(path);
+    }
+  };
 
   // Responsive state for mobile view
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
@@ -218,6 +332,11 @@ const InterfaceEn = () => {
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
+
+  // Initialize breadcrumb items with the correct language
+  useEffect(() => {
+    setBreadcrumbItems([t.dashboard]);
+  }, [language, t.dashboard]);
 
   // Function to check ESN status
   const checkEsnStatus = async () => {
@@ -315,109 +434,119 @@ const InterfaceEn = () => {
     setUnreadNotificationsCount(unreadCount);
   };
 
-  const menuItems = [
-    {
-      label: "Tableau de Bord",
-      key: "dashboard",
-      icon: <DashboardOutlined />,
-    },
-    {
-      label: "Administration",
-      key: "administration",
-      icon: <SettingOutlined />,
-      children: [
-        {
-          label: "Mon Profil ESN",
-          key: "Profile",
-          icon: <UserOutlined />,
-        },
-        {
-          label: "Gestion des Collaborateurs",
-          key: "collaborateur",
-          icon: <UsergroupAddOutlined />,
-          disabled: !esnStatus,
-        },
-      ],
-    },
-    {
-      label: "Gestion Client",
-      key: "client-management",
-      icon: <TeamOutlined />,
-      disabled: !esnStatus,
-      children: [
-        {
-          label: "Répertoire Clients",
-          key: "Liste-des-Clients",
-          icon: <SolutionOutlined />,
-          disabled: !esnStatus,
-        },
-        {
-          label: "Partenariats",
-          key: "Partenariat",
-          icon: <BankOutlined />,
-          disabled: !esnStatus,
-        },
-      ],
-    },
-    {
-      label: "Gestion Commerciale",
-      key: "commercial-management",
-      icon: <ShoppingCartOutlined />,
-      disabled: !esnStatus,
-      children: [
-        {
-          label: "Appels d'Offres",
-          key: "Liste-des-Appels-d'Offres",
-          icon: <ProjectOutlined />,
-          disabled: !esnStatus,
-        },
-        {
-          label: "Mes Candidatures",
-          key: "Mes-condidateur",
-          icon: <UserSwitchOutlined />,
-          disabled: !esnStatus,
-        },
-        {
-          label: "Bons de Commande",
-          key: "Bon-de-Commande",
-          icon: <MacCommandOutlined />,
-          disabled: !esnStatus,
-        },
-        {
-          label: "Contrats",
-          key: "Contart",
-          icon: <FileDoneOutlined />,
-          disabled: !esnStatus,
-        },
-      ],
-    },
-    {
-      label: "Documentation",
-      key: "documentation",
-      icon: <FileOutlined />,
-      children: [
-        {
-          label: "Documents Clients",
-          key: "documents",
-          icon: <FileTextOutlined />,
-        },
-      ],
-    },
-    {
-      label: (
-        <Badge
-          style={{ opacity: 1, position: "relative", left: 0 }}
-          count={unreadNotificationsCount}
-          overflowCount={9}
-        >
-          Notifications
-        </Badge>
-      ),
-      key: "notification",
-      icon: <NotificationOutlined />,
-      disabled: !esnStatus,
-    },
-  ];
+  // Function to get menu items with current language
+  const getMenuItems = () => {
+    return [
+      {
+        label: t.dashboard,
+        key: "dashboard",
+        icon: <DashboardOutlined />,
+      },
+      {
+        label: t.administration,
+        key: "administration",
+        icon: <SettingOutlined />,
+        children: [
+          {
+            label: t.profile,
+            key: "Profile",
+            icon: <UserOutlined />,
+          },
+          {
+            label: t.collaborators,
+            key: "collaborateur",
+            icon: <UsergroupAddOutlined />,
+            disabled: !esnStatus,
+          },
+        ],
+      },
+      {
+        label: t.documentation,
+        key: "documentation",
+        icon: <FileOutlined />,
+        children: [
+          {
+            label: t.clientDocuments,
+            key: "documents",
+            icon: <FileTextOutlined />,
+          },
+        ],
+      },
+
+      {
+        label: t.commercialManagement,
+        key: "commercial-management",
+        icon: <ShoppingCartOutlined />,
+        disabled: !esnStatus,
+        children: [
+          {
+            label: t.tenders,
+            key: "Liste-des-Appels-d'Offres",
+            icon: <ProjectOutlined />,
+            disabled: !esnStatus,
+          },
+          {
+            label: t.applications,
+            key: "Mes-condidateur",
+            icon: <UserSwitchOutlined />,
+            disabled: !esnStatus,
+          },
+          {
+            label: t.purchaseOrders,
+            key: "Bon-de-Commande",
+            icon: <MacCommandOutlined />,
+            disabled: !esnStatus,
+          },
+          {
+            label: t.contracts,
+            key: "Contart",
+            icon: <FileDoneOutlined />,
+            disabled: !esnStatus,
+          },
+        ],
+      },
+      {
+        label: t.clientManagement,
+        key: "client-management",
+        icon: <TeamOutlined />,
+        disabled: !esnStatus,
+        children: [
+          {
+            label: t.clientDirectory,
+            key: "Liste-des-Clients",
+            icon: <SolutionOutlined />,
+            disabled: !esnStatus,
+          },
+          {
+            label: t.partnerships,
+            key: "Partenariat",
+            icon: <BankOutlined />,
+            disabled: !esnStatus,
+          },
+        ],
+      },
+
+      {
+        label: (
+          <Badge
+            style={{ opacity: 1, position: "relative", left: 0 }}
+            count={unreadNotificationsCount}
+            overflowCount={9}
+          >
+            {t.notifications}
+          </Badge>
+        ),
+        key: "notification",
+        icon: <NotificationOutlined />,
+        disabled: !esnStatus,
+      },
+    ];
+  };
+
+  const menuItems = useMemo(
+    () => getMenuItems(),
+    [t, unreadNotificationsCount, esnStatus]
+  );
 
   const groupedMenuItems = useMemo(() => {
     // Handle main items with tooltips for disabled ones
@@ -427,11 +556,7 @@ const InterfaceEn = () => {
         if (item.disabled) {
           return {
             ...item,
-            label: (
-              <Tooltip title="Compte inactif: Veuillez compléter votre profil ESN pour accéder à cette section">
-                {item.label}
-              </Tooltip>
-            ),
+            label: <Tooltip title={t.inactiveWarning}>{item.label}</Tooltip>,
           };
         }
         return item;
@@ -446,9 +571,7 @@ const InterfaceEn = () => {
             const childItem = { ...i, group: undefined };
             if (childItem.disabled) {
               childItem.label = (
-                <Tooltip title="Compte inactif: Veuillez compléter votre profil ESN pour accéder à cette section">
-                  {childItem.label}
-                </Tooltip>
+                <Tooltip title={t.inactiveWarning}>{childItem.label}</Tooltip>
               );
             }
             return childItem;
@@ -463,9 +586,7 @@ const InterfaceEn = () => {
         if (item.disabled) {
           groupItem.disabled = true;
           groupItem.label = (
-            <Tooltip title="Compte inactif: Veuillez compléter votre profil ESN pour accéder à cette section">
-              {groupItem.label}
-            </Tooltip>
+            <Tooltip title={t.inactiveWarning}>{groupItem.label}</Tooltip>
           );
         }
 
@@ -475,7 +596,7 @@ const InterfaceEn = () => {
     }, []);
 
     return [...mainItems, ...groupedItems];
-  }, [menuItems, unreadNotificationsCount, esnStatus]);
+  }, [menuItems, t.inactiveWarning]);
 
   const findMenuPath = (key, items, path = []) => {
     for (const item of items) {
@@ -587,6 +708,7 @@ const InterfaceEn = () => {
             notifications={notifications}
             onNotificationsUpdate={handleNotificationsUpdate}
             setupdate={setupdate}
+            t={t}
           />
         );
       case "Mes-condidateur":
@@ -605,136 +727,178 @@ const InterfaceEn = () => {
   };
 
   return (
-    <div className="w-full">
-      {/* Inactive Account Warning Modal */}
-      <Modal
-        title={
-          <div className="flex items-center text-amber-600">
-            <WarningOutlined className="mr-2" /> Compte ESN Inactif
-          </div>
-        }
-        open={isModalVisible}
-        onCancel={() => setIsModalVisible(false)}
-        footer={[
-          <Button
-            key="profile"
-            type="primary"
-            onClick={() => {
-              setCurrent("Profile");
-              const path = findMenuPath("Profile", menuItems);
-              if (path) {
-                setBreadcrumbItems(path);
-              }
-              setIsModalVisible(false);
-            }}
-          >
-            Accéder à mon profil ESN
-          </Button>,
-          <Button key="cancel" onClick={() => setIsModalVisible(false)}>
-            Fermer
-          </Button>,
-        ]}
-      >
-        <div className="p-2">
-          <p className="text-base mb-3">
-            Votre compte ESN est actuellement inactif. Vous ne pouvez pas accéder à cette section.
-          </p>
-          <p className="text-base mb-3">
-            Pour activer votre compte, complétez toutes les informations requises dans votre profil ESN.
-          </p>
-          <p className="text-sm text-gray-500">
-            Seule la section "Mon Profil ESN" est accessible jusqu'à l'activation de votre compte.
-          </p>
-        </div>
-      </Modal>
-
-      {/* Header */}
-      <div className="fixed top-0 left-0 right-0 z-50 bg-white shadow-md">
-        <div className="w-full flex items-center justify-between p-4">
-          {isMobile ? (
-            <>
-              <Button type="text" icon={<MenuOutlined />} onClick={toggleDrawer} />
-              <Drawer
-                title="Menu"
-                placement="left"
-                onClose={toggleDrawer}
-                visible={drawerVisible}
-              >
-                <Menu
-                  onClick={(e) => {
-                    handleMenuClick(e);
-                    toggleDrawer();
-                  }}
-                  selectedKeys={[current]}
-                  mode="vertical"
-                  items={groupedMenuItems}
-                />
-                <div className="mt-4">
-                  <AutoComplete
-                    value={searchValue}
-                    options={getSearchOptions(searchValue)}
-                    onSelect={handleSelect}
-                    onChange={handleSearch}
-                    style={{ width: "100%" }}
-                  >
-                    <Input
-                      placeholder="Rechercher dans le menu..."
-                      suffix={<SearchOutlined />}
-                    />
-                  </AutoComplete>
-                </div>
-              </Drawer>
-            </>
-          ) : (
-            <div className="flex items-center flex-grow overflow-hidden">
-              <Menu
-                onClick={handleMenuClick}
-                selectedKeys={[current]}
-                mode="horizontal"
-                items={groupedMenuItems}
-                className="border-none flex-grow"
-                overflowedIndicator={<MoreOutlined style={{ fontSize: "18px" }} />}
-              />
-              <AutoComplete
-                value={searchValue}
-                options={getSearchOptions(searchValue)}
-                onSelect={handleSelect}
-                onChange={handleSearch}
-                className="ml-4 w-64 flex-shrink-0"
-              >
-                <Input
-                  className="rounded-lg border border-gray-200 focus:outline-none focus:border-blue-500"
-                  placeholder="Rechercher dans le menu..."
-                  suffix={<SearchOutlined className="text-gray-400" />}
-                />
-              </AutoComplete>
+    <LanguageContext.Provider value={{ language, changeLanguage, t }}>
+      <div className="w-full">
+        {/* Inactive Account Warning Modal */}
+        <Modal
+          title={
+            <div className="flex items-center text-amber-600">
+              <WarningOutlined className="mr-2" /> {t.inactiveAccount}
             </div>
-          )}
-          <div className="flex space-x-3 items-center ml-4 flex-shrink-0">
-            <Tag color={esnStatus ? "green" : "orange"}>
-              {!esnStatus ? "Compte prestataire inactif" : "Compte actif"}
-            </Tag>
-            <LogoutOutlined
+          }
+          open={isModalVisible}
+          onCancel={() => setIsModalVisible(false)}
+          footer={[
+            <Button
+              key="profile"
+              type="primary"
               onClick={() => {
-                logoutEsn();
-                navigate("/Login");
+                setCurrent("Profile");
+                const path = findMenuPath("Profile", menuItems);
+                if (path) {
+                  setBreadcrumbItems(path);
+                }
+                setIsModalVisible(false);
               }}
-              className="text-red-500 cursor-pointer text-base hover:text-red-600"
-              title="Déconnexion"
-            />
+            >
+              {t.accessProfile}
+            </Button>,
+            <Button key="cancel" onClick={() => setIsModalVisible(false)}>
+              {t.close}
+            </Button>,
+          ]}
+        >
+          <div className="p-2">
+            <p className="text-base mb-3">{t.inactiveWarning}</p>
+            <p className="text-base mb-3">{t.completeProfile}</p>
+            <p className="text-sm text-gray-500">{t.limitedAccess}</p>
+          </div>
+        </Modal>
+
+        {/* Header */}
+        <div className="fixed top-0 left-0 right-0 z-50 bg-white shadow-md">
+          <div className="w-full flex items-center justify-between p-4">
+            {isMobile ? (
+              <>
+                <Button
+                  type="text"
+                  icon={<MenuOutlined />}
+                  onClick={toggleDrawer}
+                />
+                <Drawer
+                  title={t.menu}
+                  placement="left"
+                  onClose={toggleDrawer}
+                  open={drawerVisible}
+                >
+                  <Menu
+                    onClick={(e) => {
+                      handleMenuClick(e);
+                      toggleDrawer();
+                    }}
+                    selectedKeys={[current]}
+                    mode="vertical"
+                    items={groupedMenuItems}
+                  />
+                  <div className="mt-4">
+                    <AutoComplete
+                      value={searchValue}
+                      options={getSearchOptions(searchValue)}
+                      onSelect={handleSelect}
+                      onChange={handleSearch}
+                      style={{ width: "100%" }}
+                    >
+                      <Input
+                        placeholder={t.search}
+                        suffix={<SearchOutlined />}
+                      />
+                    </AutoComplete>
+                  </div>
+                  <div className="mt-4">
+                    <Select
+                      value={language}
+                      onChange={changeLanguage}
+                      style={{ width: "100%" }}
+                    >
+                      <Select.Option value="fr">
+                        <div className="flex items-center">
+                          <span className="mr-2">🇫🇷</span>
+                          {t.languageFr}
+                        </div>
+                      </Select.Option>
+                      <Select.Option value="en">
+                        <div className="flex items-center">
+                          <span className="mr-2">🇬🇧</span>
+                          {t.languageEn}
+                        </div>
+                      </Select.Option>
+                    </Select>
+                  </div>
+                </Drawer>
+              </>
+            ) : (
+              <div className="flex items-center flex-grow overflow-hidden">
+                <Menu
+                  onClick={handleMenuClick}
+                  selectedKeys={[current]}
+                  mode="horizontal"
+                  items={groupedMenuItems}
+                  className="border-none flex-grow"
+                  overflowedIndicator={
+                    <MoreOutlined style={{ fontSize: "18px" }} />
+                  }
+                />
+                <AutoComplete
+                  value={searchValue}
+                  options={getSearchOptions(searchValue)}
+                  onSelect={handleSelect}
+                  onChange={handleSearch}
+                  className="ml-4 w-64 flex-shrink-0"
+                >
+                  <Input
+                    className="rounded-lg border border-gray-200 focus:outline-none focus:border-blue-500"
+                    placeholder={t.search}
+                    suffix={<SearchOutlined className="text-gray-400" />}
+                  />
+                </AutoComplete>
+              </div>
+            )}
+            <div className="flex space-x-3 items-center ml-4 flex-shrink-0">
+              <Select
+                value={language}
+                onChange={changeLanguage}
+                bordered={false}
+                dropdownMatchSelectWidth={false}
+                style={{ width: 100 }}
+              >
+                <Select.Option value="fr">
+                  <div className="flex items-center">
+                    <span className="mr-2">🇫🇷</span>
+                    FR
+                  </div>
+                </Select.Option>
+                <Select.Option value="en">
+                  <div className="flex items-center">
+                    <span className="mr-2">🇬🇧</span>
+                    EN
+                  </div>
+                </Select.Option>
+              </Select>
+              <Tag color={esnStatus ? "green" : "orange"}>
+                {!esnStatus ? t.inactiveProvider : t.activeAccount}
+              </Tag>
+              <LogoutOutlined
+                onClick={() => {
+                  logoutEsn();
+                  navigate("/Login");
+                }}
+                className="text-red-500 cursor-pointer text-base hover:text-red-600"
+                title={t.disconnect}
+              />
+            </div>
           </div>
         </div>
-      </div>
 
-      <div className="pt-20 px-5 mt-5">
-        <Breadcrumb className="mb-4">
-          {breadcrumbItems.map((item, index) => (
-            <Breadcrumb.Item key={index}>{item}</Breadcrumb.Item>
-          ))}
-        </Breadcrumb>
-        <div className="mt-3">{renderComponent()}</div>
+        <div className="pt-20 px-5 mt-5">
+          <Breadcrumb className="mb-4">
+            {breadcrumbItems.map((item, index) => (
+              <Breadcrumb.Item key={index}>{item}</Breadcrumb.Item>
+            ))}
+          </Breadcrumb>
+          <div className="mt-3">{renderComponent()}</div>
+        </div>
       </div>
-    </div>
+    </LanguageContext.Provider>
   );
 };
 

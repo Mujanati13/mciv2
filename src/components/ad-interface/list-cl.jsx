@@ -377,14 +377,14 @@ export const ClientList = () => {
 
         return (
           <Space>
-            <Tooltip title={getTooltipMessage()}>
+            {/* <Tooltip title={getTooltipMessage()}>
               <Button
                 type="text"
                 icon={<EditOutlined />}
                 onClick={() => openModal(record)}
                 // disabled={!isEnabled}
               />
-            </Tooltip>
+            </Tooltip> */}
             <Tooltip title="Supprimer">
               <Button
                 type="text"
@@ -439,18 +439,18 @@ export const ClientList = () => {
                 boxShadow: "0 4px 12px rgba(0, 0, 0, 0.08)",
               }}
               actions={[
-                <Tooltip title={getTooltipMessage()} key="edit-tooltip">
-                  <span>
-                    <EditOutlined
-                      key="edit"
-                      onClick={isEnabled ? () => openModal(client) : undefined}
-                      style={{
-                        color: !isEnabled ? "#d9d9d9" : "#1890ff",
-                        cursor: !isEnabled ? "not-allowed" : "pointer",
-                      }}
-                    />
-                  </span>
-                </Tooltip>,
+                // <Tooltip title={getTooltipMessage()} key="edit-tooltip">
+                //   <span>
+                //     <EditOutlined
+                //       key="edit"
+                //       onClick={isEnabled ? () => openModal(client) : undefined}
+                //       style={{
+                //         color: !isEnabled ? "#d9d9d9" : "#1890ff",
+                //         cursor: !isEnabled ? "not-allowed" : "pointer",
+                //       }}
+                //     />
+                //   </span>
+                // </Tooltip>,
                 <Tooltip title="Supprimer" key="delete-tooltip">
                   <DeleteOutlined
                     key="delete"

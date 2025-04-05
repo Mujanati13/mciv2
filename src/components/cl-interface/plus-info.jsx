@@ -152,6 +152,9 @@ const ClientPlusInfo = () => {
 
         // Generate PDF after accepting contract
         generatePDF();
+
+        // Refresh the page
+        window.location.reload();
       } else {
         throw new Error("Échec de la mise à jour du statut");
       }
@@ -583,7 +586,7 @@ const ClientPlusInfo = () => {
         [
           `Signé le ${dayjs().format("DD/MM/YYYY")} à ${dayjs().format(
             "HH:mm:ss"
-          )} par ${profile.responsible || "le responsable"}.`,
+          )} par ${profile.responsible || "Representant legal"}.`,
         ],
         105,
         255,
@@ -717,7 +720,7 @@ const ClientPlusInfo = () => {
       const client = response.data.data;
       setProfileedit(client[0]);
       console.log(client[0]);
-      
+
       const profileData = {
         id: client[0].ID_clt,
         img_path: client[0].img_path,
@@ -762,7 +765,7 @@ const ClientPlusInfo = () => {
 
       setProfile(profileData);
       console.log("profileData", profileData);
-      
+
       form.setFieldsValue({
         ...profileData,
         ...profileData.socialLinks,
@@ -1279,10 +1282,10 @@ const ClientPlusInfo = () => {
 
               <Row gutter={16}>
                 <Col xs={24} md={12}>
-                  <Form.Item name="responsible" label="Responsable">
+                  <Form.Item name="responsible" label="Representant legal">
                     <Input
                       prefix={<UserOutlined />}
-                      placeholder="Nom du responsable"
+                      placeholder="Representant legal"
                       className="rounded-lg"
                     />
                   </Form.Item>

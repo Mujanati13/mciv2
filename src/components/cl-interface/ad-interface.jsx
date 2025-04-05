@@ -32,7 +32,11 @@ const AppelDOffreInterface = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`${API_BASE_URL}/appelOffre`);
+      const response = await axios.get(`${API_BASE_URL}/getAppelOffre/`, {
+        params: {
+          clientId: localStorage.getItem("id"),
+        },
+      });
       const formattedData = response.data.data.map((item) => ({
         key: item.id.toString(),
         title: item.titre,
