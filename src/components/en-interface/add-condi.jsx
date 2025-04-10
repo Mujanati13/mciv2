@@ -14,6 +14,11 @@ import {
   Select,
   Spin,
   DatePicker,
+  Typography,
+  Descriptions,
+  Space,
+  Divider,
+  Tag,
 } from "antd";
 import {
   InboxOutlined,
@@ -23,22 +28,33 @@ import {
   UserOutlined,
   DollarOutlined,
   CommentOutlined,
+  InfoCircleOutlined,
 } from "@ant-design/icons";
 import axios from "axios";
 import dayjs from "dayjs";
 import { Endponit } from "../../helper/enpoint";
 
 const { TextArea } = Input;
+const { Paragraph } = Typography;
 
 const AppelDOffreInterface = () => {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [isApplyModalVisible, setIsApplyModalVisible] = useState(false);
+  const [isDetailsModalVisible, setIsDetailsModalVisible] = useState(false);
   const [currentOffer, setCurrentOffer] = useState(null);
   const [applyForm] = Form.useForm();
   const [consultants, setConsultants] = useState([]);
   const [nom_co, setNomCo] = useState("");
+  const [expandedDescriptions, setExpandedDescriptions] = useState({});
+
+  const toggleDescription = (id) => {
+    setExpandedDescriptions(prev => ({
+      ...prev,
+      [id]: !prev[id]
+    }));
+  };
 
   const handleSelect = (value, option) => {
     // option.dataName contains the concatenated name
@@ -101,6 +117,11 @@ const AppelDOffreInterface = () => {
       AO_id: record.id,
     });
     setIsApplyModalVisible(true);
+  };
+
+  const handleViewDetails = (record) => {
+    setCurrentOffer(record);
+    setIsDetailsModalVisible(true);
   };
 
   const handleApplySubmit = () => {
@@ -176,6 +197,15 @@ const AppelDOffreInterface = () => {
     return statusMap[status] || status;
   };
 
+  const getStatusColor = (status) => {
+    const statusColorMap = {
+      1: "green",
+      2: "blue",
+      3: "red",
+    };
+    return statusColorMap[status] || "default";
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-screen">
@@ -210,7 +240,9 @@ const AppelDOffreInterface = () => {
                 <Dropdown
                   overlay={
                     <Menu>
-                      <Menu.Item key="view-details">Voir les détails</Menu.Item>
+                      <Menu.Item key="view-details" onClick={() => handleViewDetails(item)}>
+                        Voir les détails
+                      </Menu.Item>
                     </Menu>
                   }
                   trigger={["click"]}
@@ -225,22 +257,33 @@ const AppelDOffreInterface = () => {
                 title={item.titre}
                 description={
                   <div className="space-y-2">
-                    <p className="text-sm">
-                      <p className="text-sm">
-                        {item.description.split(" ").length > 5
-                          ? `${item.description
-                              .split(" ")
-                              .slice(0, 5)
-                              .join(" ")}...`
-                          : item.description}
-                      </p>{" "}
-                    </p>
+                    <div className="text-sm">
+                      {expandedDescriptions[item.id] 
+                        ? item.description 
+                        : (item.description.length > 100 
+                          ? `${item.description.substring(0, 100)}...` 
+                          : item.description)
+                      }
+                      {item.description.length > 100 && (
+                        <Button 
+                          type="link" 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleDescription(item.id);
+                          }}
+                          className="p-0 ml-1"
+                          size="small"
+                        >
+                          {expandedDescriptions[item.id] ? "Voir moins" : "Voir plus"}
+                        </Button>
+                      )}
+                    </div>
                     <p className="text-sm">Profil: {item.profil}</p>
                     <p className="text-sm">
                       TJM: {item.tjm_min}€ - {item.tjm_max}€
                     </p>
                     <p className="text-sm">
-                      Statut: {getStatusLabel(item.statut)}
+                      Statut: <Tag color={getStatusColor(item.statut)}>{getStatusLabel(item.statut)}</Tag>
                     </p>
                     <p className="text-sm">
                       Publication: {formatDate(item.date_publication)}
@@ -259,6 +302,90 @@ const AppelDOffreInterface = () => {
         ))}
       </Row>
 
+      {/* Details Modal */}
+      <Modal
+        title={<Space><InfoCircleOutlined /> Détails de l'appel d'offre</Space>}
+        open={isDetailsModalVisible}
+        onCancel={() => setIsDetailsModalVisible(false)}
+        footer={[
+          <Button 
+            key="close" 
+            onClick={() => setIsDetailsModalVisible(false)}
+          >
+            Fermer
+          </Button>,
+          <Button
+            key="apply"
+            type="primary"
+            onClick={() => {
+              setIsDetailsModalVisible(false);
+              handleApply(currentOffer);
+            }}
+            disabled={currentOffer?.statut === "3"}
+          >
+            Postuler
+          </Button>,
+        ]}
+        width={700}
+      >
+        {currentOffer && (
+          <>
+            <Descriptions bordered column={1} size="small">
+              <Descriptions.Item label="Titre">{currentOffer.titre}</Descriptions.Item>
+              <Descriptions.Item label="Profil">{currentOffer.profil}</Descriptions.Item>
+              <Descriptions.Item label="Description">{currentOffer.description}</Descriptions.Item>
+              <Descriptions.Item label="TJM">{currentOffer.tjm_min}€ - {currentOffer.tjm_max}€</Descriptions.Item>
+              <Descriptions.Item label="Statut">
+                <Tag color={getStatusColor(currentOffer.statut)}>
+                  {getStatusLabel(currentOffer.statut)}
+                </Tag>
+              </Descriptions.Item>
+            </Descriptions>
+            
+            <Divider orientation="left">Dates importantes</Divider>
+            
+            <Row gutter={[16, 16]}>
+              <Col span={8}>
+                <Card size="small" title="Date de publication">
+                  {formatDate(currentOffer.date_publication)}
+                </Card>
+              </Col>
+              <Col span={8}>
+                <Card size="small" title="Date limite">
+                  {formatDate(currentOffer.date_limite)}
+                </Card>
+              </Col>
+              <Col span={8}>
+                <Card size="small" title="Date de début">
+                  {formatDate(currentOffer.date_debut)}
+                </Card>
+              </Col>
+            </Row>
+
+            {currentOffer.competences && (
+              <>
+                <Divider orientation="left">Compétences requises</Divider>
+                <div>
+                  {currentOffer.competences.split(',').map((skill, index) => (
+                    <Tag key={index} color="blue" style={{ margin: '0 8px 8px 0' }}>
+                      {skill.trim()}
+                    </Tag>
+                  ))}
+                </div>
+              </>
+            )}
+            
+            {currentOffer.contexte && (
+              <>
+                <Divider orientation="left">Contexte</Divider>
+                <Paragraph>{currentOffer.contexte}</Paragraph>
+              </>
+            )}
+          </>
+        )}
+      </Modal>
+
+      {/* Apply Modal */}
       <Modal
         title="Soumettre une candidature"
         open={isApplyModalVisible}

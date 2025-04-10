@@ -24,6 +24,8 @@ import {
   UserOutlined,
   ClockCircleOutlined,
   EyeOutlined,
+  FilePdfOutlined,
+  InfoCircleOutlined 
 } from "@ant-design/icons";
 import axios from "axios";
 import { Endponit } from "../../helper/enpoint";
@@ -66,7 +68,7 @@ const CandidatureInterface = () => {
       const candidatesResults = await Promise.all(candidatesPromises);
       setCandidates(candidatesResults.flat());
     } catch (error) {
-      message.error("Erreur lors du chargement des données");
+      // message.error("Erreur lors du chargement des données");
       console.error("Error:", error);
     } finally {
       setLoading(false);
@@ -89,7 +91,7 @@ const CandidatureInterface = () => {
       // Calculate the duration in days between project start and end dates
       const startDate = new Date(selectedProject.date_debut);
       const endDate = new Date(selectedProject.date_limite);
-      const workingDays =selectedProject.jours
+      const workingDays = selectedProject.jours;
 
       const bonDeCommandeData = {
         candidature_id: candidate.id_cd,
@@ -302,7 +304,7 @@ const CandidatureInterface = () => {
 
   const columns = [
     {
-      title: "Candidat",
+      title: "Responsable de compte",
       dataIndex: "responsable_compte",
       key: "nom",
       render: (text) => (
@@ -322,6 +324,35 @@ const CandidatureInterface = () => {
           {`${tjm} €`}
         </Space>
       ),
+    },
+    // Fix for CV column in the table
+    {
+      title: "CV",
+      key: "cv",
+      render: (_, record) => {
+        // Check if collaborateur exists and has a CV
+        const hasCV = record.collaborateur && record.collaborateur.CV;
+
+        return (
+          <Button
+            type="link"
+            icon={<FilePdfOutlined />}
+            onClick={() => {
+              if (hasCV) {
+                window.open(
+                  Endponit() + "/media/" + record.collaborateur.CV,
+                  "_blank"
+                );
+              } else {
+                message.info("Aucun CV disponible pour ce candidat");
+              }
+            }}
+            disabled={!hasCV}
+          >
+            {hasCV ? "Voir CV" : "Pas de CV"}
+          </Button>
+        );
+      },
     },
     {
       title: "Date Candidature",
@@ -399,80 +430,266 @@ const CandidatureInterface = () => {
     },
   ];
 
-  const renderCandidateDetails = () => (
-    <Card>
-      <Descriptions bordered column={1}>
-        <Descriptions.Item
-          label={
-            <Space>
-              <UserOutlined /> Nom complet
-            </Space>
-          }
-        >
-          {`${currentCandidate?.nom} ${currentCandidate?.prenom}`}
-        </Descriptions.Item>
-        <Descriptions.Item
-          label={
-            <Space>
-              <DollarOutlined /> TJM Proposé
-            </Space>
-          }
-        >
-          {`${currentCandidate?.tjm} €`}
-        </Descriptions.Item>
-        <Descriptions.Item
-          label={
-            <Space>
-              <CalendarOutlined /> Date de candidature
-            </Space>
-          }
-        >
-          {currentCandidate?.date_candidature &&
-            new Date(currentCandidate.date_candidature).toLocaleDateString()}
-        </Descriptions.Item>
-        <Descriptions.Item
-          label={
-            <Space>
-              <ClockCircleOutlined /> Disponibilité
-            </Space>
-          }
-        >
-          {currentCandidate?.date_disponibilite &&
-            new Date(currentCandidate.date_disponibilite).toLocaleDateString()}
-        </Descriptions.Item>
-        <Descriptions.Item label="Statut">
-          {getStatusTag(currentCandidate?.statut)}
-        </Descriptions.Item>
-      </Descriptions>
+  const renderCandidateDetails = () => {
+    const hasCV =
+      currentCandidate?.collaborateur && currentCandidate?.collaborateur.CV;
+    const collaborateur = currentCandidate?.collaborateur || {};
 
-      {currentCandidate?.statut.toLowerCase() === "en cours" && (
-        <Row justify="end" style={{ marginTop: 16 }}>
-          <Space>
-            <Button
-              type="primary"
-              icon={<CheckCircleOutlined />}
-              onClick={() =>
-                updateCandidatureStatus(currentCandidate, "Accepté")
+    // Find the associated project for this candidate
+    const associatedProject = appelsOffre.find(
+      (offre) => offre.id === currentCandidate?.AO_id
+    );
+
+    return (
+      <Card>
+        <Row gutter={[24, 24]}>
+          <Col span={24}>
+            <Card
+              type="inner"
+              title={
+                <Space>
+                  <UserOutlined
+                    style={{ fontSize: "18px", color: "#1890ff" }}
+                  />
+                  Informations du candidat
+                </Space>
               }
-              disabled={actionLoading}
+              style={{ marginBottom: "20px" }}
             >
-              Accepter
-            </Button>
-            <Button
-              danger
-              icon={<CloseCircleOutlined />}
-              onClick={() =>
-                updateCandidatureStatus(currentCandidate, "Refusé")
-              }
-              disabled={actionLoading}
-            >
-              Refuser
-            </Button>
-          </Space>
+              <Descriptions
+                bordered
+                column={{ xxl: 2, xl: 2, lg: 2, md: 1, sm: 1, xs: 1 }}
+              >
+                <Descriptions.Item label={<strong>Nom complet</strong>}>
+                  {`${currentCandidate?.nom_cn || ""}`}
+                </Descriptions.Item>
+
+                <Descriptions.Item label={<strong>Poste</strong>}>
+                  {collaborateur.Poste || "Non spécifié"}
+                </Descriptions.Item>
+
+                <Descriptions.Item
+                  label={<strong>Statut de la candidature</strong>}
+                >
+                  {getStatusTag(currentCandidate?.statut)}
+                </Descriptions.Item>
+
+                <Descriptions.Item label={<strong>TJM Proposé</strong>}>
+                  <Tag color="blue" style={{ fontSize: "14px" }}>
+                    <DollarOutlined /> {`${currentCandidate?.tjm} €`}
+                  </Tag>
+                </Descriptions.Item>
+
+                <Descriptions.Item
+                  label={<strong>Responsable de compte</strong>}
+                >
+                  {currentCandidate?.responsable_compte || "Non spécifié"}
+                </Descriptions.Item>
+
+                <Descriptions.Item label={<strong>Date de candidature</strong>}>
+                  <CalendarOutlined />{" "}
+                  {currentCandidate?.date_candidature &&
+                    new Date(
+                      currentCandidate.date_candidature
+                    ).toLocaleDateString()}
+                </Descriptions.Item>
+
+                <Descriptions.Item label={<strong>Disponibilité</strong>}>
+                  <ClockCircleOutlined />{" "}
+                  {currentCandidate?.date_disponibilite &&
+                    new Date(
+                      currentCandidate.date_disponibilite
+                    ).toLocaleDateString()}
+                </Descriptions.Item>
+
+                <Descriptions.Item label={<strong>Mobilité</strong>}>
+                  {collaborateur.Mobilité || "Non spécifiée"}
+                </Descriptions.Item>
+              </Descriptions>
+            </Card>
+          </Col>
+
+          {associatedProject && (
+            <Col span={24}>
+              <Card
+                type="inner"
+                title={
+                  <Space>
+                    <FilePdfOutlined
+                      style={{ fontSize: "18px", color: "#1890ff" }}
+                    />
+                    Projet associé
+                  </Space>
+                }
+                style={{ marginBottom: "20px" }}
+              >
+                <Descriptions bordered column={1}>
+                  <Descriptions.Item label={<strong>Titre</strong>}>
+                    {associatedProject.titre}
+                  </Descriptions.Item>
+
+                  <Descriptions.Item label={<strong>Description</strong>}>
+                    {associatedProject.description}
+                  </Descriptions.Item>
+
+                  <Descriptions.Item label={<strong>Fourchette TJM</strong>}>
+                    <Tag color="blue">{`${associatedProject.tjm_min} - ${associatedProject.tjm_max} €`}</Tag>
+                  </Descriptions.Item>
+
+                  <Descriptions.Item label={<strong>Période</strong>}>
+                    <Space>
+                      <span>
+                        Du{" "}
+                        {new Date(
+                          associatedProject.date_debut
+                        ).toLocaleDateString()}
+                      </span>
+                      <span>
+                        au{" "}
+                        {new Date(
+                          associatedProject.date_limite
+                        ).toLocaleDateString()}
+                      </span>
+                    </Space>
+                  </Descriptions.Item>
+                </Descriptions>
+              </Card>
+            </Col>
+          )}
+
+          <Col span={24}>
+            <Row gutter={[16, 16]}>
+              {hasCV && (
+                <Col span={12}>
+                  <Card
+                    type="inner"
+                    title={
+                      <Space>
+                        <FilePdfOutlined
+                          style={{ fontSize: "18px", color: "#1890ff" }}
+                        />
+                        CV du candidat
+                      </Space>
+                    }
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "center",
+                        padding: "20px",
+                      }}
+                    >
+                      <Button
+                        type="primary"
+                        icon={<FilePdfOutlined />}
+                        size="large"
+                        onClick={() => {
+                          window.open(
+                            Endponit() +
+                              "/media/" +
+                              currentCandidate.collaborateur.CV,
+                            "_blank"
+                          );
+                        }}
+                      >
+                        Voir le CV
+                      </Button>
+                    </div>
+                  </Card>
+                </Col>
+              )}
+
+              {currentCandidate?.commentaire && (
+                <Col span={hasCV ? 12 : 24}>
+                  <Card
+                    type="inner"
+                    title={
+                      <Space>
+                        <InfoCircleOutlined
+                          style={{ fontSize: "18px", color: "#1890ff" }}
+                        />
+                        Commentaire
+                      </Space>
+                    }
+                  >
+                    <div
+                      style={{
+                        padding: "10px",
+                        backgroundColor: "#f5f5f5",
+                        borderRadius: "4px",
+                        minHeight: "100px",
+                      }}
+                    >
+                      {currentCandidate.commentaire}
+                    </div>
+                  </Card>
+                </Col>
+              )}
+            </Row>
+          </Col>
         </Row>
-      )}
-    </Card>
-  );
+
+        {currentCandidate?.statut.toLowerCase() === "en cours" && (
+          <div
+            style={{
+              marginTop: 20,
+              display: "flex",
+              justifyContent: "flex-end",
+            }}
+          >
+            <Space>
+              <Button
+                type="primary"
+                size="large"
+                icon={<CheckCircleOutlined />}
+                onClick={() =>
+                  updateCandidatureStatus(currentCandidate, "Accepté")
+                }
+                disabled={actionLoading}
+              >
+                Accepter cette candidature
+              </Button>
+              <Button
+                danger
+                size="large"
+                icon={<CloseCircleOutlined />}
+                onClick={() =>
+                  updateCandidatureStatus(currentCandidate, "Refusé")
+                }
+                disabled={actionLoading}
+              >
+                Refuser
+              </Button>
+            </Space>
+          </div>
+        )}
+
+        {currentCandidate?.statut.toLowerCase() === "accepté" && (
+          <div style={{ marginTop: 20, textAlign: "center" }}>
+            <Tag
+              color="success"
+              icon={<CheckCircleOutlined />}
+              style={{ fontSize: "16px", padding: "8px 15px" }}
+            >
+              Cette candidature a été acceptée
+            </Tag>
+          </div>
+        )}
+
+        {currentCandidate?.statut.toLowerCase() === "refusé" && (
+          <div style={{ marginTop: 20, textAlign: "center" }}>
+            <Tag
+              color="error"
+              icon={<CloseCircleOutlined />}
+              style={{ fontSize: "16px", padding: "8px 15px" }}
+            >
+              Cette candidature a été refusée
+            </Tag>
+          </div>
+        )}
+      </Card>
+    );
+  };
 
   if (loading) {
     return (

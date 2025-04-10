@@ -119,7 +119,7 @@ const SignupPage = () => {
         `http://51.38.99.75:3100/api/cities/${country}`
       );
       if (response.data.success) {
-        setCities([])
+        setCities([]);
         setCities(response.data.data || []);
       } else {
         notification.warning({
@@ -228,13 +228,97 @@ const SignupPage = () => {
       // Navigate to login or dashboard
       navigate("/login");
     } catch (error) {
-      // Handle registration error
-      notification.error({
-        message: "Erreur d'inscription",
-        description:
-          error.response?.data?.message ||
-          "Une erreur est survenue lors de l'inscription.",
-      });
+      // Enhanced error handling
+      console.error("Registration error:", error);
+
+      if (error.response && error.response.data) {
+        const errorData = error.response.data;
+
+        // Handle specific validation errors
+        if (errorData.errors) {
+          // Check for SIRET duplication error
+          if (
+            errorData.errors.siret &&
+            errorData.errors.siret.includes(
+              "client with this Numéro SIRET already exists"
+            )
+          ) {
+            // Mark the SIRET field as error
+            form.setFields([
+              {
+                name: "siret",
+                errors: ["Un compte avec ce numéro SIRET existe déjà."],
+                value: form.getFieldValue("siret"),
+              },
+            ]);
+
+            notification.error({
+              message: "Erreur d'inscription",
+              description:
+                "Un compte avec ce numéro SIRET existe déjà. Veuillez utiliser un autre numéro ou vous connecter avec ce compte.",
+            });
+            return;
+          }
+
+          // Translation map for common field names
+          const fieldTranslations = {
+            siret: "Numéro SIRET",
+            raison_sociale: "Raison sociale",
+            mail_contact: "Email de contact",
+            email: "Email",
+            password: "Mot de passe",
+            tel_contact: "Téléphone",
+            adresse: "Adresse",
+            ville: "Ville",
+            pays: "Pays",
+            // Add more field translations as needed
+          };
+
+          // Mark all fields with errors in the form
+          const fieldErrors = {};
+          for (const [field, messages] of Object.entries(errorData.errors)) {
+            const fieldName = fieldTranslations[field] || field;
+            const errorMessage = Array.isArray(messages)
+              ? messages[0].includes("already exists")
+                ? `Un ${fieldName} identique existe déjà dans notre système.`
+                : messages[0]
+              : messages.includes("already exists")
+              ? `Un ${fieldName} identique existe déjà dans notre système.`
+              : messages;
+
+            // Set field error state in the form
+            form.setFields([
+              {
+                name: field,
+                errors: [errorMessage],
+                value: form.getFieldValue(field),
+              },
+            ]);
+
+            // Display error notification
+            notification.error({
+              message: `Erreur: ${fieldName}`,
+              description: errorMessage,
+            });
+          }
+        } else if (errorData.status === false && errorData.msg) {
+          // Handle generic error message with better French translation
+          notification.error({
+            message: "Échec de l'inscription",
+            description:
+              errorData.msg === "Failed to Add"
+                ? "Échec de l'ajout du compte. Veuillez vérifier vos informations."
+                : errorData.msg,
+          });
+        } else {
+          // Fallback error message
+          notification.error({
+            message: "Erreur d'inscription",
+            description:
+              "Une erreur est survenue lors de l'inscription. Veuillez réessayer.",
+          });
+        }
+      }
     } finally {
       setLoading(false);
     }

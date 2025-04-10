@@ -194,9 +194,13 @@ const UpdateBDCModal = ({ bdc, visible, onClose, onSuccess }) => {
         percentage: bdc_percentage,
         benefit: benefit,
         date_emission: bdc.date_emission ? dayjs(bdc.date_emission) : null,
-        date_debut_mission: bdc.date_debut_mission ? dayjs(bdc.date_debut_mission) : null,
-        date_fin_mission: bdc.date_fin_mission ? dayjs(bdc.date_fin_mission) : null,
-        statut: bdc.statut || "pending_esn"
+        date_debut_mission: bdc.date_debut_mission
+          ? dayjs(bdc.date_debut_mission)
+          : null,
+        date_fin_mission: bdc.date_fin_mission
+          ? dayjs(bdc.date_fin_mission)
+          : null,
+        statut: bdc.statut || "pending_esn",
       });
     }
   }, [bdc, form]);
@@ -204,15 +208,15 @@ const UpdateBDCModal = ({ bdc, visible, onClose, onSuccess }) => {
   // Update calculations when percentage changes
   const handlePercentageChange = (value) => {
     if (value === null || isNaN(value)) value = 0;
-    
+
     const newPercentage = parseFloat(value);
     const newBenefit = (montantTotal * newPercentage) / 100;
     const newNetAmount = montantTotal - newBenefit;
-    
+
     setPercentage(newPercentage);
     setBenefitAmount(newBenefit);
     setNetAmount(newNetAmount);
-    
+
     form.setFieldsValue({
       benefit: newBenefit,
     });
@@ -221,15 +225,16 @@ const UpdateBDCModal = ({ bdc, visible, onClose, onSuccess }) => {
   // Update calculations when benefit amount changes
   const handleBenefitChange = (value) => {
     if (value === null || isNaN(value)) value = 0;
-    
+
     const newBenefit = parseFloat(value);
-    const newPercentage = montantTotal > 0 ? (newBenefit / montantTotal) * 100 : 0;
+    const newPercentage =
+      montantTotal > 0 ? (newBenefit / montantTotal) * 100 : 0;
     const newNetAmount = montantTotal - newBenefit;
-    
+
     setBenefitAmount(newBenefit);
     setPercentage(newPercentage);
     setNetAmount(newNetAmount);
-    
+
     form.setFieldsValue({
       percentage: newPercentage,
     });
@@ -238,22 +243,23 @@ const UpdateBDCModal = ({ bdc, visible, onClose, onSuccess }) => {
   const handleSubmit = async (values) => {
     try {
       setLoading(true);
-      
+
       // Prepare data for submission
       const transformedValues = {
         ...bdc,
         ...values,
         id_bdc: bdc.id,
-        montant_total: montantTotal,           // Original gross amount
-        percentage: percentage,                 // Fee percentage
-        benefit: benefitAmount,                 // Fee amount
-        montant_net: netAmount,                 // Net amount after fee
+        montant_total: montantTotal, // Original gross amount
+        percentage: percentage, // Fee percentage
+        benefit: benefitAmount, // Fee amount
+        montant_net: netAmount, // Net amount after fee
       };
 
-      await axios.put(
+      const response = await axios.put(
         `${Endponit()}/api/Bondecommande/${bdc.id}`,
         transformedValues
       );
+
       message.success("Bon de commande mis à jour avec succès");
       onSuccess();
       onClose();
@@ -278,11 +284,7 @@ const UpdateBDCModal = ({ bdc, visible, onClose, onSuccess }) => {
       footer={null}
       width={800}
     >
-      <Form
-        form={form}
-        layout="vertical"
-        onFinish={handleSubmit}
-      >
+      <Form form={form} layout="vertical" onFinish={handleSubmit}>
         <Row gutter={16}>
           <Col span={12}>
             <Form.Item
@@ -320,7 +322,7 @@ const UpdateBDCModal = ({ bdc, visible, onClose, onSuccess }) => {
                 prefix={<DollarOutlined />}
                 style={{ width: "100%" }}
                 formatter={(value) => `${value}€`}
-                parser={(value) => value.replace('€', '')}
+                parser={(value) => value.replace("€", "")}
                 disabled
               />
             </Form.Item>
@@ -338,12 +340,12 @@ const UpdateBDCModal = ({ bdc, visible, onClose, onSuccess }) => {
                 min={0}
                 max={100}
                 formatter={(value) => `${value}%`}
-                parser={(value) => value.replace('%', '')}
+                parser={(value) => value.replace("%", "")}
                 onChange={handlePercentageChange}
               />
             </Form.Item>
           </Col>
-          
+
           <Col span={8}>
             <Form.Item
               name="benefit"
@@ -356,13 +358,13 @@ const UpdateBDCModal = ({ bdc, visible, onClose, onSuccess }) => {
                 min={0}
                 max={montantTotal}
                 formatter={(value) => `${value}€`}
-                parser={(value) => value.replace('€', '')}
+                parser={(value) => value.replace("€", "")}
                 onChange={handleBenefitChange}
               />
             </Form.Item>
           </Col>
         </Row>
-        
+
         <Row gutter={16}>
           <Col span={8}>
             <Form.Item label="Montant total net">
@@ -371,7 +373,7 @@ const UpdateBDCModal = ({ bdc, visible, onClose, onSuccess }) => {
                 style={{ width: "100%" }}
                 value={netAmount}
                 formatter={(value) => `${value}€`}
-                parser={(value) => value.replace('€', '')}
+                parser={(value) => value.replace("€", "")}
                 disabled
               />
             </Form.Item>
@@ -380,12 +382,9 @@ const UpdateBDCModal = ({ bdc, visible, onClose, onSuccess }) => {
 
         <Divider>Commentaire</Divider>
 
-        <Form.Item
-          name="admin_comment"
-          label="Commentaire administratif"
-        >
-          <Input.TextArea 
-            rows={4} 
+        <Form.Item name="admin_comment" label="Commentaire administratif">
+          <Input.TextArea
+            rows={4}
             placeholder="Ajoutez un commentaire ou des instructions..."
             showCount
             maxLength={500}

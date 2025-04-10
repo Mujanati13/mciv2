@@ -168,7 +168,7 @@ const BonDeCommandeInterface = () => {
       );
       setCandidates(response.data.data);
     } catch (error) {
-      message.error("Échec de la récupération des candidatures");
+      // message.error("Échec de la récupération des candidatures");
     } finally {
       setCandidatesLoading(false);
     }
@@ -192,7 +192,7 @@ const BonDeCommandeInterface = () => {
         .sort((a, b) => b.id_bdc - a.id_bdc);
       setPurchaseOrders(data);
     } catch (error) {
-      message.error("Échec de la récupération des bons de commande");
+      // message.error("Échec de la récupération des bons de commande");
     } finally {
       setLoading(false);
     }

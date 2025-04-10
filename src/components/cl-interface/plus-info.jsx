@@ -21,6 +21,7 @@ import {
   Modal,
   Checkbox,
   Space,
+  Steps,
 } from "antd";
 import {
   EditOutlined,
@@ -46,6 +47,11 @@ import {
   FileProtectOutlined,
   FilePdfOutlined,
   PrinterOutlined,
+  InfoCircleOutlined,
+  ArrowRightOutlined,
+  FormOutlined,
+  FileSearchOutlined,
+  CheckSquareOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 import axios from "axios";
@@ -56,6 +62,7 @@ import "jspdf-autotable";
 const { TextArea } = Input;
 const { Option } = Select;
 const { Panel } = Collapse;
+const { Step } = Steps;
 
 const pulseAnimationStyle = `
   @keyframes pulse {
@@ -92,6 +99,16 @@ const ClientPlusInfo = () => {
   const [contractAccepted, setContractAccepted] = useState(false);
   const [contractCheckbox, setContractCheckbox] = useState(false);
   const [pdfGenerated, setPdfGenerated] = useState(false);
+  const [currentStep, setCurrentStep] = useState(0);
+  const [isAccountActive, setIsAccountActive] = useState(false);
+
+  // Helper function to determine current activation step
+  const getActivationStep = (status, completion) => {
+    if (status === "Actif" || status === "validé") return 3; // Completed
+    if (status === "à signer") return 2; // Ready to sign contract
+    if (status === "à valider" || completion === 100) return 1; // Complete profile, pending validation
+    return 0; // Incomplete profile
+  };
 
   useEffect(() => {
     // Show a notification when component mounts if contract needs to be signed
@@ -103,7 +120,14 @@ const ClientPlusInfo = () => {
         icon: <FileProtectOutlined style={{ color: "#1890ff" }} />,
       });
     }
-  }, [profile?.Statut]);
+    
+    // Update current step based on profile status
+    if (profile) {
+      const newStep = getActivationStep(profile.Statut, completionStatus);
+      setCurrentStep(newStep);
+      setIsAccountActive(profile.Statut === "Actif" || profile.Statut === "validé");
+    }
+  }, [profile?.Statut, completionStatus]);
 
   // Show contract modal
   const showContractModal = () => {
@@ -148,6 +172,8 @@ const ClientPlusInfo = () => {
         };
 
         setProfile(updatedProfile);
+        setCurrentStep(3); // Update to completed step
+        setIsAccountActive(true);
         message.success("Contrat accepté avec succès!");
 
         // Generate PDF after accepting contract
@@ -196,6 +222,8 @@ const ClientPlusInfo = () => {
 
         setProfile(updatedProfile);
         setProfileStatus(true);
+        setCurrentStep(3); // Update to completed step
+        setIsAccountActive(true);
         message.success("Compte client activé avec succès!");
       } else {
         throw new Error("Échec de l'activation du compte");
@@ -208,10 +236,13 @@ const ClientPlusInfo = () => {
 
   // Generate PDF with client information and contract
   const generatePDF = () => {
+    // PDF generation code - unchanged
+    // ...
     if (!profile) return;
 
     try {
       const doc = new jsPDF();
+      // All PDF generation code remains the same
       // ====== PAGE 1: TITLE AND PARTIES ======
       // Add title
       doc.setFontSize(22);
@@ -553,33 +584,6 @@ const ClientPlusInfo = () => {
       });
       doc.setTextColor(0, 0, 0);
 
-      // Company information summary - Full width, not in a table
-      doc.setFontSize(13);
-      doc.setFont(undefined, "bold");
-      // doc.text("INFORMATIONS DU CLIENT", 20, 30);
-      // doc.setFont(undefined, "normal");
-      // doc.setFontSize(10);
-
-      // doc.text("Raison Sociale: " + (profile.raison_sociale || ""), 20, 40);
-      // doc.text("SIRET: " + (profile.siret || ""), 20, 50);
-      // doc.text("Numéro TVA: " + (profile.n_tva || ""), 20, 60);
-      // doc.text(
-      //   "Adresse: " +
-      //   `${profile.address || ""}, ${profile.cp || ""} ${profile.ville || ""}`,
-      //   20,
-      //   70
-      // );
-      // doc.text("Pays: " + (profile.industry || ""), 20, 80);
-      // doc.text("Email de contact: " + (profile.email || ""), 20, 90);
-      // doc.text("Téléphone: " + (profile.phone || ""), 20, 100);
-      // doc.text("Responsable: " + (profile.responsible || ""), 20, 110);
-      // doc.text(
-      //   "Informations bancaires: " +
-      //   `${profile.banque || ""} - IBAN: ${profile.iban || ""}`,
-      //   20,
-      //   120
-      // );
-
       // Final clause
       doc.setFontSize(12);
       doc.text(
@@ -692,6 +696,7 @@ const ClientPlusInfo = () => {
         };
 
         setProfile(updatedProfile);
+        setCurrentStep(1); // Update current step
         message.success(
           `Votre profil est complet! Statut mis à jour: ${newStatus}`
         );
@@ -752,16 +757,20 @@ const ClientPlusInfo = () => {
       };
 
       // Set account status - now checking for "validé" status
-      setProfileStatus(
-        client[0].statut?.toLowerCase() === "validé" ||
-          client[0].statut?.toLowerCase() === "Actif"
-      );
-
+      const isActive = client[0].statut?.toLowerCase() === "validé" || 
+                       client[0].statut?.toLowerCase() === "actif";
+      
+      setProfileStatus(isActive);
+      setIsAccountActive(isActive);
+      
       // Set contract status - now checking for "ready" or "validé" status
-      setContractAccepted(client[0].statut?.toLowerCase() === "Actif");
+      setContractAccepted(client[0].statut?.toLowerCase() === "actif");
 
       // Calculate profile completion
       calculateProfileCompletion(profileData);
+
+      // Set current step based on status
+      setCurrentStep(getActivationStep(client[0].statut, completionStatus));
 
       setProfile(profileData);
       console.log("profileData", profileData);
@@ -819,7 +828,7 @@ const ClientPlusInfo = () => {
             bic: values.bic || "",
             banque: values.banque || "",
             img_path: img_path || profile.img_path,
-            password: null,
+            // password: null,
           };
 
           try {
@@ -1020,130 +1029,219 @@ const ClientPlusInfo = () => {
     </Modal>
   );
 
+  // Get guidance message based on current status
+  const getStatusGuidance = () => {
+    switch (profile?.Statut) {
+      case "Draft":
+        return {
+          title: "Profil incomplet",
+          description: "Veuillez compléter votre profil pour activer votre compte.",
+          nextStep: "Remplissez tous les champs requis pour passer à l'étape suivante.",
+          icon: <FormOutlined style={{ color: "#faad14" }} />,
+          color: "warning",
+          action: (
+            <Button 
+              type="primary" 
+              icon={<EditOutlined />} 
+              onClick={handleEdit}
+              disabled={isEditing}>
+              Compléter mon profil
+            </Button>
+          )
+        };
+      case "à valider":
+        return {
+          title: "En attente de validation",
+          description: "Votre profil a été soumis et est en cours d'examen par notre équipe.",
+          nextStep: <mark>Nous vous contacterons prochainement pour la suite du processus. Make sure to upload the required docs befor</mark>,
+          icon: <FileSearchOutlined style={{ color: "#1890ff" }} />,
+          color: "info",
+          action: (
+            <Button type="default" disabled>
+              Validation en cours...
+            </Button>
+          )
+        };
+      case "à signer":
+        return {
+          title: "Contrat à signer",
+          description: "Votre profil a été validé. Veuillez maintenant accepter les conditions du contrat.",
+          nextStep: "Après acceptation, vous pourrez accéder à toutes les fonctionnalités de la plateforme.",
+          icon: <FileProtectOutlined style={{ color: "#52c41a" }} />,
+          color: "info",
+          action: (
+            <Button 
+              type="primary" 
+              icon={<FileProtectOutlined />} 
+              onClick={showContractModal}
+              className="pulse-animation"
+              style={{
+                boxShadow: "0 0 8px #1890ff",
+                animation: "pulse 1.5s infinite",
+              }}>
+              Accepter le contrat
+            </Button>
+          )
+        };
+      case "Actif":
+      case "validé":
+        return {
+          title: "Compte activé",
+          description: "Votre compte est pleinement activé.",
+          nextStep: "Vous avez maintenant accès à toutes les fonctionnalités de la plateforme.",
+          icon: <CheckCircleOutlined style={{ color: "#52c41a" }} />,
+          color: "success",
+          action: (
+            <Button 
+              type="default" 
+              icon={<FilePdfOutlined />} 
+              onClick={generatePDF}>
+              Télécharger le contrat
+            </Button>
+          )
+        };
+      default:
+        return {
+          title: "Statut indéterminé",
+          description: "Veuillez contacter notre support pour plus d'informations.",
+          nextStep: "Nous vous aiderons à résoudre ce problème rapidement.",
+          icon: <InfoCircleOutlined style={{ color: "#faad14" }} />,
+          color: "warning",
+          action: null
+        };
+    }
+  };
+
+  // Status guidance content
+  const statusGuidance = getStatusGuidance();
+
   return profile ? (
     <div className="w-full mx-auto p-6 bg-gradient-to-br from-blue-50 to-blue-100">
       <style>{pulseAnimationStyle}</style>
+      
+      {/* Steps for activation process - Only show when account is not active */}
+      {!isAccountActive && (
+        <Card className="mb-6 shadow rounded-xl overflow-hidden bg-white">
+          <div className="p-3">
+            <Steps 
+              current={currentStep}
+              labelPlacement="vertical"
+              progressDot
+              size="small"
+              className="my-2"
+              items={[
+                {
+                  title: 'Compléter le profil',
+                  description: null,
+                  status: currentStep >= 0 ? (currentStep > 0 ? 'finish' : 'process') : 'wait',
+                },
+                {
+                  title: 'Validation',
+                  description: null,
+                  status: currentStep >= 1 ? (currentStep > 1 ? 'finish' : 'process') : 'wait',
+                },
+                {
+                  title: 'Contrat',
+                  description: null,
+                  status: currentStep >= 2 ? (currentStep > 2 ? 'finish' : 'process') : 'wait',
+                },
+                {
+                  title: 'Actif',
+                  description: null,
+                  status: currentStep >= 3 ? 'finish' : 'wait',
+                },
+              ]}
+            />
+          </div>
+        </Card>
+      )}
+      
       <Card
-        className="shadow-2xl rounded-2xl overflow-hidden transition-all duration-300 hover:shadow-xl"
+        className="shadow-lg rounded-xl overflow-hidden transition-all duration-300 hover:shadow-xl"
         bodyStyle={{ padding: 0 }}
       >
+        {/* Status guidance alert - Compact version */}
+        <div className={`px-4 py-3 flex items-start ${
+          isAccountActive ? 'bg-green-50 border-b border-green-200' : 
+          statusGuidance.color === 'warning' ? 'bg-orange-50 border-b border-orange-200' : 
+          'bg-blue-50 border-b border-blue-200'
+        }`}>
+          <div className="mr-3 mt-1">
+            {statusGuidance.icon}
+          </div>
+          <div className="flex-grow">
+            <div className="font-medium text-lg">
+              {statusGuidance.title}
+            </div>
+            <div className="text-sm mt-1">
+              {statusGuidance.description}
+              {!isAccountActive && (
+                <div className="mt-1 text-sm text-gray-600">
+                  <b>{isAccountActive ? '' : 'Prochaine étape :'}</b> {statusGuidance.nextStep}
+                </div>
+              )}
+            </div>
+            {statusGuidance.action && (
+              <div className="mt-2">
+                {statusGuidance.action}
+              </div>
+            )}
+          </div>
+        </div>
+        
         {/* En-tête avec Progression et Actions de Modification */}
-        <div className="p-6 bg-white flex flex-col md:flex-row justify-between items-center border-b border-blue-100">
+        <div className="p-4 bg-white flex flex-col md:flex-row justify-between items-center border-b border-blue-100">
           <div className="w-full mb-4 md:mb-0 md:mr-4">
             <div className="flex justify-between items-center mb-2">
-              <h3 className="text-lg font-semibold text-blue-900">
+              <h3 className="text-base font-semibold text-blue-900">
                 Complétude du profil
               </h3>
               <Tag
-                color={profileStatus ? "green" : "orange"}
-                className="text-sm"
-              >
+                color={profileStatus ? "success" : 
+                      completionStatus === 100 ? "processing" : "warning"}
+                className="text-xs">
                 {profileStatus ? (
                   <>
                     <CheckCircleOutlined /> {profile.Statut}
                   </>
                 ) : (
                   <>
-                    <ExclamationCircleOutlined /> {profile.Statut}
+                    {completionStatus}%
                   </>
                 )}
               </Tag>
             </div>
-            <Tooltip title={`Profil ${completionStatus}% complété`}>
-              <Progress
-                percent={completionStatus}
-                status={completionStatus === 100 ? "success" : "active"}
-                strokeColor={{
-                  "0%": "#108ee9",
-                  "100%": "#87d068",
-                }}
-                strokeWidth={10}
-                className="w-full"
-              />
-            </Tooltip>
-            {/* Contract Status and Actions section */}
-            <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-100">
-              <div className="flex flex-col md:flex-row justify-between items-center">
-                <div>
-                  <h3 className="text-base font-semibold text-blue-900 mb-2">
-                    Statut du contrat:
-                    <Tag
-                      color={
-                        contractAccepted ||
-                        profile.Statut === "Actif" ||
-                        profileStatus
-                          ? "green"
-                          : profile.Statut === "à valider"
-                          ? "gold"
-                          : "green"
-                      }
-                    >
-                      {contractAccepted ||
-                      profile.Statut === "Actif" ||
-                      profileStatus
-                        ? "Contrat accepté"
-                        : profile.Statut === "à valider"
-                        ? "En attente de validation"
-                        : profile.Statut}
-                    </Tag>
-                  </h3>
-                  <p className="text-sm text-gray-600">
-                    {contractAccepted ||
-                    profile.Statut === "Actif" ||
-                    profileStatus
-                      ? "Vous avez complété toutes les informations requises."
-                      : profile.Statut === "à valider"
-                      ? "Votre profil est complet et en cours de validation par notre équipe."
-                      : "Veuillez compléter toutes les informations requises."}
-                  </p>
-                </div>
-                <div className="mt-3 md:mt-0 space-x-2">
-                  {console.log(profile.Statut)}
-                  {profile.Statut == "à signer" && (
-                    <Button
-                      type="primary"
-                      icon={<FileProtectOutlined />}
-                      onClick={showContractModal}
-                      size="middle"
-                      className="pulse-animation" // Add this class
-                      style={{
-                        boxShadow: "0 0 8px #1890ff",
-                        animation: "pulse 1.5s infinite",
-                      }}
-                    >
-                      Accepter le contrat
-                    </Button>
-                  )}
-
-                  {(contractAccepted || profile.Statut === "Actif") && (
-                    <Button
-                      type="default"
-                      icon={<FilePdfOutlined />}
-                      onClick={generatePDF}
-                      size="middle"
-                    >
-                      Télécharger le contrat
-                    </Button>
-                  )}
-                </div>
-              </div>
-            </div>
+            {!isAccountActive && (
+              <Tooltip title={`Profil ${completionStatus}% complété`}>
+                <Progress
+                  percent={completionStatus}
+                  status={completionStatus === 100 ? "success" : "active"}
+                  strokeColor={{
+                    "0%": "#108ee9",
+                    "100%": "#87d068",
+                  }}
+                  strokeWidth={8}
+                  className="w-full"
+                  size="small"
+                />
+              </Tooltip>
+            )}
           </div>
           <div className="flex space-x-2">
             {isEditing ? (
               <>
                 <Button
                   type="primary"
+                  size="middle"
                   icon={<SaveOutlined />}
                   onClick={handleEdit}
-                  className="transition-transform hover:scale-105"
                 >
                   Enregistrer
                 </Button>
                 <Button
+                  size="middle"
                   icon={<CloseOutlined />}
                   onClick={handleCancelEdit}
-                  className="transition-transform hover:scale-105"
                 >
                   Annuler
                 </Button>
@@ -1151,11 +1249,11 @@ const ClientPlusInfo = () => {
             ) : (
               <Button
                 type="primary"
+                size="middle"
                 icon={<EditOutlined />}
                 onClick={handleEdit}
-                className="transition-transform hover:scale-105"
               >
-                Modifier le Profil
+                Modifier
               </Button>
             )}
           </div>
@@ -1167,7 +1265,7 @@ const ClientPlusInfo = () => {
           <Col xs={24} md={8} className="border-r border-blue-100 pr-6">
             <div className="flex flex-col items-center">
               <Avatar
-                size={180}
+                size={150}
                 src={
                   profile.img_path
                     ? `${Endponit()}/media/${profile.img_path}`
@@ -1206,23 +1304,24 @@ const ClientPlusInfo = () => {
                   icon={<UploadOutlined />}
                   type="dashed"
                   className="mb-4"
+                  size="small"
                 >
                   Changer de Photo
                 </Button>
               </Upload>
 
               {/* Paramètres de Confidentialité */}
-              <div className="w-full bg-blue-50 p-4 rounded-lg shadow-inner">
-                <h4 className="text-center mb-4 font-semibold text-blue-800">
+              <div className="w-full bg-blue-50 p-3 rounded-lg shadow-inner">
+                <h4 className="text-center mb-2 font-semibold text-blue-800 text-sm">
                   Contrôles de Confidentialité
                 </h4>
-                <div className="space-y-3">
+                <div className="space-y-2">
                   {Object.entries(privacySettings).map(([key, value]) => (
                     <div
                       key={key}
                       className="flex justify-between items-center"
                     >
-                      <span className="text-blue-700">
+                      <span className="text-blue-700 text-xs">
                         {key
                           .replace(/([A-Z])/g, " $1")
                           .replace(/^./, (str) => str.toUpperCase())}
@@ -1231,6 +1330,7 @@ const ClientPlusInfo = () => {
                         checked={value}
                         onChange={() => handlePrivacyToggle(key)}
                         className="bg-blue-500"
+                        size="small"
                       />
                     </div>
                   ))}
@@ -1245,9 +1345,10 @@ const ClientPlusInfo = () => {
               form={form}
               layout="vertical"
               disabled={!isEditing}
-              className="space-y-4"
+              className="space-y-3"
+              size="middle"
             >
-              <Divider orientation="left">Informations de l'entreprise</Divider>
+              <Divider orientation="left" className="text-sm">Informations de l'entreprise</Divider>
 
               <Row gutter={16}>
                 <Col xs={24} md={12}>
@@ -1348,7 +1449,7 @@ const ClientPlusInfo = () => {
                 />
               </Form.Item>
 
-              <Divider orientation="left">Adresse</Divider>
+              <Divider orientation="left" className="text-sm">Adresse</Divider>
 
               <Form.Item name="address" label="Adresse">
                 <Input
@@ -1388,7 +1489,7 @@ const ClientPlusInfo = () => {
                 </Col>
               </Row>
 
-              <Divider orientation="left">Informations bancaires</Divider>
+              <Divider orientation="left" className="text-sm">Informations bancaires</Divider>
 
               <Row gutter={16}>
                 <Col xs={24} md={12}>
@@ -1419,18 +1520,18 @@ const ClientPlusInfo = () => {
                 />
               </Form.Item>
 
-              <Divider orientation="left">Informations complémentaires</Divider>
+              <Divider orientation="left" className="text-sm">Informations complémentaires</Divider>
 
               <Form.Item name="bio" label="Description / RCE">
                 <TextArea
-                  rows={4}
+                  rows={3}
                   placeholder="Description de votre entreprise"
                   className="rounded-lg"
                 />
               </Form.Item>
 
-              <Divider orientation="left">Réseaux sociaux et Web</Divider>
-              <div className="space-y-4">
+              <Divider orientation="left" className="text-sm">Réseaux sociaux et Web</Divider>
+              <div className="space-y-3">
                 <Form.Item name="linkedin" label="LinkedIn">
                   <Input
                     prefix={<LinkedinOutlined />}
@@ -1462,7 +1563,12 @@ const ClientPlusInfo = () => {
       {contractModal}
     </div>
   ) : (
-    <div>Loading...</div>
+    <div className="flex justify-center items-center p-10">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-b-4 border-blue-500 mx-auto mb-4"></div>
+        <p className="text-gray-600">Chargement des informations...</p>
+      </div>
+    </div>
   );
 };
 

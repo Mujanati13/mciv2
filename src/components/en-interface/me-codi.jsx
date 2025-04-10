@@ -55,7 +55,7 @@ const ESNCandidatureInterface = () => {
       );
       setMissionCandidatures(candidaturesMap);
     } catch (error) {
-      message.error("Erreur lors du chargement des données");
+      // message.error("Erreur lors du chargement des données");
       console.error("Error fetching data:", error);
     } finally {
       setLoading(false);

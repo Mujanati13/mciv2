@@ -167,7 +167,7 @@ Disponibilité: ${moment(response.data.data.Disponibilité).format(
       );
       setCandidates(selectedCandidates);
     } catch (error) {
-      message.error("Échec de la récupération des candidatures");
+      // message.error("Échec de la récupération des candidatures");
     } finally {
       setCandidatesLoading(false);
     }

@@ -17,6 +17,7 @@ import {
   Avatar,
   Form,
   Select,
+  Upload,
 } from "antd";
 import {
   SearchOutlined,
@@ -29,10 +30,16 @@ import {
   UserOutlined,
   MailOutlined,
   PhoneOutlined,
+  UploadOutlined,
+  FilePdfOutlined,
+  InboxOutlined,
+  CheckCircleOutlined,
 } from "@ant-design/icons";
 import { Endponit, token } from "../../helper/enpoint";
 
+const { Dragger } = Upload;
 const API_URL = Endponit() + "/api/collaborateur/";
+const UPLOAD_URL = Endponit() + "/api/saveDoc/";
 
 const CollaboratorList = () => {
   const [collaborators, setCollaborators] = useState([]);
@@ -141,6 +148,24 @@ const CollaboratorList = () => {
       onFilter: (value, record) => record.status === value,
     },
     {
+      title: "CV",
+      key: "cv",
+      render: (_, record) => (
+        <Button
+          type="link"
+          icon={<FilePdfOutlined />}
+          disabled={!record.CV}
+          onClick={() => {
+            if (record.cv_url) {
+              window.open(Endponit()+"/media/"+record.CV, "_blank");
+            }
+          }}
+        >
+          {record.CV ? "Voir CV" : "Pas de CV"}
+        </Button>
+      ),
+    },
+    {
       title: "Actions",
       key: "actions",
       width: 120,
@@ -158,14 +183,35 @@ const CollaboratorList = () => {
   const ActionButtons = ({ record, handleDelete, fetchCollaborators }) => {
     const [isEditModalVisible, setIsEditModalVisible] = useState(false);
     const [editForm] = Form.useForm();
+    const [fileList, setFileList] = useState([]);
+    const [uploading, setUploading] = useState(false);
+    const [uploadedFileUrl, setUploadedFileUrl] = useState("");
+    const [isFileUploaded, setIsFileUploaded] = useState(false);
 
     const showEditModal = () => {
       setIsEditModalVisible(true);
       editForm.setFieldsValue(record);
+      setIsFileUploaded(false);
+      setUploadedFileUrl("");
+
+      // Check if the collaborator has a CV
+      if (record.cv_url) {
+        setFileList([
+          {
+            uid: "-1",
+            name: "CV existant",
+            status: "done",
+            url: record.cv_url,
+          },
+        ]);
+      } else {
+        setFileList([]);
+      }
     };
 
     const handleEdit = async () => {
       try {
+        setUploading(true);
         const values = await editForm.validateFields();
 
         // Merge the form values with the existing record data
@@ -178,17 +224,112 @@ const CollaboratorList = () => {
         // Send the updated data to the server
         await axios.put(API_URL, updatedData, {
           headers: {
-            Authorization: token(), // Ensure token() returns the token string
+            Authorization: token(),
           },
         });
 
-        // Notify the user and refresh data
+        // Handle CV upload if there's a new file
+        if (isFileUploaded) {
+          const formData = new FormData();
+          formData.append("file", fileList[0].originFileObj);
+          formData.append("type", "cv");
+          formData.append("entity_id", record.ID_collab);
+          formData.append("entity_type", "collaborateur");
+          formData.append("path", "./uploads/cv/");
+
+          await axios.post(UPLOAD_URL, formData, {
+            headers: {
+              Authorization: `${token()}`,
+              "Content-Type": "multipart/form-data",
+            },
+          });
+        }
+
         message.success("Collaborateur mis à jour avec succès");
         fetchCollaborators();
         setIsEditModalVisible(false);
+        setIsFileUploaded(false);
+        setUploadedFileUrl("");
       } catch (error) {
         console.error("Erreur lors de la mise à jour du collaborateur:", error);
         message.error("Erreur lors de la mise à jour du collaborateur");
+      } finally {
+        setUploading(false);
+      }
+    };
+
+    // Upload configuration - using the same approach as in clientDocumen.jsx
+    const uploadProps = {
+      name: "uploadedFile",
+      customRequest: async ({ file, onSuccess, onError, onProgress }) => {
+        const formData = new FormData();
+        formData.append("uploadedFile", file);
+        formData.append("path", "./uploads/cv/");
+
+        try {
+          const saveDocResponse = await axios.post(UPLOAD_URL, formData, {
+            headers: {
+              "Content-Type": "multipart/form-data",
+              Authorization: `${token()}`,
+            },
+            onUploadProgress: (progressEvent) => {
+              const percent = Math.floor(
+                (progressEvent.loaded / progressEvent.total) * 100
+              );
+              onProgress({ percent });
+            },
+          });
+
+          if (saveDocResponse.data && saveDocResponse.data.path) {
+            setUploadedFileUrl(saveDocResponse.data.path);
+            setIsFileUploaded(true);
+            setFileList([
+              {
+                uid: "-1",
+                name: file.name,
+                status: "done",
+                originFileObj: file,
+              },
+            ]);
+            onSuccess(saveDocResponse.data);
+            message.success(`${file.name} téléchargé avec succès`);
+          }
+        } catch (error) {
+          console.error("Upload error:", error);
+          onError(error);
+          message.error(`${file.name} échec du téléchargement.`);
+        }
+      },
+      beforeUpload: (file) => {
+        // Check if file is PDF
+        const isPDF = file.type === "application/pdf";
+        if (!isPDF) {
+          message.error("Vous pouvez seulement télécharger des fichiers PDF!");
+          return false;
+        }
+
+        // Check file size (limit to 5MB)
+        const isLt5M = file.size / 1024 / 1024 < 5;
+        if (!isLt5M) {
+          message.error("Le CV doit être inférieur à 5MB!");
+          return false;
+        }
+
+        return isPDF && isLt5M;
+      },
+      onChange: (info) => {
+        if (info.file.status === "error") {
+          message.error(`${info.file.name} échec du téléchargement.`);
+        }
+      },
+      fileList,
+    };
+
+    const viewCV = () => {
+      if (record.cv_url) {
+        window.open(record.cv_url, "_blank");
+      } else {
+        message.info("Aucun CV disponible pour ce collaborateur");
       }
     };
 
@@ -226,10 +367,21 @@ const CollaboratorList = () => {
                           <p>Date de Début: {record.date_debut_activ}</p>
                           <p>Mobilité: {record.Mobilité}</p>
                           <p>LinkedIn: {record.LinkedIN}</p>
+                          {record.cv_url && (
+                            <Button icon={<FilePdfOutlined />} onClick={viewCV}>
+                              Voir CV
+                            </Button>
+                          )}
                         </div>
                       ),
                     });
                   },
+                },
+                {
+                  key: "2",
+                  label: "Voir CV",
+                  onClick: viewCV,
+                  disabled: !record.cv_url,
                 },
               ],
             }}
@@ -243,9 +395,14 @@ const CollaboratorList = () => {
           title="Modifier le Collaborateur"
           visible={isEditModalVisible}
           onOk={handleEdit}
-          onCancel={() => setIsEditModalVisible(false)}
+          onCancel={() => {
+            setIsEditModalVisible(false);
+            setIsFileUploaded(false);
+            setUploadedFileUrl("");
+          }}
           okText="Mettre à jour"
           cancelText="Annuler"
+          confirmLoading={uploading}
         >
           <Form form={editForm} layout="vertical">
             <Form.Item
@@ -278,6 +435,55 @@ const CollaboratorList = () => {
                 <Select.Option value={false}>Inactif</Select.Option>
               </Select>
             </Form.Item>
+            <Form.Item
+              label="CV"
+              name="CV"
+              tooltip="Mettre à jour le CV du collaborateur (format PDF, max 5MB)"
+            >
+              {record.cv_url && !isFileUploaded && (
+                <div
+                  className="mb-3 p-3"
+                  style={{ backgroundColor: "#f5f5f5", borderRadius: "4px" }}
+                >
+                  CV actuel:{" "}
+                  <a
+                    href={record.cv_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <FilePdfOutlined /> Voir le CV
+                  </a>
+                </div>
+              )}
+
+              <Dragger {...uploadProps}>
+                <p className="ant-upload-drag-icon">
+                  <InboxOutlined
+                    style={{ fontSize: "48px", color: "#1890ff" }}
+                  />
+                </p>
+                <p className="ant-upload-text">
+                  Cliquez ou déposez un fichier PDF ici
+                </p>
+                <p className="ant-upload-hint">
+                  Format accepté: PDF - Taille maximale: 5MB
+                </p>
+              </Dragger>
+
+              {isFileUploaded && (
+                <div
+                  className="mt-2 p-2"
+                  style={{
+                    backgroundColor: "#f6ffed",
+                    borderRadius: "4px",
+                    border: "1px solid #b7eb8f",
+                  }}
+                >
+                  <CheckCircleOutlined style={{ color: "green" }} /> CV
+                  téléchargé avec succès
+                </div>
+              )}
+            </Form.Item>
           </Form>
         </Modal>
       </>
@@ -295,18 +501,32 @@ const CollaboratorList = () => {
               <EditOutlined
                 key="edit"
                 onClick={() => {
-                  /* Edit logic */
+                  /* Edit logic - should be implemented */
+                  const actionButtons = document.querySelector(
+                    `[data-row-key="${collaborator.ID_collab}"] .ant-table-cell-fix-right`
+                  );
+                  if (actionButtons) {
+                    const editButton = actionButtons.querySelector(
+                      ".ant-btn:first-child"
+                    );
+                    if (editButton) editButton.click();
+                  }
                 }}
               />,
               <DeleteOutlined
                 key="delete"
                 onClick={() => handleDelete(collaborator)}
               />,
-              <MoreOutlined
-                key="more"
+              <FilePdfOutlined
+                key="cv"
                 onClick={() => {
-                  /* More options logic */
+                  if (collaborator.cv_url) {
+                    window.open(collaborator.cv_url, "_blank");
+                  } else {
+                    message.info("Aucun CV disponible pour ce collaborateur");
+                  }
                 }}
+                style={{ color: collaborator.cv_url ? "#1890ff" : "#d9d9d9" }}
               />,
             ]}
           >
@@ -332,38 +552,150 @@ const CollaboratorList = () => {
   const AddCollaboratorModal = () => {
     const [isModalVisible, setIsModalVisible] = useState(false);
     const [form] = Form.useForm();
+    const [fileList, setFileList] = useState([]);
+    const [uploading, setUploading] = useState(false);
+    const [uploadedFileUrl, setUploadedFileUrl] = useState("");
+    const [isFileUploaded, setIsFileUploaded] = useState(false);
 
     const showModal = () => {
       setIsModalVisible(true);
+      setIsFileUploaded(false);
+      setUploadedFileUrl("");
+      setFileList([]);
+      form.resetFields();
     };
 
     const handleOk = async () => {
       try {
+        setUploading(true);
         const values = await form.validateFields();
+
+        // First create the collaborator with the CV URL
         const newCollaborator = {
           ID_ESN: localStorage.getItem("id"),
           ...values,
           Actif: true,
+          CV: uploadedFileUrl, // Add the uploaded CV URL directly to the collaborator record
           date_debut_activ: new Date().toISOString().split("T")[0],
         };
 
-        await axios.post(API_URL, newCollaborator, {
+        const response = await axios.post(API_URL, newCollaborator, {
           headers: {
             Authorization: `${token()}`,
           },
         });
+
+        // If there's a CV file to upload and it's not already included in the collaborator record
+        // This is for the file association in case your backend needs a separate record
+        // if (isFileUploaded) {
+        //   const formData = new FormData();
+        //   formData.append("file", fileList[0].originFileObj);
+        //   formData.append("type", "cv");
+        //   formData.append(
+        //     "entity_id",
+        //     response.data.id || response.data.ID_collab
+        //   );
+        //   formData.append("entity_type", "collaborateur");
+        //   formData.append("path", "./uploads/cv/");
+
+        //   // This might be redundant if you've already included the URL in the collaborator record
+        //   // but keeping it for compatibility with your other code
+        //   await axios.post(UPLOAD_URL, formData, {
+        //     headers: {
+        //       Authorization: `${token()}`,
+        //       "Content-Type": "multipart/form-data",
+        //     },
+        //   });
+        // }
+
         message.success("Nouveau collaborateur ajouté avec succès");
         fetchCollaborators();
         setIsModalVisible(false);
         form.resetFields();
+        setFileList([]);
+        setIsFileUploaded(false);
+        setUploadedFileUrl("");
       } catch (error) {
+        console.error("Error adding collaborator:", error);
         message.error("Erreur lors de l'ajout du collaborateur");
+      } finally {
+        setUploading(false);
       }
     };
 
     const handleCancel = () => {
       setIsModalVisible(false);
       form.resetFields();
+      setFileList([]);
+      setIsFileUploaded(false);
+      setUploadedFileUrl("");
+    };
+
+    // Upload configuration for Add Modal - using the same approach as in clientDocumen.jsx
+    const props = {
+      name: "uploadedFile",
+      customRequest: async ({ file, onSuccess, onError, onProgress }) => {
+        const formData = new FormData();
+        formData.append("uploadedFile", file);
+        formData.append("path", "./uploads/cv/");
+
+        try {
+          const saveDocResponse = await axios.post(UPLOAD_URL, formData, {
+            headers: {
+              "Content-Type": "multipart/form-data",
+              Authorization: `${token()}`,
+            },
+            onUploadProgress: (progressEvent) => {
+              const percent = Math.floor(
+                (progressEvent.loaded / progressEvent.total) * 100
+              );
+              onProgress({ percent });
+            },
+          });
+
+          if (saveDocResponse.data && saveDocResponse.data.path) {
+            setUploadedFileUrl(saveDocResponse.data.path);
+            setIsFileUploaded(true);
+            setFileList([
+              {
+                uid: "-1",
+                name: file.name,
+                status: "done",
+                originFileObj: file,
+              },
+            ]);
+            onSuccess(saveDocResponse.data);
+            message.success(`${file.name} téléchargé avec succès`);
+          }
+        } catch (error) {
+          console.error("Upload error:", error);
+          onError(error);
+          message.error(`${file.name} échec du téléchargement.`);
+        }
+      },
+      beforeUpload: (file) => {
+        // Check if file is PDF
+        const isPDF = file.type === "application/pdf";
+        if (!isPDF) {
+          message.error("Vous pouvez seulement télécharger des fichiers PDF!");
+          return false;
+        }
+
+        // Check file size (limit to 5MB)
+        const isLt5M = file.size / 1024 / 1024 < 5;
+        if (!isLt5M) {
+          message.error("Le CV doit être inférieur à 5MB!");
+          return false;
+        }
+
+        return isPDF && isLt5M;
+      },
+      onChange: (info) => {
+        if (info.file.status === "error") {
+          message.error(`${info.file.name} échec du téléchargement.`);
+        }
+      },
+      fileList,
     };
 
     return (
@@ -378,6 +710,7 @@ const CollaboratorList = () => {
           onCancel={handleCancel}
           okText="Ajouter"
           cancelText="Annuler"
+          confirmLoading={uploading}
         >
           <Form form={form} layout="vertical" name="add_collaborator">
             <Form.Item
@@ -421,11 +754,42 @@ const CollaboratorList = () => {
             </Form.Item>
             <Form.Item label="Mobilité" name="Mobilité">
               <Select>
-                <Select.Option value="National">National</Select.Option>
-                <Select.Option value="International">
-                  International
-                </Select.Option>
+                <Option value="National">National</Option>
+                <Option value="International">International</Option>
               </Select>
+            </Form.Item>
+            <Form.Item
+              label="CV"
+              name="CV"
+              tooltip="Téléchargez le CV du collaborateur (format PDF, max 5MB)"
+            >
+              <Dragger {...props}>
+                <p className="ant-upload-drag-icon">
+                  <InboxOutlined
+                    style={{ fontSize: "48px", color: "#1890ff" }}
+                  />
+                </p>
+                <p className="ant-upload-text">
+                  Cliquez ou déposez un fichier PDF ici
+                </p>
+                <p className="ant-upload-hint">
+                  Format accepté: PDF - Taille maximale: 5MB
+                </p>
+              </Dragger>
+
+              {isFileUploaded && (
+                <div
+                  className="mt-2 p-2"
+                  style={{
+                    backgroundColor: "#f6ffed",
+                    borderRadius: "4px",
+                    border: "1px solid #b7eb8f",
+                  }}
+                >
+                  <CheckCircleOutlined style={{ color: "green" }} /> CV
+                  téléchargé avec succès
+                </div>
+              )}
             </Form.Item>
           </Form>
         </Modal>
@@ -473,13 +837,14 @@ const CollaboratorList = () => {
           loading={loading}
           pagination={{
             total: collaborators.length,
-            pageSize: 10,
+            pageSize: 7,
             showTotal: (total) => `Total ${total} collaborateurs`,
             showSizeChanger: true,
             showQuickJumper: true,
           }}
-          size="middle"
+          size="small"
           scroll={{ x: "max-content" }}
+          rowKey="ID_collab"
         />
       ) : (
         <CardView

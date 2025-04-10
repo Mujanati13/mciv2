@@ -20,6 +20,7 @@ import {
   Modal,
   Checkbox,
   Spin,
+  Steps,
 } from "antd";
 import {
   BuildOutlined,
@@ -42,6 +43,9 @@ import {
   FileProtectOutlined,
   FilePdfOutlined,
   UserOutlined,
+  FormOutlined,
+  FileSearchOutlined,
+  CloseOutlined,
 } from "@ant-design/icons";
 import axios from "axios";
 import { Endponit, token } from "../../helper/enpoint";
@@ -103,6 +107,26 @@ const ESNProfilePageFrancais = () => {
   const [cities, setCities] = useState([]);
   const [citiesLoading, setCitiesLoading] = useState(false);
   const baseApiUrl = Endponit();
+  const [currentStep, setCurrentStep] = useState(0);
+
+  // Get activation step based on status
+  const getActivationStep = (status, completionPercentage) => {
+    if (!status) return 0;
+    
+    switch (status.toLowerCase()) {
+      case "draft":
+        return completionPercentage === 100 ? 1 : 0;
+      case "à valider":
+        return 1;
+      case "à signer":
+        return 2;
+      case "actif":
+      case "validé":
+        return 3;
+      default:
+        return 0;
+    }
+  };
 
   // Fetch countries and convert ISO codes to localized names (French)
   const fetchCountries = useCallback(async () => {
@@ -217,6 +241,7 @@ const ESNProfilePageFrancais = () => {
           ...profileData,
           Statut: "Actif",
         });
+        setCurrentStep(3);
         message.success("Contrat accepté avec succès!");
         generatePDF();
         // Refresh the page after contract acceptance and PDF generation
@@ -253,6 +278,7 @@ const ESNProfilePageFrancais = () => {
           Date_validation: dayjs(),
         });
         setIsAccountActive(true);
+        setCurrentStep(3);
         message.success("Compte ESN activé avec succès!");
       } else {
         throw new Error("Échec de l'activation du compte");
@@ -368,6 +394,7 @@ const ESNProfilePageFrancais = () => {
       IBAN: { weight: 7, filled: !!data.IBAN },
       BIC: { weight: 5, filled: !!data.BIC },
       Banque: { weight: 5, filled: !!data.Banque },
+      responsible: { weight: 5, filled: !!data.responsible },
     };
     const allFields = {
       ...requiredFields,
@@ -386,6 +413,10 @@ const ESNProfilePageFrancais = () => {
     setCompletionStatus(completion);
     const active = completion >= 99 && data.Statut?.toLowerCase() === "actif";
     setIsAccountActive(active);
+    
+    // Set current step based on status
+    setCurrentStep(getActivationStep(data.Statut, completion));
+    
     if (
       completion === 100 &&
       data.Statut !== "à signer" &&
@@ -405,7 +436,6 @@ const ESNProfilePageFrancais = () => {
         ...data,
         ID_ESN: esnId,
         Statut: "à valider",
-        password: null,
       };
       const response = await axios.put(
         `${baseApiUrl}/api/ESN/`,
@@ -417,6 +447,7 @@ const ESNProfilePageFrancais = () => {
           ...data,
           Statut: "à valider",
         });
+        setCurrentStep(1);
         message.success(
           "Votre profil est complet! Statut mis à jour: à valider"
         );
@@ -474,7 +505,6 @@ const ESNProfilePageFrancais = () => {
         ...profileData,
         ...formValues,
         ID_ESN: esnId,
-        password: null,
         Date_validation: formValues.Date_validation
           ? formValues.Date_validation.format("YYYY-MM-DD")
           : null,
@@ -498,6 +528,7 @@ const ESNProfilePageFrancais = () => {
         profileData.Statut !== "à valider"
       ) {
         updatePayload.Statut = "à valider";
+        setCurrentStep(1);
       }
       console.log("Sending update payload:", updatePayload);
       const response = await axios.put(
@@ -536,6 +567,88 @@ const ESNProfilePageFrancais = () => {
     }
   };
 
+  // Get status guidance based on current status
+  const getStatusGuidance = () => {
+    if (!profileData) return {};
+    
+    switch (profileData.Statut) {
+      case "Draft":
+        return {
+          title: "Profil incomplet",
+          description: "Veuillez compléter votre profil pour activer votre compte.",
+          nextStep: "Remplissez tous les champs requis pour passer à l'étape suivante.",
+          icon: <FormOutlined style={{ color: "#faad14" }} />,
+          color: "warning",
+          action: (
+            <Button 
+              type="primary" 
+              icon={<EditOutlined />} 
+              onClick={startEditing}
+              disabled={isEditing}>
+              Compléter mon profil
+            </Button>
+          )
+        };
+      case "à valider":
+        return {
+          title: "En attente de validation",
+          description: "Votre profil a été soumis et est en cours d'examen par notre équipe.",
+          nextStep: "Nous vous contacterons prochainement pour la suite du processus.",
+          icon: <FileSearchOutlined style={{ color: "#1890ff" }} />,
+          color: "info",
+          action: (
+            <Button type="default" disabled>
+              Validation en cours...
+            </Button>
+          )
+        };
+      case "à signer":
+        return {
+          title: "Contrat à signer",
+          description: "Votre profil a été validé. Veuillez maintenant accepter les conditions du contrat.",
+          nextStep: "Après acceptation, vous pourrez accéder à toutes les fonctionnalités de la plateforme.",
+          icon: <FileProtectOutlined style={{ color: "#52c41a" }} />,
+          color: "info",
+          action: (
+            <Button 
+              type="primary" 
+              icon={<FileProtectOutlined />} 
+              onClick={showContractModal}
+              className="orange-pulse-animation">
+              Accepter le contrat
+            </Button>
+          )
+        };
+      case "Actif":
+      case "actif":
+      case "validé":
+        return {
+          title: "Compte activé",
+          description: "Votre compte est pleinement activé.",
+          nextStep: "Vous avez maintenant accès à toutes les fonctionnalités de la plateforme.",
+          icon: <CheckCircleOutlined style={{ color: "#52c41a" }} />,
+          color: "success",
+          action: (
+            <Button 
+              type="default" 
+              icon={<FilePdfOutlined />} 
+              onClick={generatePDF}>
+              Télécharger le contrat
+            </Button>
+          )
+        };
+      default:
+        return {
+          title: "Statut indéterminé",
+          description: "Veuillez contacter notre support pour plus d'informations.",
+          nextStep: "Nous vous aiderons à résoudre ce problème rapidement.",
+          icon: <ExclamationCircleOutlined style={{ color: "#faad14" }} />,
+          color: "warning",
+          action: null
+        };
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -559,6 +672,9 @@ const ESNProfilePageFrancais = () => {
       </div>
     );
   }
+
+  // Status guidance content
+  const statusGuidance = getStatusGuidance();
 
   const renderContent = () => {
     const formItemLayout = {
@@ -847,19 +963,114 @@ const ESNProfilePageFrancais = () => {
         </Form>
       );
     }
+    
     return (
       <div>
+        {/* Steps for activation process - Only show when account is not active */}
+        {!isAccountActive && (
+          <Card className="mb-6 shadow rounded-xl overflow-hidden bg-white">
+            <div className="p-3">
+              <Steps 
+                current={currentStep}
+                labelPlacement="vertical"
+                progressDot
+                size="small"
+                className="my-2"
+                items={[
+                  {
+                    title: 'Compléter le profil',
+                    description: null,
+                    status: currentStep >= 0 ? (currentStep > 0 ? 'finish' : 'process') : 'wait',
+                  },
+                  {
+                    title: 'Validation',
+                    description: null,
+                    status: currentStep >= 1 ? (currentStep > 1 ? 'finish' : 'process') : 'wait',
+                  },
+                  {
+                    title: 'Contrat',
+                    description: null,
+                    status: currentStep >= 2 ? (currentStep > 2 ? 'finish' : 'process') : 'wait',
+                  },
+                  {
+                    title: 'Actif',
+                    description: null,
+                    status: currentStep >= 3 ? 'finish' : 'wait',
+                  },
+                ]}
+              />
+            </div>
+          </Card>
+        )}
+
+        {/* Status guidance alert - Compact version */}
+        <Card className="mb-6 shadow rounded-xl overflow-hidden bg-white">
+          <div className={`px-4 py-3 flex items-start ${
+            isAccountActive ? 'bg-green-50 border-b border-green-200' : 
+            statusGuidance.color === 'warning' ? 'bg-orange-50 border-b border-orange-200' : 
+            'bg-blue-50 border-b border-blue-200'
+          }`}>
+            <div className="mr-3 mt-1">
+              {statusGuidance.icon}
+            </div>
+            <div className="flex-grow">
+              <div className="font-medium text-lg">
+                {statusGuidance.title}
+              </div>
+              <div className="text-sm mt-1">
+                {statusGuidance.description}
+                {!isAccountActive && (
+                  <div className="mt-1 text-sm text-gray-600">
+                    <b>{isAccountActive ? '' : 'Prochaine étape :'}</b> {statusGuidance.nextStep}
+                  </div>
+                )}
+              </div>
+              {statusGuidance.action && (
+                <div className="mt-2">
+                  {statusGuidance.action}
+                </div>
+              )}
+            </div>
+          </div>
+        </Card>
+        
         {/* Profile Completion Progress */}
         <Row gutter={[16, 16]} className="mb-6">
           <Col span={24}>
-            <Card bordered={false}>
+            <Card bordered={false} className="shadow rounded-xl overflow-hidden">
               <div className="flex flex-col md:flex-row justify-between items-center mb-4">
                 <div className="mb-4 md:mb-0 w-full">
                   <div className="flex items-center mb-2">
                     <h3 className="text-lg font-semibold text-blue-900 mr-3">
                       Complétude du profil
                     </h3>
+                    <Tag
+                      color={profileData.Statut === "Actif" || profileData.Statut === "actif" ? "success" : 
+                            completionStatus === 100 ? "processing" : "warning"}
+                      className="text-xs">
+                      {profileData.Statut === "Actif" || profileData.Statut === "actif" ? (
+                        <>
+                          <CheckCircleOutlined /> {profileData.Statut}
+                        </>
+                      ) : (
+                        <>
+                          {completionStatus}%
+                        </>
+                      )}
+                    </Tag>
                   </div>
+                  <Tooltip title={`Profil ${completionStatus}% complété`}>
+                    <Progress
+                      percent={completionStatus}
+                      status={completionStatus === 100 ? "success" : "active"}
+                      strokeColor={{
+                        "0%": "#108ee9",
+                        "100%": "#87d068",
+                      }}
+                      strokeWidth={10}
+                      className="w-full"
+                    />
+                  </Tooltip>
                 </div>
                 <Button
                   type="primary"
@@ -869,104 +1080,10 @@ const ESNProfilePageFrancais = () => {
                   Modifier le Profil
                 </Button>
               </div>
-              <Tooltip title={`Profil ${completionStatus}% complété`}>
-                <Progress
-                  percent={completionStatus}
-                  status={completionStatus === 100 ? "success" : "active"}
-                  strokeColor={{
-                    "0%": "#108ee9",
-                    "100%": "#87d068",
-                  }}
-                  strokeWidth={10}
-                  className="w-full"
-                />
-              </Tooltip>
-              {!isAccountActive && completionStatus < 80 && (
-                <Alert
-                  message="Pour activer votre compte ESN, complétez votre profil"
-                  description="Les informations essentielles sont nécessaires pour activer votre compte et accéder à toutes les fonctionnalités."
-                  type="warning"
-                  showIcon
-                  className="mt-4"
-                />
-              )}
             </Card>
           </Col>
         </Row>
         <Row gutter={[16, 16]}>
-          <Col span={24} className="text-center">
-            <div className="mt-4">
-              <Tag
-                color={isAccountActive ? "success" : "warning"}
-                icon={
-                  isAccountActive ? (
-                    <CheckCircleOutlined />
-                  ) : (
-                    <ExclamationCircleOutlined />
-                  )
-                }
-                className="text-base px-4 py-1"
-              >
-                {profileData.Statut || "En attente d'activation"}
-              </Tag>
-            </div>
-          </Col>
-          {/* Contract Status and Buttons */}
-          <Col span={24}>
-            <Card bordered={false}>
-              <div className="flex flex-col md:flex-row justify-between items-center">
-                <div>
-                  <h3 className="text-lg font-semibold text-blue-900 mb-2">
-                    Statut du contrat:{" "}
-                    <Tag
-                      color={
-                        contractAccepted ||
-                        profileData.Statut === "ready" ||
-                        profileData.Statut === "Actif"
-                          ? "green"
-                          : "orange"
-                      }
-                    >
-                      {contractAccepted ||
-                      profileData.Statut === "ready" ||
-                      profileData.Statut === "Actif"
-                        ? "Contrat accepté"
-                        : "En attente de signature"}
-                    </Tag>
-                  </h3>
-                  <p className="text-gray-600">
-                    {contractAccepted ||
-                    profileData.Statut === "ready" ||
-                    profileData.Statut === "Actif"
-                      ? "Vous avez accepté les conditions générales d'utilisation."
-                      : "Pour activer votre compte, veuillez accepter les conditions générales d'utilisation."}
-                  </p>
-                </div>
-                <div className="mt-4 md:mt-0">
-                  {!contractAccepted && profileData.Statut == "à signer" && (
-                    <Button
-                      type="primary"
-                      icon={<FileProtectOutlined />}
-                      onClick={showContractModal}
-                      className="orange-pulse-animation mr-2"
-                      style={{ borderColor: "#ff8c00" }}
-                    >
-                      Accepter le contrat
-                    </Button>
-                  )}
-                  {(contractAccepted || profileData.Statut === "Actif") && (
-                    <Button
-                      type="default"
-                      icon={<FilePdfOutlined />}
-                      onClick={generatePDF}
-                    >
-                      Télécharger le contrat
-                    </Button>
-                  )}
-                </div>
-              </div>
-            </Card>
-          </Col>
           {/* Company Information Section */}
           <Col span={24}>
             <Divider orientation="center" className="text-2xl font-semibold">
@@ -975,7 +1092,7 @@ const ESNProfilePageFrancais = () => {
                 Informations de l'Entreprise
               </Space>
             </Divider>
-            <Card bordered={false}>
+            <Card bordered={false} className="shadow-sm rounded-xl">
               <Descriptions
                 layout="vertical"
                 bordered
@@ -1013,7 +1130,7 @@ const ESNProfilePageFrancais = () => {
                 Coordonnées de Contact
               </Space>
             </Divider>
-            <Card bordered={false}>
+            <Card bordered={false} className="shadow-sm rounded-xl">
               <Descriptions
                 layout="vertical"
                 bordered
@@ -1053,7 +1170,7 @@ const ESNProfilePageFrancais = () => {
                 Informations Bancaires
               </Space>
             </Divider>
-            <Card bordered={false}>
+            <Card bordered={false} className="shadow-sm rounded-xl">
               <Descriptions
                 layout="vertical"
                 bordered
