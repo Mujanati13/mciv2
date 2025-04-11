@@ -169,7 +169,7 @@ const CollaboratorList = () => {
         checkEsnDocuments(esnIds);
       }
     } catch (error) {
-      message.error("Erreur lors du chargement des données");
+      // message.error("Erreur lors du chargement des données");
       console.error("Fetch error:", error);
     } finally {
       setLoading(false);
@@ -225,10 +225,10 @@ const CollaboratorList = () => {
             },
           }
         );
-        message.success("ESN marqué comme 'à signer'");
+        message.success("L'ESN a été marquée comme 'à signer' avec succès");
         onClose(true); // Pass true to indicate the list should refresh
       } catch (error) {
-        message.error("Erreur lors de la modification du statut");
+        message.error("Erreur lors de la modification du statut de l'ESN");
         console.error("Status change error:", error);
       }
     };
@@ -260,7 +260,7 @@ const CollaboratorList = () => {
               }
             >
               {collaborator.status === "Draft"
-                ? "En cours de création"
+                ? "Brouillon"
                 : collaborator.status === "à valider"
                 ? "À valider"
                 : collaborator.status === "à signer"
@@ -451,11 +451,12 @@ const CollaboratorList = () => {
               <InfoCircleOutlined className="text-blue-500 text-lg mt-1 mr-3" />
               <div>
                 <h4 className="font-medium text-blue-700 m-0">
-                  Profil complété à 100%
+                  Profil prêt pour la prochaine étape
                 </h4>
                 <p className="text-blue-600 mt-1 mb-0">
-                  Ce profil est complet et peut être marqué comme "À signer"
-                  pour validation.
+                  Ce profil d'ESN est complet et contient tous les documents
+                  nécessaires. Vous pouvez maintenant le faire passer à l'étape
+                  "À signer" pour continuer le processus de validation.
                 </p>
               </div>
             </div>
@@ -467,13 +468,15 @@ const CollaboratorList = () => {
               <WarningOutlined className="text-yellow-500 text-lg mt-1 mr-3" />
               <div>
                 <h4 className="font-medium text-yellow-700 m-0">
-                  Profil incomplet
+                  Dossier ESN incomplet
                 </h4>
                 <p className="text-yellow-600 mt-1 mb-0">
                   {collaborator.completion < 100
-                    ? "Complétez le profil à 100% "
-                    : "Ajoutez au moins un document "}
-                  pour pouvoir marquer ce profil comme "À signer".
+                    ? "Les informations de cette ESN sont incomplètes. Veuillez vous assurer que toutes les informations obligatoires sont renseignées (actuellement à " +
+                      collaborator.completion +
+                      "%) "
+                    : "Le dossier est complet au niveau des informations mais aucun document n'a été fourni. Veuillez vérifier que les documents nécessaires ont été ajoutés "}
+                  avant de pouvoir faire passer cette ESN à l'étape suivante.
                 </p>
               </div>
             </div>
@@ -552,11 +555,11 @@ const CollaboratorList = () => {
   // Delete Collaborator
   const handleDelete = async (record) => {
     Modal.confirm({
-      title: "Êtes-vous sûr de vouloir supprimer ce collaborateur ?",
-      content: `Cette action supprimera définitivement ${record.nom}.`,
-      okText: "Oui",
+      title: "Êtes-vous sûr de vouloir supprimer cette ESN ?",
+      content: `Cette action supprimera définitivement ${record.nom} et toutes ses données associées.`,
+      okText: "Supprimer",
       okType: "danger",
-      cancelText: "Non",
+      cancelText: "Annuler",
       async onOk() {
         try {
           await axios.delete(`${API_BASE_URL}` + record.id, {
@@ -565,10 +568,10 @@ const CollaboratorList = () => {
               Authorization: `${token()}`,
             },
           });
-          message.success("ENS supprimé avec succès");
+          message.success("ESN supprimée avec succès");
           showPasswordPrompt(); // Refresh with password
         } catch (error) {
-          message.error("Erreur lors de la suppression du ENS");
+          message.error("Erreur lors de la suppression de l'ESN");
           console.error("Delete error:", error);
         }
       },
@@ -631,7 +634,7 @@ const CollaboratorList = () => {
         switch (status) {
           case "Draft":
             color = "orange";
-            text = "En cours de création";
+            text = "Brouillon";
             break;
           case "à valider":
             color = "blue";
@@ -657,7 +660,7 @@ const CollaboratorList = () => {
         return <Tag color={color}>{text}</Tag>;
       },
       filters: [
-        { text: "En cours de création", value: "Draft" },
+        { text: "Brouillon", value: "Draft" },
         { text: "À valider", value: "à valider" },
         { text: "À signer", value: "à signer" },
         { text: "Actif", value: "Actif" },
@@ -723,7 +726,8 @@ const CollaboratorList = () => {
 
     // Modified to show details first before verifying
     const handleVerifyWithDetails = () => {
-      onViewDetails(record, true); // Pass true to indicate verification intent
+      setVerificationIntent(true);
+      onViewDetails(record); // Pass true to indicate verification intent
     };
 
     return (
@@ -738,7 +742,9 @@ const CollaboratorList = () => {
         </Tooltip> */}
         <Tooltip
           title={
-            isEnabled ? "Validation de l'ESN" : "Profil incomplet" // Updated message here
+            isEnabled
+              ? "Valider et vérifier l'ESN"
+              : "Profil incomplet (vérifiez les détails)"
           }
         >
           <Button
@@ -749,7 +755,7 @@ const CollaboratorList = () => {
             // disabled={!isEnabled}
           />
         </Tooltip>
-        <Tooltip title="Supprimer">
+        <Tooltip title="Supprimer cette ESN">
           <Button
             type="text"
             danger
@@ -778,7 +784,8 @@ const CollaboratorList = () => {
 
           // Modified to show details first before verifying
           const handleVerifyWithDetails = () => {
-            onViewDetails(collaborator, true); // Pass true to indicate verification intent
+            setVerificationIntent(true);
+            onViewDetails(collaborator); // Pass true to indicate verification intent
           };
 
           return (
@@ -803,27 +810,23 @@ const CollaboratorList = () => {
                   <Tooltip
                     title={
                       isEnabled
-                        ? "Marquer comme 'à signer'"
-                        : "Profil incomplet" // Updated message here
+                        ? "Valider et faire passer à l'étape 'À signer'"
+                        : "Profil incomplet - Voir les détails"
                     }
                     key="verify-tooltip"
                   >
                     <span>
                       <CheckCircleOutlined
                         key="verify"
-                        onClick={
-                          isEnabled
-                            ? () => handleVerifyWithDetails()
-                            : undefined
-                        }
+                        onClick={handleVerifyWithDetails}
                         style={{
                           color: isEnabled ? "#52c41a" : "#d9d9d9",
-                          cursor: isEnabled ? "pointer" : "not-allowed",
+                          cursor: "pointer",
                         }}
                       />
                     </span>
                   </Tooltip>,
-                  <Tooltip title="Supprimer" key="delete-tooltip">
+                  <Tooltip title="Supprimer cette ESN" key="delete-tooltip">
                     <DeleteOutlined
                       key="delete"
                       onClick={() => handleDelete(collaborator)}
@@ -868,7 +871,7 @@ const CollaboratorList = () => {
                         }
                       >
                         {collaborator.status === "Draft"
-                          ? "En cours de création"
+                          ? "Brouillon"
                           : collaborator.status === "à valider"
                           ? "À valider"
                           : collaborator.status === "à signer"
@@ -885,7 +888,7 @@ const CollaboratorList = () => {
                       </Space>
                       <Space>{collaborator.poste}</Space>
                       {!hasDocuments && (
-                        <Tag color="orange">Aucun document</Tag>
+                        <Tag color="orange">Documents manquants</Tag>
                       )}
                     </Space>
                   }
@@ -916,7 +919,7 @@ const CollaboratorList = () => {
             <Radio.Button value="card">Cartes</Radio.Button>
           </Radio.Group>
           <Input
-            placeholder="Rechercher..."
+            placeholder="Rechercher une ESN..."
             prefix={<SearchOutlined />}
             onChange={(e) => handleSearch(e.target.value)}
             style={{ width: 200 }}
@@ -933,7 +936,7 @@ const CollaboratorList = () => {
           <Button icon={<ExportOutlined />} onClick={handleExport}>
             Exporter
           </Button>
-          <Tooltip title="Actualiser">
+          <Tooltip title="Actualiser la liste">
             <Button icon={<ReloadOutlined />} onClick={handleRefresh} />
           </Tooltip>
         </div>
@@ -949,7 +952,7 @@ const CollaboratorList = () => {
             pagination={{
               total: collaborators.length,
               pageSize: 10,
-              showTotal: (total) => `Total ${total} collaborateurs`,
+              showTotal: (total) => `Total : ${total} ESN`,
               showSizeChanger: true,
               showQuickJumper: true,
             }}
@@ -959,7 +962,7 @@ const CollaboratorList = () => {
           <div style={{ marginTop: 16 }}>
             <span style={{ marginLeft: 8 }}>
               {selectedRowKeys.length > 0
-                ? `${selectedRowKeys.length} collaborateur(s) sélectionné(s)`
+                ? `${selectedRowKeys.length} ESN sélectionnée(s)`
                 : ""}
             </span>
           </div>
@@ -979,10 +982,15 @@ const CollaboratorList = () => {
       <DetailsModal
         visible={detailsModalVisible}
         collaborator={selectedCollaborator}
-        onClose={() => {
+        onClose={(shouldRefresh) => {
           setDetailsModalVisible(false);
           setSelectedCollaborator(null);
+          setVerificationIntent(false);
+          if (shouldRefresh) {
+            handleRefresh();
+          }
         }}
+        verificationIntent={verificationIntent}
       />
     </Card>
   );
@@ -1092,7 +1100,7 @@ const AddCollaboratorModal = ({
         Province: values.province,
         mail_Contact: values.email,
         Tel_Contact: values.phone,
-        Statut: values.status || "En attente",
+        Statut: values.status || "Draft",
         N_TVA: values.tva,
         IBAN: values.iban,
         BIC: values.bic,
@@ -1157,12 +1165,14 @@ const AddCollaboratorModal = ({
   return (
     <>
       <Button type="primary" onClick={showModal} icon={<PlusOutlined />}>
-        {editingCollaborator ? "Modifier" : "Nouveau ENS"}
+        {editingCollaborator ? "Modifier l'ESN" : "Nouvelle ESN"}
       </Button>
       <Modal
         title={
           <div className="text-xl font-semibold text-gray-800">
-            {editingCollaborator ? "Modifier un ENS" : "Ajouter un ENS"}
+            {editingCollaborator
+              ? "Modifier une ESN"
+              : "Ajouter une nouvelle ESN"}
           </div>
         }
         visible={isModalVisible}
@@ -1381,7 +1391,7 @@ const AddCollaboratorModal = ({
                   >
                     <Input
                       // prefix={<Pass className="text-gray-400" />}
-                      placeholder="Mot de passe"
+                      placeholder="Mot de passe pour l'accès ESN"
                       className="rounded-md"
                     />
                   </Form.Item>
@@ -1441,7 +1451,7 @@ const AddCollaboratorModal = ({
                     name="status"
                   >
                     <Select placeholder="Sélectionnez le statut">
-                      <Option value="Draft">En cours de création</Option>
+                      <Option value="Draft">Brouillon</Option>
                       <Option value="à valider">À valider</Option>
                       <Option value="à signer">À signer</Option>
                       <Option value="Actif">Actif</Option>

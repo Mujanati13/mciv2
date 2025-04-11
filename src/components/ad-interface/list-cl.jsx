@@ -77,18 +77,18 @@ export const ClientList = () => {
   const confirmVerification = () => {
     if (verifyingClient) {
       console.log(verifyingClient);
-      
-      handleStatusUpdate(verifyingClient.id, "à signer" , verifyingClient.email);
+
+      handleStatusUpdate(verifyingClient.id, "à signer", verifyingClient.email);
       closeVerificationModal();
     }
   };
 
   // Status update function
-  const handleStatusUpdate = async (clientId, newStatus , mail_Contact) => {
+  const handleStatusUpdate = async (clientId, newStatus, mail_Contact) => {
     try {
       await axios.put(
         `${Endponit()}/api/client/${clientId}`,
-        { statut: newStatus , ID_clt :clientId , mail_contact: mail_Contact },
+        { statut: newStatus, ID_clt: clientId, mail_contact: mail_Contact },
         {
           headers: { Authorization: `${token()}` },
         }
@@ -763,9 +763,11 @@ export const ClientList = () => {
                 </h4>
                 <p className="text-yellow-600 mt-1 mb-0">
                   {client?.completion < 100
-                    ? "Complétez le profil à 100% "
-                    : "Ajoutez au moins un document "}
-                  pour pouvoir marquer ce profil comme "À signer".
+                    ? "Ce profil client est incomplet. Il est nécessaire de renseigner toutes les informations obligatoires (actuellement à " +
+                      client?.completion +
+                      "%) "
+                    : "Les documents requis n'ont pas été fournis. Veuillez vous assurer qu'au moins un document a été ajouté "}
+                  avant de pouvoir faire passer ce client au statut "À signer".
                 </p>
               </div>
             </div>

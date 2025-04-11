@@ -34,6 +34,9 @@ import {
   FilePdfOutlined,
   InboxOutlined,
   CheckCircleOutlined,
+  CalendarOutlined,
+  CompassOutlined,
+  LinkedinOutlined
 } from "@ant-design/icons";
 import { Endponit, token } from "../../helper/enpoint";
 
@@ -336,13 +339,13 @@ const CollaboratorList = () => {
     return (
       <>
         <Space size="middle">
-          <Tooltip title="Modifier">
+          {/* <Tooltip title="Modifier">
             <Button
               type="text"
               icon={<EditOutlined />}
               onClick={showEditModal}
             />
-          </Tooltip>
+          </Tooltip> */}
           <Tooltip title="Supprimer">
             <Button
               type="text"
@@ -359,21 +362,189 @@ const CollaboratorList = () => {
                   label: "Voir détails",
                   onClick: () => {
                     Modal.info({
-                      title: "Détails du Collaborateur",
+                      title: null,
+                      className: "collaborator-details-modal",
+                      width: 520,
+                      icon: null,
                       content: (
-                        <div>
-                          <p>Nom: {record.fullName}</p>
-                          <p>Poste: {record.Poste}</p>
-                          <p>Date de Début: {record.date_debut_activ}</p>
-                          <p>Mobilité: {record.Mobilité}</p>
-                          <p>LinkedIn: {record.LinkedIN}</p>
-                          {record.cv_url && (
-                            <Button icon={<FilePdfOutlined />} onClick={viewCV}>
-                              Voir CV
-                            </Button>
-                          )}
+                        <div style={{ margin: '-20px -24px' }}>
+                          {/* Header with background color */}
+                          <div 
+                            style={{ 
+                              background: 'linear-gradient(135deg, #1890ff 0%, #096dd9 100%)',
+                              padding: '30px 24px 40px',
+                              borderTopLeftRadius: '2px',
+                              borderTopRightRadius: '2px',
+                              position: 'relative',
+                              marginBottom: 60
+                            }}
+                          >
+                            <h2 style={{ 
+                              color: 'white', 
+                              margin: 0, 
+                              fontSize: 20, 
+                              marginBottom: 5,
+                              textAlign: 'center'
+                            }}>
+                              Détails du Collaborateur
+                            </h2>
+                          </div>
+                          
+                          {/* Avatar positioned to overlap header & content */}
+                          <div style={{ 
+                            position: 'absolute', 
+                            top: 80, 
+                            left: '50%', 
+                            transform: 'translateX(-50%)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center'
+                          }}>
+                            <Avatar 
+                              size={100} 
+                              icon={<UserOutlined />} 
+                              style={{ 
+                                backgroundColor: 'white',
+                                color: '#1890ff',
+                                border: '4px solid white',
+                                boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+                              }} 
+                            />
+                            <h2 style={{ 
+                              margin: '12px 0 4px', 
+                              fontSize: 18, 
+                              fontWeight: 'bold' 
+                            }}>
+                              {record.fullName}
+                            </h2>
+                           
+                          </div>
+                          
+                          {/* Information Content */}
+                          <div style={{ padding: '80px 24px 24px' }}>
+                            {/* Info cards in a grid */}
+                            <div style={{ 
+                              display: 'grid', 
+                              gridTemplateColumns: 'repeat(2, 1fr)', 
+                              gap: '16px',
+                              marginBottom: '24px'
+                            }}>
+                              {/* Card 1: Position */}
+                              <div style={{ 
+                                background: '#f5f5f5', 
+                                borderRadius: '8px', 
+                                padding: '16px',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center'
+                              }}>
+                                <UserOutlined style={{ fontSize: '24px', color: '#1890ff', marginBottom: '8px' }} />
+                                <div style={{ fontSize: '13px', color: '#8c8c8c', marginBottom: '4px' }}>Poste</div>
+                                <div style={{ fontSize: '16px', fontWeight: '500' }}>{record.Poste || "Non spécifié"}</div>
+                              </div>
+                              
+                              {/* Card 2: Start Date */}
+                              <div style={{ 
+                                background: '#f5f5f5', 
+                                borderRadius: '8px', 
+                                padding: '16px',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center'
+                              }}>
+                                <CalendarOutlined style={{ fontSize: '24px', color: '#1890ff', marginBottom: '8px' }} />
+                                <div style={{ fontSize: '13px', color: '#8c8c8c', marginBottom: '4px' }}>Date de Début</div>
+                                <div style={{ fontSize: '16px', fontWeight: '500' }}>{record.date_debut_activ || "Non spécifié"}</div>
+                              </div>
+                              
+                              {/* Card 3: Mobility */}
+                              <div style={{ 
+                                background: '#f5f5f5', 
+                                borderRadius: '8px', 
+                                padding: '16px',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center'
+                              }}>
+                                <CompassOutlined style={{ fontSize: '24px', color: '#1890ff', marginBottom: '8px' }} />
+                                <div style={{ fontSize: '13px', color: '#8c8c8c', marginBottom: '4px' }}>Mobilité</div>
+                                <div style={{ fontSize: '16px', fontWeight: '500' }}>{record.Mobilité || "Non spécifié"}</div>
+                              </div>
+                              
+                              {/* Card 4: LinkedIn */}
+                              <div style={{ 
+                                background: '#f5f5f5', 
+                                borderRadius: '8px', 
+                                padding: '16px',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center'
+                              }}>
+                                <LinkedinOutlined style={{ fontSize: '24px', color: '#0073b1', marginBottom: '8px' }} />
+                                <div style={{ fontSize: '13px', color: '#8c8c8c', marginBottom: '4px' }}>LinkedIn</div>
+                                <div style={{ fontSize: '16px', fontWeight: '500' }}>
+                                  {record.LinkedIN ? (
+                                    <a href={record.LinkedIN} target="_blank" rel="noopener noreferrer">
+                                      Voir profil
+                                    </a>
+                                  ) : (
+                                    "Non spécifié"
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                            
+                            {/* Additional contacts if available */}
+                            {(record.Email || record.Telephone) && (
+                              <div style={{ 
+                                background: '#f9f9f9', 
+                                borderRadius: '8px', 
+                                padding: '16px',
+                                marginBottom: '24px'
+                              }}>
+                                <div style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '12px' }}>
+                                  Contact
+                                </div>
+                                
+                                {record.Email && (
+                                  <div style={{ display: 'flex', alignItems: 'center', marginBottom: '8px' }}>
+                                    <MailOutlined style={{ marginRight: '10px', color: '#1890ff' }} />
+                                    <a href={`mailto:${record.Email}`}>{record.Email}</a>
+                                  </div>
+                                )}
+                                
+                                {record.Telephone && (
+                                  <div style={{ display: 'flex', alignItems: 'center' }}>
+                                    <PhoneOutlined style={{ marginRight: '10px', color: '#1890ff' }} />
+                                    <a href={`tel:${record.Telephone}`}>{record.Telephone}</a>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                            
+                            {/* CV Button */}
+                            {record.cv_url && (
+                              <div style={{ textAlign: 'center' }}>
+                                <Button 
+                                  type="primary" 
+                                  icon={<FilePdfOutlined />} 
+                                  onClick={viewCV}
+                                  size="large"
+                                  style={{ 
+                                    height: '42px', 
+                                    paddingLeft: '24px', 
+                                    paddingRight: '24px',
+                                    boxShadow: '0 2px 0 rgba(0,0,0,0.045)'
+                                  }}
+                                >
+                                  Voir CV
+                                </Button>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       ),
+                      okText: "Fermer",
                     });
                   },
                 },
