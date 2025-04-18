@@ -67,7 +67,10 @@ const CollaboratorList = () => {
   };
 
   const calculateProfileCompletion = (collaborator) => {
-    // Define required fields for a complete profile
+    const documentWeight = 0.4; // Uncomment this line
+    const profileWeight = 1; // Change to 0.6 for proper weighting
+  
+    // Define required fields for a complete profile (60% of total score)
     const requiredFields = [
       "Raison_sociale",
       "SIRET",
@@ -80,18 +83,30 @@ const CollaboratorList = () => {
       "IBAN",
       "BIC",
       "Banque",
+      "responsible", // Added responsible person field
     ];
-
-    // Add this function after fetchCollaborators
-
-    // Count filled fields
+  
+    // Count filled profile fields
     const filledFields = requiredFields.filter(
       (field) =>
         collaborator[field] && collaborator[field].toString().trim() !== ""
     ).length;
-
-    // Calculate percentage
-    return Math.round((filledFields / requiredFields.length) * 100);
+  
+    // Calculate profile completion percentage (60% of total)
+    const profileCompletion =
+      (filledFields / requiredFields.length) * profileWeight * 100;
+  
+    // Document completion calculation remains the same
+    let documentCompletion = 0;
+    if (esnsWithDocuments[collaborator.id]) {
+      documentCompletion = documentWeight * 100; // Full 40% if documents exist
+    }
+  
+    // Total completion is the sum of profile completion and document completion
+    const totalCompletion = Math.round(profileCompletion + documentCompletion);
+  
+    // Cap at 100%
+    return Math.min(totalCompletion, 100);
   };
 
   const checkEsnDocuments = async (esnIds) => {
@@ -260,7 +275,7 @@ const CollaboratorList = () => {
               }
             >
               {collaborator.status === "Draft"
-                ? "Brouillon"
+                ? "En cours de creation"
                 : collaborator.status === "à valider"
                 ? "À valider"
                 : collaborator.status === "à signer"
@@ -285,7 +300,7 @@ const CollaboratorList = () => {
                 onClick={handleVerify}
                 icon={<CheckCircleOutlined />}
               >
-                Marquer comme "À signer"
+                Valider la création du compte
               </Button>
             ),
         ].filter(Boolean)}
@@ -634,7 +649,7 @@ const CollaboratorList = () => {
         switch (status) {
           case "Draft":
             color = "orange";
-            text = "Brouillon";
+            text = "En cours de creation";
             break;
           case "à valider":
             color = "blue";
@@ -743,7 +758,7 @@ const CollaboratorList = () => {
         <Tooltip
           title={
             isEnabled
-              ? "Valider et vérifier l'ESN"
+              ? "Valider la création du compte"
               : "Profil incomplet (vérifiez les détails)"
           }
         >

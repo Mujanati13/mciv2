@@ -17,7 +17,7 @@ import ClientDocument from "../components/cl-interface/document";
 import CollaboratorList from "../components/ad-interface/list-ens";
 import { isAdminLoggedIn } from "../helper/db";
 import BDCManagement from "../components/ad-interface/bdc-validateur";
-
+import ListeAppelOffre from "../components/ad-interface/list-appeloffre";
 const items = [
   {
     label: "Tableau de Bord",
@@ -35,9 +35,9 @@ const items = [
     icon: <UsergroupAddOutlined />,
   },
   {
-    label: "Liste Contrats",
-    key: "Contrats",
-    // icon: <UsergroupAddOutlined />,
+    label: "Appels d'offres",
+    key: "appeloffre",
+    icon: <RiseOutlined />,
   },
   {
     label: "Bon de commande",
@@ -83,8 +83,8 @@ const InterfaceAd = () => {
         return <ClientList />;
       case "documents":
         return <ClientDocument />;
-      case "Contrats":
-        return <ContractStats />;
+      case "appeloffre":
+        return <ListeAppelOffre />;
       case "bdc":
         return <BDCManagement />;
       default:

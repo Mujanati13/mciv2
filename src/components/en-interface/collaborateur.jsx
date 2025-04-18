@@ -18,6 +18,7 @@ import {
   Form,
   Select,
   Upload,
+  Switch,
 } from "antd";
 import {
   SearchOutlined,
@@ -36,11 +37,12 @@ import {
   CheckCircleOutlined,
   CalendarOutlined,
   CompassOutlined,
-  LinkedinOutlined
+  LinkedinOutlined,
 } from "@ant-design/icons";
 import { Endponit, token } from "../../helper/enpoint";
 
 const { Dragger } = Upload;
+const { Option } = Select;
 const API_URL = Endponit() + "/api/collaborateur/";
 const UPLOAD_URL = Endponit() + "/api/saveDoc/";
 
@@ -51,6 +53,27 @@ const CollaboratorList = () => {
   const [selectedRowKeys, setSelectedRowKeys] = useState([]);
   const [viewMode, setViewMode] = useState("table");
 
+  // First, add this utility function at the top of your CollaboratorList component
+  const calculateExperience = (startDate) => {
+    if (!startDate) return 0;
+
+    const start = new Date(startDate);
+    const today = new Date();
+
+    // Calculate difference in years
+    let years = today.getFullYear() - start.getFullYear();
+
+    // Adjust for months and days
+    if (
+      today.getMonth() < start.getMonth() ||
+      (today.getMonth() === start.getMonth() &&
+        today.getDate() < start.getDate())
+    ) {
+      years--;
+    }
+
+    return Math.max(0, years);
+  };
   // Fetch collaborators
   const fetchCollaborators = async () => {
     setLoading(true);
@@ -131,7 +154,7 @@ const CollaboratorList = () => {
       key: "Poste",
     },
     {
-      title: "Date de Début",
+      title: "Date de recrutement",
       dataIndex: "date_debut_activ",
       key: "date_debut_activ",
     },
@@ -159,8 +182,8 @@ const CollaboratorList = () => {
           icon={<FilePdfOutlined />}
           disabled={!record.CV}
           onClick={() => {
-            if (record.cv_url) {
-              window.open(Endponit()+"/media/"+record.CV, "_blank");
+            if (record.CV) {
+              window.open(Endponit() + "/media/" + record.CV, "_blank");
             }
           }}
         >
@@ -198,13 +221,13 @@ const CollaboratorList = () => {
       setUploadedFileUrl("");
 
       // Check if the collaborator has a CV
-      if (record.cv_url) {
+      if (record.CV) {
         setFileList([
           {
             uid: "-1",
             name: "CV existant",
             status: "done",
-            url: record.cv_url,
+            url: record.CV,
           },
         ]);
       } else {
@@ -240,12 +263,12 @@ const CollaboratorList = () => {
           formData.append("entity_type", "collaborateur");
           formData.append("path", "./uploads/cv/");
 
-          await axios.post(UPLOAD_URL, formData, {
-            headers: {
-              Authorization: `${token()}`,
-              "Content-Type": "multipart/form-data",
-            },
-          });
+          // await axios.post(UPLOAD_URL, formData, {
+          //   headers: {
+          //     Authorization: `${token()}`,
+          //     "Content-Type": "multipart/form-data",
+          //   },
+          // });
         }
 
         message.success("Collaborateur mis à jour avec succès");
@@ -329,8 +352,8 @@ const CollaboratorList = () => {
     };
 
     const viewCV = () => {
-      if (record.cv_url) {
-        window.open(record.cv_url, "_blank");
+      if (record.CV) {
+        window.open(Endponit() + "/media/" + record.CV, "_blank");
       } else {
         message.info("Aucun CV disponible pour ce collaborateur");
       }
@@ -339,13 +362,13 @@ const CollaboratorList = () => {
     return (
       <>
         <Space size="middle">
-          {/* <Tooltip title="Modifier">
+          <Tooltip title="Modifier">
             <Button
               type="text"
               icon={<EditOutlined />}
               onClick={showEditModal}
             />
-          </Tooltip> */}
+          </Tooltip>
           <Tooltip title="Supprimer">
             <Button
               type="text"
@@ -367,124 +390,381 @@ const CollaboratorList = () => {
                       width: 520,
                       icon: null,
                       content: (
-                        <div style={{ margin: '-20px -24px' }}>
+                        <div style={{ margin: "-20px -24px" }}>
                           {/* Header with background color */}
-                          <div 
-                            style={{ 
-                              background: 'linear-gradient(135deg, #1890ff 0%, #096dd9 100%)',
-                              padding: '30px 24px 40px',
-                              borderTopLeftRadius: '2px',
-                              borderTopRightRadius: '2px',
-                              position: 'relative',
-                              marginBottom: 60
+                          <div
+                            style={{
+                              background:
+                                "linear-gradient(135deg, #1890ff 0%, #096dd9 100%)",
+                              padding: "30px 24px 40px",
+                              borderTopLeftRadius: "2px",
+                              borderTopRightRadius: "2px",
+                              position: "relative",
+                              marginBottom: 60,
                             }}
                           >
-                            <h2 style={{ 
-                              color: 'white', 
-                              margin: 0, 
-                              fontSize: 20, 
-                              marginBottom: 5,
-                              textAlign: 'center'
-                            }}>
+                            <h2
+                              style={{
+                                color: "white",
+                                margin: 0,
+                                fontSize: 20,
+                                marginBottom: 5,
+                                textAlign: "center",
+                              }}
+                            >
                               Détails du Collaborateur
                             </h2>
                           </div>
-                          
+
                           {/* Avatar positioned to overlap header & content */}
-                          <div style={{ 
-                            position: 'absolute', 
-                            top: 80, 
-                            left: '50%', 
-                            transform: 'translateX(-50%)',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center'
-                          }}>
-                            <Avatar 
-                              size={100} 
-                              icon={<UserOutlined />} 
-                              style={{ 
-                                backgroundColor: 'white',
-                                color: '#1890ff',
-                                border: '4px solid white',
-                                boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
-                              }} 
+                          <div
+                            style={{
+                              position: "absolute",
+                              top: 80,
+                              left: "50%",
+                              transform: "translateX(-50%)",
+                              display: "flex",
+                              flexDirection: "column",
+                              alignItems: "center",
+                            }}
+                          >
+                            <Avatar
+                              size={100}
+                              icon={<UserOutlined />}
+                              style={{
+                                backgroundColor: "white",
+                                color: "#1890ff",
+                                border: "4px solid white",
+                                boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+                              }}
                             />
-                            <h2 style={{ 
-                              margin: '12px 0 4px', 
-                              fontSize: 18, 
-                              fontWeight: 'bold' 
-                            }}>
+                            <h2
+                              style={{
+                                margin: "12px 0 4px",
+                                fontSize: 18,
+                                fontWeight: "bold",
+                              }}
+                            >
                               {record.fullName}
                             </h2>
-                           
                           </div>
-                          
+
                           {/* Information Content */}
-                          <div style={{ padding: '80px 24px 24px' }}>
+                          <div style={{ padding: "80px 24px 24px" }}>
                             {/* Info cards in a grid */}
-                            <div style={{ 
-                              display: 'grid', 
-                              gridTemplateColumns: 'repeat(2, 1fr)', 
-                              gap: '16px',
-                              marginBottom: '24px'
-                            }}>
-                              {/* Card 1: Position */}
-                              <div style={{ 
-                                background: '#f5f5f5', 
-                                borderRadius: '8px', 
-                                padding: '16px',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center'
-                              }}>
-                                <UserOutlined style={{ fontSize: '24px', color: '#1890ff', marginBottom: '8px' }} />
-                                <div style={{ fontSize: '13px', color: '#8c8c8c', marginBottom: '4px' }}>Poste</div>
-                                <div style={{ fontSize: '16px', fontWeight: '500' }}>{record.Poste || "Non spécifié"}</div>
+                            <div
+                              style={{
+                                display: "grid",
+                                gridTemplateColumns: "repeat(2, 1fr)",
+                                gap: "16px",
+                                marginBottom: "24px",
+                              }}
+                            >
+                              {/* Role Information */}
+                              <div
+                                style={{
+                                  background: "#f5f5f5",
+                                  borderRadius: "8px",
+                                  padding: "16px",
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  alignItems: "center",
+                                }}
+                              >
+                                <UserOutlined
+                                  style={{
+                                    fontSize: "24px",
+                                    color: "#1890ff",
+                                    marginBottom: "8px",
+                                  }}
+                                />
+                                <div
+                                  style={{
+                                    fontSize: "13px",
+                                    color: "#8c8c8c",
+                                    marginBottom: "4px",
+                                  }}
+                                >
+                                  Poste
+                                </div>
+                                <div
+                                  style={{
+                                    fontSize: "16px",
+                                    fontWeight: "500",
+                                  }}
+                                >
+                                  {record.Poste || "Non spécifié"}
+                                </div>
                               </div>
-                              
-                              {/* Card 2: Start Date */}
-                              <div style={{ 
-                                background: '#f5f5f5', 
-                                borderRadius: '8px', 
-                                padding: '16px',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center'
-                              }}>
-                                <CalendarOutlined style={{ fontSize: '24px', color: '#1890ff', marginBottom: '8px' }} />
-                                <div style={{ fontSize: '13px', color: '#8c8c8c', marginBottom: '4px' }}>Date de Début</div>
-                                <div style={{ fontSize: '16px', fontWeight: '500' }}>{record.date_debut_activ || "Non spécifié"}</div>
+
+                              {/* Employment Start */}
+                              <div
+                                style={{
+                                  background: "#f5f5f5",
+                                  borderRadius: "8px",
+                                  padding: "16px",
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  alignItems: "center",
+                                }}
+                              >
+                                <CalendarOutlined
+                                  style={{
+                                    fontSize: "24px",
+                                    color: "#1890ff",
+                                    marginBottom: "8px",
+                                  }}
+                                />
+                                <div
+                                  style={{
+                                    fontSize: "13px",
+                                    color: "#8c8c8c",
+                                    marginBottom: "4px",
+                                  }}
+                                >
+                                  Date de Début
+                                </div>
+                                <div
+                                  style={{
+                                    fontSize: "16px",
+                                    fontWeight: "500",
+                                  }}
+                                >
+                                  {record.date_debut_activ || "Non spécifié"}
+                                </div>
                               </div>
-                              
-                              {/* Card 3: Mobility */}
-                              <div style={{ 
-                                background: '#f5f5f5', 
-                                borderRadius: '8px', 
-                                padding: '16px',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center'
-                              }}>
-                                <CompassOutlined style={{ fontSize: '24px', color: '#1890ff', marginBottom: '8px' }} />
-                                <div style={{ fontSize: '13px', color: '#8c8c8c', marginBottom: '4px' }}>Mobilité</div>
-                                <div style={{ fontSize: '16px', fontWeight: '500' }}>{record.Mobilité || "Non spécifié"}</div>
+
+                              {/* Birth Date */}
+                              <div
+                                style={{
+                                  background: "#f5f5f5",
+                                  borderRadius: "8px",
+                                  padding: "16px",
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  alignItems: "center",
+                                }}
+                              >
+                                <CalendarOutlined
+                                  style={{
+                                    fontSize: "24px",
+                                    color: "#52c41a",
+                                    marginBottom: "8px",
+                                  }}
+                                />
+                                <div
+                                  style={{
+                                    fontSize: "13px",
+                                    color: "#8c8c8c",
+                                    marginBottom: "4px",
+                                  }}
+                                >
+                                  Date de Naissance
+                                </div>
+                                <div
+                                  style={{
+                                    fontSize: "16px",
+                                    fontWeight: "500",
+                                  }}
+                                >
+                                  {record.Date_naissance || "Non spécifié"}
+                                </div>
                               </div>
-                              
-                              {/* Card 4: LinkedIn */}
-                              <div style={{ 
-                                background: '#f5f5f5', 
-                                borderRadius: '8px', 
-                                padding: '16px',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center'
-                              }}>
-                                <LinkedinOutlined style={{ fontSize: '24px', color: '#0073b1', marginBottom: '8px' }} />
-                                <div style={{ fontSize: '13px', color: '#8c8c8c', marginBottom: '4px' }}>LinkedIn</div>
-                                <div style={{ fontSize: '16px', fontWeight: '500' }}>
+
+                              {/* Roles */}
+                              <div
+                                style={{
+                                  background: "#f5f5f5",
+                                  borderRadius: "8px",
+                                  padding: "16px",
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  alignItems: "center",
+                                }}
+                              >
+                                <UserOutlined
+                                  style={{
+                                    fontSize: "24px",
+                                    color: "#52c41a",
+                                    marginBottom: "8px",
+                                  }}
+                                />
+                                <div
+                                  style={{
+                                    fontSize: "13px",
+                                    color: "#8c8c8c",
+                                    marginBottom: "4px",
+                                  }}
+                                >
+                                  Rôles
+                                </div>
+                                <div
+                                  style={{
+                                    fontSize: "14px",
+                                    fontWeight: "500",
+                                  }}
+                                >
+                                  {[
+                                    record.Admin ? "Admin" : null,
+                                    record.Commercial ? "Commercial" : null,
+                                    record.Consultant ? "Consultant" : null,
+                                  ]
+                                    .filter(Boolean)
+                                    .join(", ") || "Non spécifié"}
+                                </div>
+                              </div>
+
+                              {/* End Date */}
+                              <div
+                                style={{
+                                  background: "#f5f5f5",
+                                  borderRadius: "8px",
+                                  padding: "16px",
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  alignItems: "center",
+                                }}
+                              >
+                                <CalendarOutlined
+                                  style={{
+                                    fontSize: "24px",
+                                    color: "#ff4d4f",
+                                    marginBottom: "8px",
+                                  }}
+                                />
+                                <div
+                                  style={{
+                                    fontSize: "13px",
+                                    color: "#8c8c8c",
+                                    marginBottom: "4px",
+                                  }}
+                                >
+                                  Date de Fin
+                                </div>
+
+                                <div
+                                  style={{
+                                    fontSize: "16px",
+                                    fontWeight: "500",
+                                  }}
+                                >
+                                  {record.date_dé || "Non spécifié"}
+                                </div>
+                              </div>
+
+                              {/* Mobility */}
+                              <div
+                                style={{
+                                  background: "#f5f5f5",
+                                  borderRadius: "8px",
+                                  padding: "16px",
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  alignItems: "center",
+                                }}
+                              >
+                                <CompassOutlined
+                                  style={{
+                                    fontSize: "24px",
+                                    color: "#1890ff",
+                                    marginBottom: "8px",
+                                  }}
+                                />
+                                <div
+                                  style={{
+                                    fontSize: "13px",
+                                    color: "#8c8c8c",
+                                    marginBottom: "4px",
+                                  }}
+                                >
+                                  Mobilité
+                                </div>
+                                <div
+                                  style={{
+                                    fontSize: "16px",
+                                    fontWeight: "500",
+                                  }}
+                                >
+                                  {record.Mobilité || "Non spécifié"}
+                                </div>
+                              </div>
+
+                              {/* Availability */}
+                              <div
+                                style={{
+                                  background: "#f5f5f5",
+                                  borderRadius: "8px",
+                                  padding: "16px",
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  alignItems: "center",
+                                }}
+                              >
+                                <CheckCircleOutlined
+                                  style={{
+                                    fontSize: "24px",
+                                    color: "#52c41a",
+                                    marginBottom: "8px",
+                                  }}
+                                />
+                                <div
+                                  style={{
+                                    fontSize: "13px",
+                                    color: "#8c8c8c",
+                                    marginBottom: "4px",
+                                  }}
+                                >
+                                  Disponibilité
+                                </div>
+                                <div
+                                  style={{
+                                    fontSize: "16px",
+                                    fontWeight: "500",
+                                  }}
+                                >
+                                  {record.Disponibilité || "Non spécifié"}
+                                </div>
+                              </div>
+
+                              {/* LinkedIn */}
+                              <div
+                                style={{
+                                  background: "#f5f5f5",
+                                  borderRadius: "8px",
+                                  padding: "16px",
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  alignItems: "center",
+                                }}
+                              >
+                                <LinkedinOutlined
+                                  style={{
+                                    fontSize: "24px",
+                                    color: "#0073b1",
+                                    marginBottom: "8px",
+                                  }}
+                                />
+                                <div
+                                  style={{
+                                    fontSize: "13px",
+                                    color: "#8c8c8c",
+                                    marginBottom: "4px",
+                                  }}
+                                >
+                                  LinkedIn
+                                </div>
+                                <div
+                                  style={{
+                                    fontSize: "16px",
+                                    fontWeight: "500",
+                                  }}
+                                >
                                   {record.LinkedIN ? (
-                                    <a href={record.LinkedIN} target="_blank" rel="noopener noreferrer">
+                                    <a
+                                      href={record.LinkedIN}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                    >
                                       Voir profil
                                     </a>
                                   ) : (
@@ -493,48 +773,81 @@ const CollaboratorList = () => {
                                 </div>
                               </div>
                             </div>
-                            
+
                             {/* Additional contacts if available */}
                             {(record.Email || record.Telephone) && (
-                              <div style={{ 
-                                background: '#f9f9f9', 
-                                borderRadius: '8px', 
-                                padding: '16px',
-                                marginBottom: '24px'
-                              }}>
-                                <div style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '12px' }}>
+                              <div
+                                style={{
+                                  background: "#f9f9f9",
+                                  borderRadius: "8px",
+                                  padding: "16px",
+                                  marginBottom: "24px",
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    fontSize: "14px",
+                                    fontWeight: "bold",
+                                    marginBottom: "12px",
+                                  }}
+                                >
                                   Contact
                                 </div>
-                                
+
                                 {record.Email && (
-                                  <div style={{ display: 'flex', alignItems: 'center', marginBottom: '8px' }}>
-                                    <MailOutlined style={{ marginRight: '10px', color: '#1890ff' }} />
-                                    <a href={`mailto:${record.Email}`}>{record.Email}</a>
+                                  <div
+                                    style={{
+                                      display: "flex",
+                                      alignItems: "center",
+                                      marginBottom: "8px",
+                                    }}
+                                  >
+                                    <MailOutlined
+                                      style={{
+                                        marginRight: "10px",
+                                        color: "#1890ff",
+                                      }}
+                                    />
+                                    <a href={`mailto:${record.Email}`}>
+                                      {record.Email}
+                                    </a>
                                   </div>
                                 )}
-                                
+
                                 {record.Telephone && (
-                                  <div style={{ display: 'flex', alignItems: 'center' }}>
-                                    <PhoneOutlined style={{ marginRight: '10px', color: '#1890ff' }} />
-                                    <a href={`tel:${record.Telephone}`}>{record.Telephone}</a>
+                                  <div
+                                    style={{
+                                      display: "flex",
+                                      alignItems: "center",
+                                    }}
+                                  >
+                                    <PhoneOutlined
+                                      style={{
+                                        marginRight: "10px",
+                                        color: "#1890ff",
+                                      }}
+                                    />
+                                    <a href={`tel:${record.Telephone}`}>
+                                      {record.Telephone}
+                                    </a>
                                   </div>
                                 )}
                               </div>
                             )}
-                            
+
                             {/* CV Button */}
-                            {record.cv_url && (
-                              <div style={{ textAlign: 'center' }}>
-                                <Button 
-                                  type="primary" 
-                                  icon={<FilePdfOutlined />} 
+                            {record.CV && (
+                              <div style={{ textAlign: "center" }}>
+                                <Button
+                                  type="primary"
+                                  icon={<FilePdfOutlined />}
                                   onClick={viewCV}
                                   size="large"
-                                  style={{ 
-                                    height: '42px', 
-                                    paddingLeft: '24px', 
-                                    paddingRight: '24px',
-                                    boxShadow: '0 2px 0 rgba(0,0,0,0.045)'
+                                  style={{
+                                    height: "42px",
+                                    paddingLeft: "24px",
+                                    paddingRight: "24px",
+                                    boxShadow: "0 2px 0 rgba(0,0,0,0.045)",
                                   }}
                                 >
                                   Voir CV
@@ -552,7 +865,7 @@ const CollaboratorList = () => {
                   key: "2",
                   label: "Voir CV",
                   onClick: viewCV,
-                  disabled: !record.cv_url,
+                  disabled: !record.CV,
                 },
               ],
             }}
@@ -574,51 +887,186 @@ const CollaboratorList = () => {
           okText="Mettre à jour"
           cancelText="Annuler"
           confirmLoading={uploading}
+          width={700}
         >
           <Form form={editForm} layout="vertical">
-            <Form.Item
-              name="Nom"
-              label="Nom"
-              rules={[{ required: true, message: "Veuillez saisir le nom" }]}
-            >
-              <Input />
-            </Form.Item>
-            <Form.Item
-              name="Prenom"
-              label="Prénom"
-              rules={[{ required: true, message: "Veuillez saisir le prénom" }]}
-            >
-              <Input />
-            </Form.Item>
-            <Form.Item
-              name="Poste"
-              label="Poste"
-              rules={[{ required: true, message: "Veuillez saisir le poste" }]}
-            >
-              <Select placeholder="Sélectionnez un poste">
-                <Select.Option value="consultant">Consultant</Select.Option>
-                <Select.Option value="commercial">Commercial</Select.Option>
-              </Select>
-            </Form.Item>
-            <Form.Item name="Actif" label="Statut">
-              <Select>
-                <Select.Option value={true}>Actif</Select.Option>
-                <Select.Option value={false}>Inactif</Select.Option>
-              </Select>
-            </Form.Item>
+            <Row gutter={16}>
+              <Col span={12}>
+                <Form.Item
+                  name="Nom"
+                  label="Nom"
+                  rules={[
+                    { required: true, message: "Veuillez saisir le nom" },
+                  ]}
+                >
+                  <Input />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item
+                  name="Prenom"
+                  label="Prénom"
+                  rules={[
+                    { required: true, message: "Veuillez saisir le prénom" },
+                  ]}
+                >
+                  <Input />
+                </Form.Item>
+              </Col>
+            </Row>
+
+            <Row gutter={16}>
+              <Col span={12}>
+                <Form.Item
+                  label="Date de naissance"
+                  name="Date_naissance"
+                  rules={[
+                    {
+                      required: true,
+                      message: "Veuillez saisir la date de naissance",
+                    },
+                    {
+                      validator: (_, value) => {
+                        if (!value) return Promise.resolve();
+
+                        const birthDate = new Date(value);
+                        const today = new Date();
+
+                        // Calculate age
+                        const ageInMilliseconds = today - birthDate;
+                        const ageInYears =
+                          ageInMilliseconds / (1000 * 60 * 60 * 24 * 365.25);
+
+                        if (ageInYears < 18) {
+                          return Promise.reject(
+                            "L'âge doit être supérieur ou égal à 18 ans"
+                          );
+                        }
+
+                        return Promise.resolve();
+                      },
+                    },
+                  ]}
+                >
+                  <Input type="date" defaultValue="2000-01-01" />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item
+                  name="Poste"
+                  label="Poste"
+                  rules={[
+                    { required: true, message: "Veuillez saisir le poste" },
+                  ]}
+                >
+                  <Select placeholder="Sélectionnez un poste">
+                    <Select.Option value="Développeur">
+                      Développeur
+                    </Select.Option>
+                    <Select.Option value="Chef de Projet">
+                      Chef de Projet
+                    </Select.Option>
+                    <Select.Option value="Consultant">Consultant</Select.Option>
+                    <Select.Option value="Commercial">Commercial</Select.Option>
+                    <Select.Option value="Administrateur">
+                      Administrateur
+                    </Select.Option>
+                  </Select>
+                </Form.Item>
+              </Col>
+            </Row>
+
+            <Row gutter={16}>
+              <Col span={12}>
+                <Form.Item label="Date de recrutement" name="date_debut_activ">
+                  <Input type="date" />
+                </Form.Item>
+              </Col>
+              {/* <Col span={12}>
+                <Form.Item label="Date de fin" name="date_dé">
+                  <Input type="date" />
+                </Form.Item>
+              </Col> */}
+            </Row>
+
+            <Row gutter={16}>
+              <Col span={12}>
+                <Form.Item label="Mobilité" name="Mobilité">
+                  <Select placeholder="Sélectionnez la mobilité">
+                    <Select.Option value="National">National</Select.Option>
+                    <Select.Option value="International">
+                      International
+                    </Select.Option>
+                    <Select.Option value="Régional">Régional</Select.Option>
+                    <Select.Option value="Local">Local</Select.Option>
+                  </Select>
+                </Form.Item>
+              </Col>
+              {/* <Col span={12}>
+                <Form.Item
+                  label="Disponibilité à partir de"
+                  name="Disponibilité"
+                >
+                  <Input type="date" />
+                </Form.Item>
+              </Col> */}
+            </Row>
+
+            {/* <Row gutter={16}>
+              <Col span={24}>
+                <Form.Item label="Profil LinkedIn" name="LinkedIN">
+                  <Input placeholder="https://www.linkedin.com/in/username" />
+                </Form.Item>
+              </Col>
+            </Row> */}
+
+            {/* <Row gutter={16}>
+              <Col span={8}>
+                <Form.Item label="Admin" name="Admin" valuePropName="checked">
+                  <Switch />
+                </Form.Item>
+              </Col>
+              <Col span={8}>
+                <Form.Item
+                  label="Commercial"
+                  name="Commercial"
+                  valuePropName="checked"
+                >
+                  <Switch />
+                </Form.Item>
+              </Col>
+              <Col span={8}>
+                <Form.Item
+                  label="Consultant"
+                  name="Consultant"
+                  valuePropName="checked"
+                >
+                  <Switch />
+                </Form.Item>
+              </Col>
+            </Row> */}
+
+            <Row gutter={16}>
+              <Col span={12}>
+                <Form.Item name="Actif" label="Statut" valuePropName="checked">
+                  <Switch checkedChildren="Actif" unCheckedChildren="Inactif" />
+                </Form.Item>
+              </Col>
+            </Row>
+
             <Form.Item
               label="CV"
               name="CV"
               tooltip="Mettre à jour le CV du collaborateur (format PDF, max 5MB)"
             >
-              {record.cv_url && !isFileUploaded && (
+              {record.CV && !isFileUploaded && (
                 <div
                   className="mb-3 p-3"
                   style={{ backgroundColor: "#f5f5f5", borderRadius: "4px" }}
                 >
                   CV actuel:{" "}
                   <a
-                    href={record.cv_url}
+                    href={Endponit() + "/media/" + record.CV}
                     target="_blank"
                     rel="noopener noreferrer"
                   >
@@ -691,13 +1139,16 @@ const CollaboratorList = () => {
               <FilePdfOutlined
                 key="cv"
                 onClick={() => {
-                  if (collaborator.cv_url) {
-                    window.open(collaborator.cv_url, "_blank");
+                  if (collaborator.CV) {
+                    window.open(
+                      Endponit() + "/media/" + collaborator.CV,
+                      "_blank"
+                    );
                   } else {
                     message.info("Aucun CV disponible pour ce collaborateur");
                   }
                 }}
-                style={{ color: collaborator.cv_url ? "#1890ff" : "#d9d9d9" }}
+                style={{ color: collaborator.CV ? "#1890ff" : "#d9d9d9" }}
               />,
             ]}
           >
@@ -747,7 +1198,8 @@ const CollaboratorList = () => {
           ...values,
           Actif: true,
           CV: uploadedFileUrl, // Add the uploaded CV URL directly to the collaborator record
-          date_debut_activ: new Date().toISOString().split("T")[0],
+          date_debut_activ:
+            values.date_debut_activ || new Date().toISOString().split("T")[0],
         };
 
         const response = await axios.post(API_URL, newCollaborator, {
@@ -755,29 +1207,6 @@ const CollaboratorList = () => {
             Authorization: `${token()}`,
           },
         });
-
-        // If there's a CV file to upload and it's not already included in the collaborator record
-        // This is for the file association in case your backend needs a separate record
-        // if (isFileUploaded) {
-        //   const formData = new FormData();
-        //   formData.append("file", fileList[0].originFileObj);
-        //   formData.append("type", "cv");
-        //   formData.append(
-        //     "entity_id",
-        //     response.data.id || response.data.ID_collab
-        //   );
-        //   formData.append("entity_type", "collaborateur");
-        //   formData.append("path", "./uploads/cv/");
-
-        //   // This might be redundant if you've already included the URL in the collaborator record
-        //   // but keeping it for compatibility with your other code
-        //   await axios.post(UPLOAD_URL, formData, {
-        //     headers: {
-        //       Authorization: `${token()}`,
-        //       "Content-Type": "multipart/form-data",
-        //     },
-        //   });
-        // }
 
         message.success("Nouveau collaborateur ajouté avec succès");
         fetchCollaborators();
@@ -802,7 +1231,7 @@ const CollaboratorList = () => {
       setUploadedFileUrl("");
     };
 
-    // Upload configuration for Add Modal - using the same approach as in clientDocumen.jsx
+    // Upload configuration for Add Modal
     const props = {
       name: "uploadedFile",
       customRequest: async ({ file, onSuccess, onError, onProgress }) => {
@@ -882,53 +1311,145 @@ const CollaboratorList = () => {
           okText="Ajouter"
           cancelText="Annuler"
           confirmLoading={uploading}
+          width={700}
         >
           <Form form={form} layout="vertical" name="add_collaborator">
-            <Form.Item
-              label="Nom"
-              name="Nom"
-              rules={[
-                {
-                  required: true,
-                  message: "Veuillez saisir le nom du collaborateur",
-                },
-              ]}
-            >
-              <Input />
-            </Form.Item>
-            <Form.Item
-              label="Prénom"
-              name="Prenom"
-              rules={[
-                {
-                  required: true,
-                  message: "Veuillez saisir le prénom du collaborateur",
-                },
-              ]}
-            >
-              <Input />
-            </Form.Item>
-            <Form.Item
-              label="Poste"
-              name="Poste"
-              rules={[
-                {
-                  required: true,
-                  message: "Veuillez saisir le poste du collaborateur",
-                },
-              ]}
-            >
-              <Select placeholder="Sélectionnez un poste">
-                <Select.Option value="consultant">Consultant</Select.Option>
-                <Select.Option value="commercial">Commercial</Select.Option>
-              </Select>
-            </Form.Item>
-            <Form.Item label="Mobilité" name="Mobilité">
-              <Select>
-                <Option value="National">National</Option>
-                <Option value="International">International</Option>
-              </Select>
-            </Form.Item>
+            <Row gutter={16}>
+              <Col span={12}>
+                <Form.Item
+                  label="Nom"
+                  name="Nom"
+                  rules={[
+                    {
+                      required: true,
+                      message: "Veuillez saisir le nom du collaborateur",
+                    },
+                  ]}
+                >
+                  <Input />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item
+                  label="Prénom"
+                  name="Prenom"
+                  rules={[
+                    {
+                      required: true,
+                      message: "Veuillez saisir le prénom du collaborateur",
+                    },
+                  ]}
+                >
+                  <Input />
+                </Form.Item>
+              </Col>
+            </Row>
+
+            <Row gutter={16}>
+              <Col span={12}>
+                <Form.Item
+                  label="Date de naissance"
+                  name="Date_naissance"
+                  rules={[
+                    {
+                      required: true,
+                      message: "Veuillez saisir la date de naissance",
+                    },
+                    {
+                      validator: (_, value) => {
+                        if (!value) return Promise.resolve();
+
+                        const birthDate = new Date(value);
+                        const today = new Date();
+
+                        // Calculate age
+                        const ageInMilliseconds = today - birthDate;
+                        const ageInYears =
+                          ageInMilliseconds / (1000 * 60 * 60 * 24 * 365.25);
+
+                        if (ageInYears < 18) {
+                          return Promise.reject(
+                            "L'âge doit être supérieur ou égal à 18 ans"
+                          );
+                        }
+
+                        return Promise.resolve();
+                      },
+                    },
+                  ]}
+                >
+                  <Input type="date" />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item
+                  label="Poste"
+                  name="Poste"
+                  rules={[
+                    {
+                      required: true,
+                      message: "Veuillez saisir le poste du collaborateur",
+                    },
+                  ]}
+                >
+                  <Select placeholder="Sélectionnez un poste">
+                    <Select.Option value="consultant">Consultant</Select.Option>
+                    <Select.Option value="commercial">Commercial</Select.Option>
+                  </Select>
+                </Form.Item>
+              </Col>
+            </Row>
+
+            <Row gutter={16}>
+              <Col span={12}>
+                <Form.Item label="Date de recrutement" name="date_debut_activ">
+                  <Input
+                    type="date"
+                    defaultValue={new Date().toISOString().split("T")[0]}
+                  />
+                </Form.Item>
+              </Col>
+              {/* <Col span={12}>
+                <Form.Item
+                  label="Date de fin (si applicable)"
+                  name="date_dé"
+                >
+                  <Input type="date" />
+                </Form.Item>
+              </Col> */}
+            </Row>
+
+            <Row gutter={16}>
+              <Col span={12}>
+                <Form.Item label="Mobilité" name="Mobilité">
+                  <Select placeholder="Sélectionnez la mobilité">
+                    <Select.Option value="National">National</Select.Option>
+                    <Select.Option value="International">
+                      International
+                    </Select.Option>
+                    <Select.Option value="Régional">Régional</Select.Option>
+                    <Select.Option value="Local">Local</Select.Option>
+                  </Select>
+                </Form.Item>
+              </Col>
+              {/* <Col span={12}>
+                <Form.Item
+                  label="Disponibilité à partir de"
+                  name="Disponibilité"
+                >
+                  <Input type="date" />
+                </Form.Item>
+              </Col> */}
+            </Row>
+
+            <Row gutter={16}>
+              <Col span={24}>
+                <Form.Item label="Profil LinkedIn" name="LinkedIN">
+                  <Input placeholder="https://www.linkedin.com/in/username" />
+                </Form.Item>
+              </Col>
+            </Row>
+
             <Form.Item
               label="CV"
               name="CV"

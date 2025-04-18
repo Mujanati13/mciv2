@@ -65,6 +65,38 @@ const ClientDocumentManagement = () => {
   const [currentDocType, setCurrentDocType] = useState(null);
   const [activeTabKey, setActiveTabKey] = useState("1");
 
+  // Function to check if a date is within the last 3 months
+  const isWithinLastThreeMonths = (dateString) => {
+    if (!dateString) return false;
+    
+    const selectedDate = new Date(dateString);
+    const today = new Date();
+    
+    // Calculate date 3 months ago
+    const threeMonthsAgo = new Date();
+    threeMonthsAgo.setMonth(today.getMonth() - 3);
+    
+    return selectedDate >= threeMonthsAgo;
+  };
+
+  // Function to check if document type requires 3-month validation
+  const requiresRecentValidation = (docType) => {
+    if (!docType) return false;
+    
+    const typesRequiring3MonthValidation = [
+      "KBIS de moins de 3 mois",
+      "Attestation de régularité fiscale de moins de 3 mois",
+      "Attestation de régularité sociale de moins de 3 mois",
+      "kbis",
+      "attestation_fiscale", 
+      "attestation_sociale"
+    ];
+    
+    return typesRequiring3MonthValidation.some(type => 
+      docType.toLowerCase().includes(type.toLowerCase())
+    );
+  };
+
   // Required document types with their initial states
   const initialRequiredDocs = [
     {
@@ -95,13 +127,13 @@ const ClientDocumentManagement = () => {
       docId: null,
       icon: <FilePdfOutlined />,
     },
-    {
-      key: "dpae",
-      name: "DPAE",
-      status: "À uploader",
-      docId: null,
-      icon: <FilePdfOutlined />,
-    },
+    // {
+    //   key: "dpae",
+    //   name: "DPAE",
+    //   status: "À uploader",
+    //   docId: null,
+    //   icon: <FilePdfOutlined />,
+    // },
   ];
 
   const [requiredDocs, setRequiredDocs] = useState(initialRequiredDocs);
@@ -781,7 +813,24 @@ const ClientDocumentManagement = () => {
             )}
           </Form.Item>
 
-          <Form.Item name="Date_Valid" label="Date de Validité">
+          <Form.Item 
+            name="Date_Valid" 
+            label="Date de Validité"
+            rules={[
+              ({ getFieldValue }) => ({
+                validator(_, value) {
+                  const docType = getFieldValue('Type');
+                  if (!value || !requiresRecentValidation(docType)) {
+                    return Promise.resolve();
+                  }
+                  if (isWithinLastThreeMonths(value)) {
+                    return Promise.resolve();
+                  }
+                  return Promise.reject(new Error('La date doit être dans les 3 derniers mois'));
+                },
+              }),
+            ]}
+          >
             <Input type="date" />
           </Form.Item>
 
@@ -888,7 +937,23 @@ const ClientDocumentManagement = () => {
             )}
           </Form.Item>
 
-          <Form.Item name="Date_Valid" label="Date de Validité">
+          <Form.Item 
+            name="Date_Valid" 
+            label="Date de Validité"
+            rules={[
+              {
+                validator(_, value) {
+                  if (!value || !requiresRecentValidation(currentDocType?.key || currentDocType?.name)) {
+                    return Promise.resolve();
+                  }
+                  if (isWithinLastThreeMonths(value)) {
+                    return Promise.resolve();
+                  }
+                  return Promise.reject(new Error('La date doit être dans les 3 derniers mois'));
+                },
+              },
+            ]}
+          >
             <Input type="date" />
           </Form.Item>
 

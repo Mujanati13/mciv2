@@ -191,6 +191,7 @@ export const ClientList = () => {
       "pays",
       "siret",
       "n_tva",
+      "responsible",
     ];
 
     // Count filled fields
@@ -593,7 +594,7 @@ export const ClientList = () => {
             icon={<CheckCircleOutlined />}
             disabled={!isEnabled}
           >
-            Valider
+            Valider la création du compte
           </Button>,
         ]}
         width={800}

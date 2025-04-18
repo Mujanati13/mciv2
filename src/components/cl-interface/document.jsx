@@ -65,6 +65,38 @@ const DocumentManagement = () => {
   const [currentDocType, setCurrentDocType] = useState(null);
   const [activeTabKey, setActiveTabKey] = useState("1");
 
+  // Function to check if a date is within the last 3 months
+  const isWithinLastThreeMonths = (dateString) => {
+    if (!dateString) return false;
+    
+    const selectedDate = new Date(dateString);
+    const today = new Date();
+    
+    // Calculate date 3 months ago
+    const threeMonthsAgo = new Date();
+    threeMonthsAgo.setMonth(today.getMonth() - 3);
+    
+    return selectedDate >= threeMonthsAgo;
+  };
+
+  // Function to check if document type requires 3-month validation
+  const requiresRecentValidation = (docType) => {
+    if (!docType) return false;
+    
+    const typesRequiring3MonthValidation = [
+      "KBIS de moins de 3 mois",
+      "Attestation de régularité fiscale de moins de 3 mois",
+      "Attestation de régularité sociale de moins de 3 mois",
+      "kbis",
+      "attestation_fiscale", 
+      "attestation_sociale"
+    ];
+    
+    return typesRequiring3MonthValidation.some(type => 
+      docType.toLowerCase().includes(type.toLowerCase())
+    );
+  };
+
   // Required document types with their initial states
   const initialRequiredDocs = [
     { key: 'kbis', name: 'KBIS de moins de 3 mois', status: 'À uploader', docId: null, icon: <FilePdfOutlined /> },
@@ -461,31 +493,7 @@ const DocumentManagement = () => {
 
   return (
     <div className="p-4">
-      {/* <Card className="mb-5">
-        <Row gutter={[24, 24]} align="middle">
-          <Col xs={24} md={16}>
-            <Title level={3}>Gestion de Documents</Title>
-            <Text type="secondary">
-              Gérez vos documents obligatoires et téléchargez d'autres documents professionnels.
-            </Text>
-          </Col>
-          <Col xs={24} md={8}>
-            <div style={{ textAlign: 'center' }}>
-              <Progress
-                type="circle"
-                percent={completionPercentage}
-                format={percent => (
-                  <>
-                    <div>{percent}%</div>
-                    <div style={{ fontSize: '12px' }}>Documents requis</div>
-                  </>
-                )}
-                status={completionPercentage === 100 ? 'success' : 'active'}
-              />
-            </div>
-          </Col>
-        </Row>
-      </Card> */}
+      {/* <Card className="mb-5">...</Card> */}
 
       <Tabs activeKey={activeTabKey} onChange={handleTabChange} type="card">
         <TabPane 
@@ -563,99 +571,7 @@ const DocumentManagement = () => {
             />
           </Card>
         </TabPane>
-        {/* <TabPane tab="Autres Documents" key="2">
-          <Card>
-            <div className="mb-4 flex justify-between">
-              <Radio.Group
-                value={isTableView}
-                onChange={(e) => setIsTableView(!isTableView)}
-                buttonStyle="solid"
-              >
-                <Radio.Button value={true}>
-                  <AppstoreOutlined /> Tableau
-                </Radio.Button>
-                <Radio.Button value={false}>
-                  <AppstoreOutlined /> Cartes
-                </Radio.Button>
-              </Radio.Group>
-              <Search
-                placeholder="Rechercher un document..."
-                allowClear
-                onChange={(e) => setSearchText(e.target.value)}
-                style={{ width: 300 }}
-                prefix={<SearchOutlined />}
-              />
-            </div>
-
-            {filteredDocuments.length === 0 ? (
-              <Empty 
-                description="Aucun document trouvé" 
-                image={Empty.PRESENTED_IMAGE_SIMPLE}
-              />
-            ) : isTableView ? (
-              <Table
-                columns={columns}
-                dataSource={filteredDocuments}
-                pagination={{ pageSize: 10 }}
-                bordered
-                loading={loading}
-                rowKey="ID_DOC_CLT"
-              />
-            ) : (
-              <Row gutter={[16, 16]}>
-                {filteredDocuments.map((doc) => (
-                  <Col xs={24} sm={12} md={8} key={doc.ID_DOC_CLT}>
-                    <Card
-                      hoverable
-                      style={{ height: '100%' }}
-                      actions={[
-                        <Tooltip title="Voir le document">
-                          <EyeOutlined 
-                            key="view" 
-                            onClick={() => window.open(Endponit() + "/media/" + doc.Doc_URL, "_blank")}
-                          />
-                        </Tooltip>,
-                        <Tooltip title="Modifier">
-                          <EditOutlined 
-                            key="edit" 
-                            onClick={() => openEditModal(doc)} 
-                          />
-                        </Tooltip>,
-                        <Tooltip title="Supprimer">
-                          <DeleteOutlined
-                            key="delete"
-                            onClick={() => handleDelete(doc)}
-                          />
-                        </Tooltip>,
-                      ]}
-                    >
-                      <Card.Meta
-                        avatar={
-                          <Avatar 
-                            icon={doc.Doc_URL?.endsWith('.pdf') ? <FilePdfOutlined /> : <FileWordOutlined />} 
-                            style={{ backgroundColor: doc.Statut === 'Validé' ? '#52c41a' : '#1890ff' }}
-                          />
-                        }
-                        title={doc.Titre}
-                        description={
-                          <>
-                            <p>Date Validité: {doc.Date_Valid || "Non spécifiée"}</p>
-                            <p>
-                              Statut:{" "}
-                              <Tag color={doc.Statut === "Validé" ? "success" : "warning"}>
-                                {doc.Statut}
-                              </Tag>
-                            </p>
-                          </>
-                        }
-                      />
-                    </Card>
-                  </Col>
-                ))}
-              </Row>
-            )}
-          </Card>
-        </TabPane> */}
+        {/* <TabPane tab="Autres Documents" key="2">...</TabPane> */}
       </Tabs>
 
       {/* Edit Document Modal */}
@@ -713,7 +629,24 @@ const DocumentManagement = () => {
             </Dragger>
           </Form.Item>
 
-          <Form.Item name="Date_Valid" label="Date de Validité">
+          <Form.Item 
+            name="Date_Valid" 
+            label="Date de Validité"
+            rules={[
+              {
+                validator(_, value) {
+                  const docTitle = selectedDocument?.Titre || '';
+                  if (!value || !requiresRecentValidation(docTitle)) {
+                    return Promise.resolve();
+                  }
+                  if (isWithinLastThreeMonths(value)) {
+                    return Promise.resolve();
+                  }
+                  return Promise.reject(new Error('La date doit être dans les 3 derniers mois'));
+                },
+              },
+            ]}
+          >
             <Input type="date" />
           </Form.Item>
 
@@ -789,7 +722,23 @@ const DocumentManagement = () => {
             )}
           </Form.Item>
 
-          <Form.Item name="Date_Valid" label="Date de Validité">
+          <Form.Item 
+            name="Date_Valid" 
+            label="Date de Validité"
+            rules={[
+              {
+                validator(_, value) {
+                  if (!value || !requiresRecentValidation(currentDocType?.key || currentDocType?.name)) {
+                    return Promise.resolve();
+                  }
+                  if (isWithinLastThreeMonths(value)) {
+                    return Promise.resolve();
+                  }
+                  return Promise.reject(new Error('La date doit être dans les 3 derniers mois'));
+                },
+              },
+            ]}
+          >
             <Input type="date" />
           </Form.Item>
 

@@ -17,6 +17,7 @@ import {
   Select,
   Divider,
   notification,
+  Checkbox,
 } from "antd";
 import {
   SearchOutlined,
@@ -51,6 +52,7 @@ import moment from "moment";
 const { Text } = Typography;
 const { confirm } = Modal;
 const { TextArea } = Input;
+const { Option } = Select;
 
 const OrderInterface = () => {
   const [purchaseOrders, setPurchaseOrders] = useState([]);
@@ -75,6 +77,8 @@ const OrderInterface = () => {
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
   const [editForm] = Form.useForm();
   const [recordToEdit, setRecordToEdit] = useState(null);
+  const [ad, setad] = useState(null);
+  const [candidatureTJM, setCandidatureTJM] = useState(null);
 
   const generateBDCNumber = () => {
     return `BDC-${Date.now()}`;
@@ -85,7 +89,19 @@ const OrderInterface = () => {
       const response = await axios.get(
         `${Endponit()}/api/get_collaborateur_by_id/${candidatureId}`
       );
+
       setCollaboratorInfo(response.data.data);
+      console.log("====================================");
+
+      // Store AO data in state
+      setad(response.data.linked_ao[0]);
+
+      // Store candidature TJM for later use
+      const candidatureTjmValue = parseFloat(
+        response.data.linked_candidatures[0].tjm
+      );
+      setCandidatureTJM(candidatureTjmValue);
+      setTjm(candidatureTjmValue);
 
       // Update description field with collaborator info
       const description = `${response.data.data.Poste} - ${
@@ -96,9 +112,7 @@ Experience professionnelle: ${moment().diff(
         "years"
       )} ans
 Mobilité: ${response.data.data.Mobilité}
-Disponibilité: ${moment(response.data.data.Disponibilité).format(
-        "DD/MM/YYYY"
-      )}`;
+      `;
 
       form.setFieldValue("description", description);
       setdescription(description);
@@ -204,7 +218,6 @@ Disponibilité: ${moment(response.data.data.Disponibilité).format(
       );
       setPurchaseOrders(response.data.data);
     } catch (error) {
-
       message.error("Échec de la récupération des bons de commande");
     } finally {
       setLoading(false);
@@ -425,7 +438,7 @@ Disponibilité: ${moment(response.data.data.Disponibilité).format(
       await axios.put(`${Endponit()}/api/Bondecommande/${id}`, {
         ...bdc,
         statut: "pending_admin",
-        numero_bdc : bdcNumber
+        numero_bdc: bdcNumber,
       });
       message.success("Bon de commande accepté avec succès");
       await fetchPurchaseOrders();
@@ -849,6 +862,35 @@ Disponibilité: ${moment(response.data.data.Disponibilité).format(
               </Select>
             </Form.Item>
           )}
+
+          {ad && (
+            <Form.Item name="use_ao_default" valuePropName="checked">
+              <Checkbox
+                onChange={(e) => {
+                  if (e.target.checked) {
+                    // Use appel d'offre values as defaults
+                    const startDate = moment(ad.date_debut);
+                    const endDate = moment(ad.date_debut).add(ad.jours, "days");
+
+                    form.setFieldsValue({
+                      date_debut: startDate,
+                      date_fin: endDate,
+                      jours: ad.jours,
+                      TJM: candidatureTJM,
+                      montant_total: ad.jours * candidatureTJM,
+                    });
+
+                    setTjm(candidatureTJM);
+                    setJours(ad.jours);
+                  }
+                }}
+              >
+                Utiliser les valeurs de l'appel d'offre comme valeurs par défaut
+                ({ad.titre})
+              </Checkbox>
+            </Form.Item>
+          )}
+
           <Form.Item
             label={
               <span className="font-semibold text-gray-700">
@@ -881,6 +923,7 @@ Disponibilité: ${moment(response.data.data.Disponibilité).format(
             <Form.Item
               label="Date de debut"
               name="date_debut"
+              initialValue={ad?.date_debut ? moment(ad.date_debut) : null}
               rules={[
                 { required: true, message: "Veuillez sélectionner une date" },
               ]}
@@ -1097,14 +1140,6 @@ Disponibilité: ${moment(response.data.data.Disponibilité).format(
         open={isDetailsModalVisible}
         onCancel={() => setIsDetailsModalVisible(false)}
         footer={[
-          // <Button
-          //   key="download"
-          //   icon={<DownloadOutlined />}
-          //   onClick={() => handleDownload(selectedPO)}
-          //   loading={downloadLoading[selectedPO?.id_bdc]}
-          // >
-          //   Télécharger
-          // </Button>,
           <Button key="close" onClick={() => setIsDetailsModalVisible(false)}>
             Fermer
           </Button>,
@@ -1197,7 +1232,17 @@ Disponibilité: ${moment(response.data.data.Disponibilité).format(
           <Form.Item
             label="Date de début"
             name="date_debut"
-            rules={[{ required: true }]}
+            rules={[
+              { required: true, message: "Champ requis" },
+              {
+                validator: (_, value) => {
+                  if (value && value.isBefore(moment().startOf("day"))) {
+                    return Promise.reject("La date doit être dans le futur");
+                  }
+                  return Promise.resolve();
+                },
+              },
+            ]}
           >
             <DatePicker
               format="YYYY-MM-DD"
@@ -1210,7 +1255,17 @@ Disponibilité: ${moment(response.data.data.Disponibilité).format(
           <Form.Item
             label="Date de fin"
             name="date_fin"
-            rules={[{ required: true }]}
+            rules={[
+              { required: true, message: "Champ requis" },
+              {
+                validator: (_, value) => {
+                  if (value && value.isBefore(moment().startOf("day"))) {
+                    return Promise.reject("La date doit être dans le futur");
+                  }
+                  return Promise.resolve();
+                },
+              },
+            ]}
           >
             <DatePicker
               format="YYYY-MM-DD"

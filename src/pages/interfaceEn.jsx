@@ -55,7 +55,7 @@ import BonDeCommandeInterface from "../components/en-interface/bdc-list";
 import ClientPartenariatInterface from "../components/en-interface/partenariat-list";
 import ContractList from "../components/en-interface/contart-en";
 import { isEsnLoggedIn, logoutEsn } from "../helper/db";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import ESNCandidatureInterface from "../components/en-interface/me-codi";
 import ESNProfilePageFrancais from "../components/en-interface/profile";
 // import { messaging } from "../helper/firebase/config";
@@ -288,7 +288,11 @@ const NotificationInterface = ({
 };
 
 const InterfaceEn = () => {
-  const [current, setCurrent] = useState("dashboard");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [current, setCurrent] = useState(() => {
+    const menuParam = searchParams.get('menu');
+    return menuParam || "dashboard";
+  });
   const [searchValue, setSearchValue] = useState("");
   const [breadcrumbItems, setBreadcrumbItems] = useState([]);
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
@@ -337,6 +341,18 @@ const InterfaceEn = () => {
   useEffect(() => {
     setBreadcrumbItems([t.dashboard]);
   }, [language, t.dashboard]);
+
+  // Set initial view based on URL query parameter
+  useEffect(() => {
+    const menuParam = searchParams.get('menu');
+    if (menuParam) {
+      setCurrent(menuParam);
+      const path = findMenuPath(menuParam, getMenuItems());
+      if (path) {
+        setBreadcrumbItems(path);
+      }
+    }
+  }, []);
 
   // Function to check ESN status
   const checkEsnStatus = async () => {
@@ -497,12 +513,12 @@ const InterfaceEn = () => {
             icon: <MacCommandOutlined />,
             disabled: !esnStatus,
           },
-          {
-            label: t.contracts,
-            key: "Contart",
-            icon: <FileDoneOutlined />,
-            disabled: !esnStatus,
-          },
+          // {
+          //   label: t.contracts,
+          //   key: "Contart",
+          //   icon: <FileDoneOutlined />,
+          //   disabled: !esnStatus,
+          // },
         ],
       },
       {
@@ -659,6 +675,7 @@ const InterfaceEn = () => {
       return;
     }
     setCurrent(value);
+    setSearchParams({ menu: value });
     setSearchValue("");
     const path = findMenuPath(value, menuItems);
     if (path) {
@@ -673,6 +690,7 @@ const InterfaceEn = () => {
       return;
     }
     setCurrent(e.key);
+    setSearchParams({ menu: e.key });
     const path = findMenuPath(e.key, menuItems);
     if (path) {
       setBreadcrumbItems(path);
@@ -744,6 +762,7 @@ const InterfaceEn = () => {
               type="primary"
               onClick={() => {
                 setCurrent("Profile");
+                setSearchParams({ menu: "Profile" });
                 const path = findMenuPath("Profile", menuItems);
                 if (path) {
                   setBreadcrumbItems(path);

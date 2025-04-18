@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect } from "react";
+import { Link } from "react-router-dom"; // Import Link
 import {
   Card,
   Button,
@@ -52,6 +53,7 @@ import {
   FormOutlined,
   FileSearchOutlined,
   CheckSquareOutlined,
+  FolderOpenOutlined, // Added for document link
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 import axios from "axios";
@@ -92,7 +94,12 @@ const ClientPlusInfo = () => {
   });
   const [profile, setProfile] = useState(null);
   const [profileedit, setProfileedit] = useState(null);
-  const [completionStatus, setCompletionStatus] = useState(0);
+  // Updated state for completion details
+  const [completionDetails, setCompletionDetails] = useState({
+    profile: 0,
+    document: 0,
+    total: 0,
+  });
   const [profileStatus, setProfileStatus] = useState(false);
   // Add new state variables for contract handling
   const [contractModalVisible, setContractModalVisible] = useState(false);
@@ -103,10 +110,10 @@ const ClientPlusInfo = () => {
   const [isAccountActive, setIsAccountActive] = useState(false);
 
   // Helper function to determine current activation step
-  const getActivationStep = (status, completion) => {
+  const getActivationStep = (status, totalCompletion) => {
     if (status === "Actif" || status === "validé") return 3; // Completed
     if (status === "à signer") return 2; // Ready to sign contract
-    if (status === "à valider" || completion === 100) return 1; // Complete profile, pending validation
+    if (status === "à valider" || totalCompletion === 100) return 1; // Complete profile, pending validation
     return 0; // Incomplete profile
   };
 
@@ -120,14 +127,19 @@ const ClientPlusInfo = () => {
         icon: <FileProtectOutlined style={{ color: "#1890ff" }} />,
       });
     }
-    
-    // Update current step based on profile status
+
+    // Update current step based on profile status and total completion
     if (profile) {
-      const newStep = getActivationStep(profile.Statut, completionStatus);
+      const newStep = getActivationStep(
+        profile.Statut,
+        completionDetails.total
+      );
       setCurrentStep(newStep);
-      setIsAccountActive(profile.Statut === "Actif" || profile.Statut === "validé");
+      setIsAccountActive(
+        profile.Statut === "Actif" || profile.Statut === "validé"
+      );
     }
-  }, [profile?.Statut, completionStatus]);
+  }, [profile?.Statut, completionDetails.total]); // Depend on total completion
 
   // Show contract modal
   const showContractModal = () => {
@@ -615,55 +627,107 @@ const ClientPlusInfo = () => {
     fetchClientData();
   }, []);
 
-  // Calculate the profile completion percentage
-  const calculateProfileCompletion = (profileData) => {
+  const calculateProfileCompletion = (profileData, documentStatus = {}) => {
+    // 1. Define required and optional profile fields with their respective weights
     const requiredFields = {
-      raison_sociale: { weight: 15, filled: !!profileData.raison_sociale },
-      email: { weight: 15, filled: !!profileData.email },
+      raison_sociale: { weight: 10, filled: !!profileData.raison_sociale },
+      email: { weight: 10, filled: !!profileData.email },
+      responsible: { weight: 5, filled: !!profileData.responsible },
+      address: { weight: 5, filled: !!profileData.address },
+      ville: { weight: 5, filled: !!profileData.ville },
+      siret: { weight: 5, filled: !!profileData.siret },
     };
 
     const optionalFields = {
-      phone: { weight: 5, filled: !!profileData.phone },
-      address: { weight: 5, filled: !!profileData.address },
-      // cp: { weight: 3, filled: !!profileData.cp },
-      ville: { weight: 3, filled: !!profileData.ville },
-      responsible: { weight: 5, filled: !!profileData.responsible }, // Add this line
-      province: { weight: 3, filled: !!profileData.province },
-      siret: { weight: 8, filled: !!profileData.siret },
-      n_tva: { weight: 5, filled: !!profileData.n_tva },
-      // occupation: { weight: 5, filled: !!profileData.occupation },
-      // birthDate: { weight: 5, filled: !!profileData.birthDate },
-      // bio: { weight: 5, filled: !!profileData.bio },
-      // industry: { weight: 5, filled: !!profileData.industry },
-      // img_path: { weight: 10, filled: !!profileData.img_path },
+      phone: { weight: 3, filled: !!profileData.phone },
+      cp: { weight: 2, filled: !!profileData.cp },
+      province: { weight: 2, filled: !!profileData.province },
+      n_tva: { weight: 3, filled: !!profileData.n_tva },
       iban: { weight: 3, filled: !!profileData.iban },
-      bic: { weight: 3, filled: !!profileData.bic },
+      bic: { weight: 2, filled: !!profileData.bic },
       banque: { weight: 2, filled: !!profileData.banque },
+      linkedin: {
+        weight: 1,
+        filled: !!(profileData.socialLinks && profileData.socialLinks.linkedin),
+      },
+      twitter: {
+        weight: 1,
+        filled: !!(profileData.socialLinks && profileData.socialLinks.twitter),
+      },
     };
 
-    const allFields = { ...requiredFields, ...optionalFields };
+    // 2. Combine fields and calculate profile completion
+    const profileFields = { ...requiredFields, ...optionalFields };
+    let profileFilledWeight = 0;
+    let profileTotalWeight = 0;
 
-    let totalWeight = 0;
-    let filledWeight = 0;
-
-    Object.values(allFields).forEach((field) => {
-      totalWeight += field.weight;
+    // Calculate weights
+    Object.values(profileFields).forEach((field) => {
+      profileTotalWeight += field.weight;
       if (field.filled) {
-        filledWeight += field.weight;
+        profileFilledWeight += field.weight;
       }
     });
 
-    const completion = Math.round((filledWeight / totalWeight) * 100);
-    setCompletionStatus(completion);
+    // Calculate profile percentage (0-100%)
+    const profilePercent =
+      profileTotalWeight > 0
+        ? Math.round((profileFilledWeight / profileTotalWeight) * 100)
+        : 0;
 
-    // Check if profile is 100% complete and update status if needed
-    if (
-      completion === 100 &&
-      profile &&
-      profile.Statut == "Draft" // Only update if current status is specifically "Draft"
-    ) {
-      updateClientStatus("à valider");
+    // ===== DOCUMENT COMPLETION (50% of total) =====
+
+    // 1. Define required documents with normalized keys
+    const requiredDocs = [
+      "kbis",
+      "Document obligatoire: Attestation de régularité fiscale de moins de 3 mois",
+      "Attestation de régularité sociale de moins de 3 mois",
+      "rib",
+      "dpae",
+    ];
+
+    // 2. Count valid documents (not marked as "À uploader")
+    const validDocs = requiredDocs.filter(
+      (doc) => documentStatus[doc] !== "À uploader"
+    ).length;
+
+    console.log("Document Status:", documentStatus);
+    console.log("Valid Documents:", validDocs, "out of", requiredDocs.length);
+    console.log(
+      "Missing Documents:",
+      requiredDocs.filter((doc) => documentStatus[doc] === "À uploader")
+    );
+
+    // 3. Calculate document percentage (0-100%)
+    const documentPercent = Math.round((validDocs / requiredDocs.length) * 100);
+
+    // ===== TOTAL COMPLETION (profile 50% + documents 50%) =====
+    const totalPercent = Math.round(
+      profilePercent * 0.5 + documentPercent * 0.5
+    );
+
+    // NEW: Cap total completion at 95% if documents are incomplete
+    let adjustedTotalPercent = totalPercent;
+    if (documentPercent < 100 && adjustedTotalPercent > 95) {
+      adjustedTotalPercent = 95;
+      console.log("Total completion capped at 95% due to incomplete documents");
     }
+
+    // Update client status if profile is 100% complete (now using adjustedTotalPercent)
+    if (adjustedTotalPercent === 100 && profile && profile.Statut === "Draft") {
+      if (profileedit) {
+        updateClientStatus("à valider");
+      } else {
+        console.warn("Profile edit data not available yet for status update.");
+      }
+    }
+
+    // Return detailed completion breakdown with adjusted total
+    return {
+      profile: profilePercent,
+      document: documentPercent,
+      total: adjustedTotalPercent,
+    };
   };
 
   // Function to update client status
@@ -672,10 +736,12 @@ const ClientPlusInfo = () => {
       const clientId = localStorage.getItem("id");
 
       const updatePayload = {
-        // ...profileedit,
         mail_contact: profileedit.mail_contact,
         ID_clt: clientId,
-        statut: "à valider",
+        statut: newStatus,
+        linkedin: profileedit.linkedin || profile.socialLinks?.linkedin || "",
+        twitter: profileedit.twitter || profile.socialLinks?.twitter || "",
+        website: profileedit.website || profile.socialLinks?.website || "",
       };
 
       const response = await axios.put(
@@ -689,14 +755,17 @@ const ClientPlusInfo = () => {
       );
 
       if (response) {
-        // Update local profile state
         const updatedProfile = {
           ...profile,
-          statut: newStatus,
+          Statut: newStatus,
+          socialLinks: {
+            linkedin: updatePayload.linkedin,
+            twitter: updatePayload.twitter,
+            website: updatePayload.website,
+          },
         };
-
         setProfile(updatedProfile);
-        setCurrentStep(1); // Update current step
+        setCurrentStep(getActivationStep(newStatus, 100)); // Use 100 as completion is implicitly 100
         message.success(
           `Votre profil est complet! Statut mis à jour: ${newStatus}`
         );
@@ -713,7 +782,8 @@ const ClientPlusInfo = () => {
     const id = localStorage.getItem("id");
 
     try {
-      const response = await axios.get(`${Endponit()}/api/getUserData`, {
+      // Fetch client profile data
+      const profileResponse = await axios.get(`${Endponit()}/api/getUserData`, {
         headers: {
           Authorization: `Bearer ${token()}`,
         },
@@ -722,9 +792,9 @@ const ClientPlusInfo = () => {
         },
       });
 
-      const client = response.data.data;
+      const client = profileResponse.data.data;
       setProfileedit(client[0]);
-      console.log(client[0]);
+      console.log("Client Data:", client[0]);
 
       const profileData = {
         id: client[0].ID_clt,
@@ -756,24 +826,78 @@ const ClientPlusInfo = () => {
         Statut: client[0].statut || "",
       };
 
-      // Set account status - now checking for "validé" status
-      const isActive = client[0].statut?.toLowerCase() === "validé" || 
-                       client[0].statut?.toLowerCase() === "actif";
-      
+      // Fetch client document status
+      let documentStatus = {
+        kbis: "À uploader",
+        attestation_fiscale: "À uploader",
+        attestation_sociale: "À uploader",
+        rib: "À uploader",
+        dpae: "À uploader",
+      };
+
+      try {
+        const docResponse = await axios.get(
+          Endponit() + "/api/getDocumentClient/",
+          {
+            headers: {
+              Authorization: `${token()}`,
+            },
+            params: {
+              ClientId: id,
+            },
+          }
+        );
+
+        const fetchedDocs = docResponse.data.data;
+        console.log("Fetched Documents:", fetchedDocs);
+
+        const requiredDocKeys = [
+          "kbis",
+          "attestation_fiscale",
+          "attestation_sociale",
+          "rib",
+          "dpae",
+        ];
+        fetchedDocs.forEach((doc) => {
+          requiredDocKeys.forEach((key) => {
+            const normalizedKey = key.replace("_", " ");
+            if (doc.Titre && doc.Titre.toLowerCase().includes(normalizedKey)) {
+              if (doc.Statut && doc.Statut !== "À uploader") {
+                documentStatus[key] = doc.Statut;
+              }
+            }
+          });
+        });
+        console.log("Processed Document Status:", documentStatus);
+      } catch (docError) {
+        console.error("Error fetching client documents:", docError);
+      }
+
+      // Calculate profile completion details
+      const currentCompletionDetails = calculateProfileCompletion(
+        profileData,
+        documentStatus
+      );
+      setCompletionDetails(currentCompletionDetails); // Update state with details
+
+      // Set account status
+      const isActive =
+        client[0].statut?.toLowerCase() === "validé" ||
+        client[0].statut?.toLowerCase() === "actif";
+
       setProfileStatus(isActive);
       setIsAccountActive(isActive);
-      
-      // Set contract status - now checking for "ready" or "validé" status
+
+      // Set contract status
       setContractAccepted(client[0].statut?.toLowerCase() === "actif");
 
-      // Calculate profile completion
-      calculateProfileCompletion(profileData);
-
-      // Set current step based on status
-      setCurrentStep(getActivationStep(client[0].statut, completionStatus));
+      // Set current step based on status and total completion
+      setCurrentStep(
+        getActivationStep(client[0].statut, currentCompletionDetails.total)
+      );
 
       setProfile(profileData);
-      console.log("profileData", profileData);
+      console.log("profileData set:", profileData);
 
       form.setFieldsValue({
         ...profileData,
@@ -804,7 +928,7 @@ const ClientPlusInfo = () => {
       form
         .validateFields()
         .then(async (values) => {
-          const updatedProfile = {
+          const updatedProfilePayload = {
             ID_clt: profile.id,
             raison_sociale: values.raison_sociale,
             mail_contact: values.email,
@@ -812,7 +936,7 @@ const ClientPlusInfo = () => {
             adresse: values.address || "",
             cp: values.cp || "",
             ville: values.ville || "",
-            responsible: values.responsible || "", // Add this line
+            responsible: values.responsible || "",
             province: values.province || "",
             siret: values.siret || "",
             n_tva: values.n_tva || "",
@@ -828,43 +952,23 @@ const ClientPlusInfo = () => {
             bic: values.bic || "",
             banque: values.banque || "",
             img_path: img_path || profile.img_path,
-            // password: null,
           };
 
           try {
-            await axios.put(`${Endponit()}/api/client/`, updatedProfile, {
-              headers: {
-                Authorization: `Bearer ${token()}`,
-              },
-            });
+            await axios.put(
+              `${Endponit()}/api/client/`,
+              updatedProfilePayload,
+              {
+                headers: {
+                  Authorization: `Bearer ${token()}`,
+                },
+              }
+            );
 
-            const updatedProfileData = {
-              ...profile,
-              ...updatedProfile,
-              birthDate: values.birthDate,
-              address: values.address,
-              cp: values.cp,
-              ville: values.ville,
-              province: values.province,
-              siret: values.siret,
-              n_tva: values.n_tva,
-              iban: values.iban,
-              bic: values.bic,
-              banque: values.banque,
-              socialLinks: {
-                linkedin: values.linkedin || "",
-                twitter: values.twitter || "",
-                website: values.website || "",
-              },
-            };
-
-            setProfile(updatedProfileData);
-            calculateProfileCompletion(updatedProfileData);
+            // Re-fetch data to get updated profile and recalculate completion details
+            fetchClientData();
             setIsEditing(false);
             message.success("Profil mis à jour avec succès");
-
-            // Retrieve updated profile data to reflect any status changes
-            fetchClientData();
           } catch (error) {
             console.error("Error updating client data:", error);
             message.error(
@@ -873,12 +977,13 @@ const ClientPlusInfo = () => {
           }
         })
         .catch((error) => {
+          console.error("Form validation failed:", error);
           message.error("Veuillez vérifier les champs requis");
         });
     } else {
       setIsEditing(true);
     }
-  }, [form, isEditing, profile, img_path]);
+  }, [form, isEditing, profile, img_path, profileedit]); // Added profileedit dependency
 
   const handleCancelEdit = () => {
     form.setFieldsValue({
@@ -922,9 +1027,21 @@ const ClientPlusInfo = () => {
       const imagePath = uploadResponse.data.path;
       setimg_path(imagePath);
 
-      const updatedProfile = { ...profile, img_path: imagePath };
-      setProfile(updatedProfile);
-      calculateProfileCompletion(updatedProfile);
+      const updatePayload = {
+        ID_clt: profile.id,
+        img_path: imagePath,
+        mail_contact: profile.email,
+      };
+
+      await axios.put(`${Endponit()}/api/client/`, updatePayload, {
+        headers: {
+          Authorization: `Bearer ${token()}`,
+        },
+      });
+
+      // Re-fetch data to get updated profile and recalculate completion details
+      fetchClientData();
+      message.success("Image de profil mise à jour.");
     } catch (error) {
       console.error("Upload Error:", error);
       message.error("Erreur lors du téléchargement de l'image");
@@ -1031,83 +1148,144 @@ const ClientPlusInfo = () => {
 
   // Get guidance message based on current status
   const getStatusGuidance = () => {
+    const documentLink = (
+      <Link
+        onClick={() => {
+          location.reload();
+          location.href = "/interface-cl?menu=documents";
+        }}
+        to="/interface-cl?menu=documents"
+        className="ml-2 text-sm font-normal text-blue-600 hover:text-blue-800" // Added styling
+      >
+        (Gérer les documents <FolderOpenOutlined />)
+      </Link>
+    );
+
     switch (profile?.Statut) {
       case "Draft":
         return {
           title: "Profil incomplet",
-          description: "Veuillez compléter votre profil pour activer votre compte.",
-          nextStep: "Remplissez tous les champs requis pour passer à l'étape suivante.",
+          description:
+            "Veuillez compléter votre profil et uploader les documents requis pour activer votre compte.",
+          nextStep:
+            "Remplissez tous les champs requis et uploader les documents pour passer à l'étape suivante.",
           icon: <FormOutlined style={{ color: "#faad14" }} />,
           color: "warning",
           action: (
-            <Button 
-              type="primary" 
-              icon={<EditOutlined />} 
-              onClick={handleEdit}
-              disabled={isEditing}>
-              Compléter mon profil
-            </Button>
-          )
+            <Space>
+              <Button
+                type="primary"
+                icon={<EditOutlined />}
+                onClick={handleEdit}
+                disabled={isEditing}
+              >
+                Compléter mon profil
+              </Button>
+              {/* Show doc button in actions only when profile is incomplete */}
+              <Link
+                onClick={() => {
+                  location.reload();
+                  location.href = "/interface-cl?menu=documents";
+                }}
+                to="/interface-cl?menu=documents"
+              >
+                <Button icon={<FolderOpenOutlined />}>
+                  Gérer les documents
+                </Button>
+              </Link>
+            </Space>
+          ),
         };
       case "à valider":
         return {
-          title: "En attente de validation",
-          description: "Votre profil a été soumis et est en cours d'examen par notre équipe.",
-          nextStep: <mark>Nous vous contacterons prochainement pour la suite du processus. Make sure to upload the required docs befor</mark>,
+          title: (
+            <>
+              En attente de validation
+              {documentLink} {/* Include link in title */}
+            </>
+          ),
+          description:
+            "Votre profil a été soumis et est en cours d'examen par notre équipe.",
+          nextStep:
+            "Assurez-vous d'avoir uploadé tous les documents obligatoires. Nous vous contacterons prochainement.",
           icon: <FileSearchOutlined style={{ color: "#1890ff" }} />,
           color: "info",
           action: (
-            <Button type="default" disabled>
-              Validation en cours...
-            </Button>
-          )
+            <Space>
+              <Button type="default" disabled>
+                Validation en cours...
+              </Button>
+              {/* Document link is now in the title */}
+            </Space>
+          ),
         };
       case "à signer":
         return {
-          title: "Contrat à signer",
-          description: "Votre profil a été validé. Veuillez maintenant accepter les conditions du contrat.",
-          nextStep: "Après acceptation, vous pourrez accéder à toutes les fonctionnalités de la plateforme.",
+          title: (
+            <>
+              Contrat à signer
+              {documentLink} {/* Include link in title */}
+            </>
+          ),
+          description:
+            "Votre profil a été validé. Veuillez maintenant accepter les conditions du contrat.",
+          nextStep:
+            "Après sginateur de contart, vous pourrez accéder à toutes les fonctionnalités de la plateforme.",
           icon: <FileProtectOutlined style={{ color: "#52c41a" }} />,
           color: "info",
           action: (
-            <Button 
-              type="primary" 
-              icon={<FileProtectOutlined />} 
+            <Button
+              type="primary"
+              icon={<FileProtectOutlined />}
               onClick={showContractModal}
               className="pulse-animation"
               style={{
-                boxShadow: "0 0 8px #1890ff",
+                boxShadow: "0 0 8px #fa8c16",
                 animation: "pulse 1.5s infinite",
-              }}>
-              Accepter le contrat
+                backgroundColor: "#fa8c16",
+                borderColor: "#fa8c16",
+              }}
+            >
+              Signer le contrat
             </Button>
-          )
+          ),
         };
       case "Actif":
       case "validé":
         return {
-          title: "Compte activé",
+          title: (
+            <>
+              Compte activé
+              {documentLink} {/* Include link in title */}
+            </>
+          ),
           description: "Votre compte est pleinement activé.",
-          nextStep: "Vous avez maintenant accès à toutes les fonctionnalités de la plateforme.",
+          nextStep:
+            "Vous avez maintenant accès à toutes les fonctionnalités de la plateforme.",
           icon: <CheckCircleOutlined style={{ color: "#52c41a" }} />,
           color: "success",
           action: (
-            <Button 
-              type="default" 
-              icon={<FilePdfOutlined />} 
-              onClick={generatePDF}>
-              Télécharger le contrat
-            </Button>
-          )
+            <Space>
+              <Button
+                type="default"
+                icon={<FilePdfOutlined />}
+                onClick={generatePDF}
+              >
+                Télécharger le contrat
+              </Button>
+              {/* Document link is now in the title */}
+            </Space>
+          ),
         };
       default:
         return {
           title: "Statut indéterminé",
-          description: "Veuillez contacter notre support pour plus d'informations.",
+          description:
+            "Veuillez contacter notre support pour plus d'informations.",
           nextStep: "Nous vous aiderons à résoudre ce problème rapidement.",
           icon: <InfoCircleOutlined style={{ color: "#faad14" }} />,
           color: "warning",
-          action: null
+          action: null,
         };
     }
   };
@@ -1115,15 +1293,20 @@ const ClientPlusInfo = () => {
   // Status guidance content
   const statusGuidance = getStatusGuidance();
 
+  // Tooltip title generation
+  const getTooltipTitle = () => {
+    return `Profil: ${completionDetails.profile}% | Documents: ${completionDetails.document}%`;
+  };
+
   return profile ? (
     <div className="w-full mx-auto p-6 bg-gradient-to-br from-blue-50 to-blue-100">
       <style>{pulseAnimationStyle}</style>
-      
+
       {/* Steps for activation process - Only show when account is not active */}
       {!isAccountActive && (
         <Card className="mb-6 shadow rounded-xl overflow-hidden bg-white">
           <div className="p-3">
-            <Steps 
+            <Steps
               current={currentStep}
               labelPlacement="vertical"
               progressDot
@@ -1131,91 +1314,115 @@ const ClientPlusInfo = () => {
               className="my-2"
               items={[
                 {
-                  title: 'Compléter le profil',
+                  title: "Compléter le profil & Docs",
                   description: null,
-                  status: currentStep >= 0 ? (currentStep > 0 ? 'finish' : 'process') : 'wait',
+                  status:
+                    currentStep >= 0
+                      ? currentStep > 0
+                        ? "finish"
+                        : "process"
+                      : "wait",
                 },
                 {
-                  title: 'Validation',
+                  title: "Validation",
                   description: null,
-                  status: currentStep >= 1 ? (currentStep > 1 ? 'finish' : 'process') : 'wait',
+                  status:
+                    currentStep >= 1
+                      ? currentStep > 1
+                        ? "finish"
+                        : "process"
+                      : "wait",
                 },
                 {
-                  title: 'Contrat',
+                  title: "Contrat",
                   description: null,
-                  status: currentStep >= 2 ? (currentStep > 2 ? 'finish' : 'process') : 'wait',
+                  status:
+                    currentStep >= 2
+                      ? currentStep > 2
+                        ? "finish"
+                        : "process"
+                      : "wait",
                 },
                 {
-                  title: 'Actif',
+                  title: "Actif",
                   description: null,
-                  status: currentStep >= 3 ? 'finish' : 'wait',
+                  status: currentStep >= 3 ? "finish" : "wait",
                 },
               ]}
             />
           </div>
         </Card>
       )}
-      
+
       <Card
         className="shadow-lg rounded-xl overflow-hidden transition-all duration-300 hover:shadow-xl"
         bodyStyle={{ padding: 0 }}
       >
         {/* Status guidance alert - Compact version */}
-        <div className={`px-4 py-3 flex items-start ${
-          isAccountActive ? 'bg-green-50 border-b border-green-200' : 
-          statusGuidance.color === 'warning' ? 'bg-orange-50 border-b border-orange-200' : 
-          'bg-blue-50 border-b border-blue-200'
-        }`}>
-          <div className="mr-3 mt-1">
-            {statusGuidance.icon}
-          </div>
+        <div
+          className={`px-4 py-3 flex items-start ${
+            isAccountActive
+              ? "bg-green-50 border-b border-green-200"
+              : statusGuidance.color === "warning"
+              ? "bg-orange-50 border-b border-orange-200"
+              : "bg-blue-50 border-b border-blue-200"
+          }`}
+        >
+          <div className="mr-3 mt-1">{statusGuidance.icon}</div>
           <div className="flex-grow">
             <div className="font-medium text-lg">
-              {statusGuidance.title}
+              {statusGuidance.title} {/* Title now includes the link */}
             </div>
             <div className="text-sm mt-1">
               {statusGuidance.description}
               {!isAccountActive && (
                 <div className="mt-1 text-sm text-gray-600">
-                  <b>{isAccountActive ? '' : 'Prochaine étape :'}</b> {statusGuidance.nextStep}
+                  <b>{isAccountActive ? "" : "Prochaine étape :"}</b>{" "}
+                  {statusGuidance.nextStep}
                 </div>
               )}
             </div>
             {statusGuidance.action && (
-              <div className="mt-2">
-                {statusGuidance.action}
-              </div>
+              <div className="mt-2">{statusGuidance.action}</div>
             )}
           </div>
         </div>
-        
+
         {/* En-tête avec Progression et Actions de Modification */}
         <div className="p-4 bg-white flex flex-col md:flex-row justify-between items-center border-b border-blue-100">
           <div className="w-full mb-4 md:mb-0 md:mr-4">
             <div className="flex justify-between items-center mb-2">
               <h3 className="text-base font-semibold text-blue-900">
-                Complétude du profil
+                Complétude du profil & Documents
               </h3>
               <Tag
-                color={profileStatus ? "success" : 
-                      completionStatus === 100 ? "processing" : "warning"}
-                className="text-xs">
+                color={
+                  profileStatus
+                    ? "success"
+                    : completionDetails.total === 100 // Use total completion
+                    ? "processing"
+                    : "warning"
+                }
+                className="text-xs"
+              >
                 {profileStatus ? (
                   <>
                     <CheckCircleOutlined /> {profile.Statut}
                   </>
                 ) : (
-                  <>
-                    {completionStatus}%
-                  </>
+                  <>{completionDetails.total}%</> // Display total completion
                 )}
               </Tag>
             </div>
             {!isAccountActive && (
-              <Tooltip title={`Profil ${completionStatus}% complété`}>
+              <Tooltip title={getTooltipTitle()}>
+                {" "}
+                {/* Updated Tooltip */}
                 <Progress
-                  percent={completionStatus}
-                  status={completionStatus === 100 ? "success" : "active"}
+                  percent={completionDetails.total} // Use total completion
+                  status={
+                    completionDetails.total === 100 ? "success" : "active"
+                  } // Use total completion
                   strokeColor={{
                     "0%": "#108ee9",
                     "100%": "#87d068",
@@ -1256,6 +1463,7 @@ const ClientPlusInfo = () => {
                 Modifier
               </Button>
             )}
+            {/* Document button removed from here, link is in title/actions */}
           </div>
         </div>
 
@@ -1268,7 +1476,7 @@ const ClientPlusInfo = () => {
                 size={150}
                 src={
                   profile.img_path
-                    ? `${Endponit()}/media/${profile.img_path}`
+                    ? `${Endponit()}/media/${profile.img_path}` // Use relative path with endpoint
                     : undefined
                 }
                 icon={!profile.img_path && <UserOutlined />}
@@ -1279,6 +1487,7 @@ const ClientPlusInfo = () => {
                 listType="picture"
                 className="avatar-uploader"
                 showUploadList={false}
+                customRequest={() => {}} // Prevent default upload behavior
                 beforeUpload={(file) => {
                   // Image type validation
                   const isImage = file.type.startsWith("image/");
@@ -1286,19 +1495,20 @@ const ClientPlusInfo = () => {
                     message.error(
                       "Vous ne pouvez télécharger que des fichiers image!"
                     );
-                    return false;
+                    return Upload.LIST_IGNORE; // Prevent upload
                   }
 
                   // File size validation
                   const isLt2M = file.size / 1024 / 1024 < 2;
                   if (!isLt2M) {
                     message.error("L'image doit être inférieure à 2MB!");
-                    return false;
+                    return Upload.LIST_IGNORE; // Prevent upload
                   }
 
-                  return isImage && isLt2M;
+                  // Manually trigger upload handler
+                  handleProfileImageUpload({ file });
+                  return false; // Prevent default upload behavior after manual handling
                 }}
-                onChange={handleProfileImageUpload}
               >
                 <Button
                   icon={<UploadOutlined />}
@@ -1348,7 +1558,9 @@ const ClientPlusInfo = () => {
               className="space-y-3"
               size="middle"
             >
-              <Divider orientation="left" className="text-sm">Informations de l'entreprise</Divider>
+              <Divider orientation="left" className="text-sm">
+                Informations de l'entreprise
+              </Divider>
 
               <Row gutter={16}>
                 <Col xs={24} md={12}>
@@ -1449,7 +1661,9 @@ const ClientPlusInfo = () => {
                 />
               </Form.Item>
 
-              <Divider orientation="left" className="text-sm">Adresse</Divider>
+              <Divider orientation="left" className="text-sm">
+                Adresse
+              </Divider>
 
               <Form.Item name="address" label="Adresse">
                 <Input
@@ -1489,15 +1703,86 @@ const ClientPlusInfo = () => {
                 </Col>
               </Row>
 
-              <Divider orientation="left" className="text-sm">Informations bancaires</Divider>
+              <Divider orientation="left" className="text-sm">
+                Informations bancaires
+              </Divider>
 
               <Row gutter={16}>
                 <Col xs={24} md={12}>
-                  <Form.Item name="iban" label="IBAN">
+                  <Form.Item
+                    name="iban"
+                    label="IBAN"
+                    rules={[
+                      {
+                        validator: (_, value) => {
+                          if (!value) {
+                            return Promise.resolve(); // Allow empty field if not required
+                          }
+
+                          // Remove spaces and convert to uppercase
+                          const cleanedIBAN = value
+                            .replace(/\s/g, "")
+                            .toUpperCase();
+
+                          // Basic format check
+                          const ibanRegex = /^[A-Z]{2}[0-9]{2}[A-Z0-9]{1,30}$/;
+                          if (!ibanRegex.test(cleanedIBAN)) {
+                            return Promise.reject(
+                              new Error("Format IBAN invalide")
+                            );
+                          }
+
+                          // IBAN checksum validation
+                          // Rearrange IBAN: Move first 4 characters to the end
+                          const rearranged =
+                            cleanedIBAN.substring(4) +
+                            cleanedIBAN.substring(0, 4);
+
+                          // Convert letters to numbers (A=10, B=11, etc.)
+                          const characters = rearranged.split("");
+                          const numbers = characters.map((char) => {
+                            return /[A-Z]/.test(char)
+                              ? (char.charCodeAt(0) - 55).toString()
+                              : char;
+                          });
+
+                          // Calculate MOD 97
+                          let remainder = numbers.join("");
+                          let block;
+
+                          // Process in chunks for large IBANs
+                          while (remainder.length > 10) {
+                            block = remainder.substring(0, 10);
+                            remainder =
+                              (parseInt(block, 10) % 97) +
+                              remainder.substring(10);
+                          }
+
+                          // Valid IBAN should give remainder of 1
+                          if (parseInt(remainder, 10) % 97 === 1) {
+                            return Promise.resolve();
+                          }
+
+                          return Promise.reject(
+                            new Error("Numéro IBAN invalide, veuillez vérifier")
+                          );
+                        },
+                      },
+                    ]}
+                  >
                     <Input
                       prefix={<CreditCardOutlined />}
                       placeholder="IBAN"
                       className="rounded-lg"
+                      // Optional: Format IBAN with spaces as user types
+                      onChange={(e) => {
+                        // Remove existing spaces first
+                        let value = e.target.value.replace(/\s/g, "");
+                        // Add a space every 4 characters
+                        value = value.replace(/(.{4})/g, "$1 ").trim();
+                        // Update the form field with formatted value
+                        form.setFieldsValue({ iban: value });
+                      }}
                     />
                   </Form.Item>
                 </Col>
@@ -1520,7 +1805,9 @@ const ClientPlusInfo = () => {
                 />
               </Form.Item>
 
-              <Divider orientation="left" className="text-sm">Informations complémentaires</Divider>
+              <Divider orientation="left" className="text-sm">
+                Informations complémentaires
+              </Divider>
 
               <Form.Item name="bio" label="Description / RCE">
                 <TextArea
@@ -1530,7 +1817,9 @@ const ClientPlusInfo = () => {
                 />
               </Form.Item>
 
-              <Divider orientation="left" className="text-sm">Réseaux sociaux et Web</Divider>
+              <Divider orientation="left" className="text-sm">
+                Réseaux sociaux et Web
+              </Divider>
               <div className="space-y-3">
                 <Form.Item name="linkedin" label="LinkedIn">
                   <Input

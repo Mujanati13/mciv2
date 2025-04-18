@@ -44,7 +44,8 @@ const AppelDOffreInterface = () => {
         profile: item.profil,
         tjm_min: item.tjm_min,
         tjm_max: item.tjm_max,
-        status: item.statut === "1" ? "Ouvert" : "Fermé",
+        status: item.statut === "1" ? "Public" : 
+               item.statut === "2" ? "Restreint" : "Brouillon",
         publication_date: item.date_publication,
         deadline: item.date_limite,
         start_date: item.date_debut,
@@ -135,7 +136,7 @@ const AppelDOffreInterface = () => {
   const onFinish = async (values) => {
     try {
       const formData = {
-        client_id: localStorage.getItem("id"), // You might want to make this dynamic
+        client_id: localStorage.getItem("id"),
         titre: values.title,
         description: values.description,
         profil: values.profile,
@@ -144,7 +145,8 @@ const AppelDOffreInterface = () => {
         date_publication: moment().format("YYYY-MM-DD"),
         date_limite: values.deadline.format("YYYY-MM-DD"),
         date_debut: values.start_date.format("YYYY-MM-DD"),
-        statut: values.status === "Ouvert" ? "1" : "0",
+        statut: values.status === "Public" ? "1" : 
+               values.status === "Restreint" ? "2" : "3",
         jours: values.workingdayes,
       };
 
@@ -164,7 +166,6 @@ const AppelDOffreInterface = () => {
         await axios.post(`${API_BASE_URL}/notify_expiration_ao/`, {
           ao_id: res_data.data.id,
           client_id: localStorage.getItem("id"),
-          // esn_list
         });
         res_data.data.esn_tokens.forEach(async (token) => {
           if (token != null) {
@@ -230,12 +231,16 @@ const AppelDOffreInterface = () => {
       dataIndex: "status",
       key: "status",
       filters: [
-        { text: "Ouvert", value: "Ouvert" },
-        { text: "Fermé", value: "Fermé" },
+        { text: "Public", value: "Public" },
+        { text: "Restreint", value: "Restreint" },
+        { text: "Brouillon", value: "Brouillon" },
       ],
       onFilter: (value, record) => record.status === value,
       render: (status) => (
-        <span style={{ color: status === "Ouvert" ? "#52c41a" : "#ff4d4f" }}>
+        <span style={{ 
+          color: status === "Public" ? "#52c41a" : 
+                 status === "Restreint" ? "#faad14" : "#8c8c8c" 
+        }}>
           {status}
         </span>
       ),
@@ -291,6 +296,7 @@ const AppelDOffreInterface = () => {
       form.setFieldsValue({ workingdayes: days });
     }
   };
+  
   return (
     <div style={{ padding: 0 }}>
       <div
@@ -399,33 +405,45 @@ const AppelDOffreInterface = () => {
                 label="Date de début"
                 rules={[
                   { required: true, message: "Veuillez sélectionner une date" },
+                  {
+                    validator: (_, value) => {
+                      if (value && value.isBefore(moment().startOf("day"))) {
+                        return Promise.reject(
+                          "La date doit être dans le futur"
+                        );
+                      }
+                      return Promise.resolve();
+                    },
+                  },
                 ]}
               >
-                <DatePicker
-                  style={{ width: "100%" }}
-                  format="DD/MM/YYYY"
-                  onChange={handleDateChange}
-                />
+                <DatePicker style={{ width: "100%" }} format="DD/MM/YYYY" />
               </Form.Item>
             </Col>
             <Col span={8}>
               <Form.Item
                 name="deadline"
-                label="Date limite"
+                label="date de fin"
                 rules={[
                   { required: true, message: "Veuillez sélectionner une date" },
+                  {
+                    validator: (_, value) => {
+                      if (value && value.isBefore(moment().startOf("day"))) {
+                        return Promise.reject(
+                          "La date doit être dans le futur"
+                        );
+                      }
+                      return Promise.resolve();
+                    },
+                  },
                 ]}
               >
-                <DatePicker
-                  style={{ width: "100%" }}
-                  format="DD/MM/YYYY"
-                  onChange={handleDateChange}
-                />
+                <DatePicker style={{ width: "100%" }} format="DD/MM/YYYY" />
               </Form.Item>
             </Col>
             <Form.Item
               name="workingdayes"
-              label="Jours ouvrés"
+              label="Nombre de jours"
               rules={[
                 { required: true, message: "Champ requis" },
                 ({ getFieldValue }) => ({
@@ -468,8 +486,9 @@ const AppelDOffreInterface = () => {
             ]}
           >
             <Select>
-              <Select.Option value="Ouvert">Ouvert</Select.Option>
-              <Select.Option value="Fermé">Fermé</Select.Option>
+              <Select.Option value="Public">Public</Select.Option>
+              <Select.Option value="Restreint">Restreint</Select.Option>
+              <Select.Option value="Brouillon">Brouillon</Select.Option>
             </Select>
           </Form.Item>
         </Form>

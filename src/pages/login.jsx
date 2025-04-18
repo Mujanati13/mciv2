@@ -8,32 +8,41 @@ import {
   Typography,
   Space,
   Divider,
-  Radio,
   message,
 } from "antd";
-import { UserOutlined, LockOutlined } from "@ant-design/icons";
-import { useNavigate } from "react-router-dom";
+import { UserOutlined, LockOutlined, BankOutlined } from "@ant-design/icons";
+import { useNavigate, useLocation } from "react-router-dom";
 import { isClientLoggedIn, isEsnLoggedIn } from "../helper/db";
 import { Endponit } from "../helper/enpoint";
 
 const { Title, Text, Link } = Typography;
 
 const LoginPage = () => {
+  const location = useLocation();
+  const queryParams = new URLSearchParams(location.search);
+  const typeFromURL = queryParams.get("type");
+  
   const [loading, setLoading] = useState(false);
-  const [userType, setUserType] = useState("client");
+  const [userType, setUserType] = useState(typeFromURL || "client");
+  const [showLoginForm, setShowLoginForm] = useState(!!typeFromURL);
   const navigate = useNavigate();
 
   useEffect(() => {
-    {
-      const auth = isEsnLoggedIn();
-      const auth2 = isClientLoggedIn();
-      if (auth == true) {
-        navigate("/interface-en");
-      } else if (auth2 == true) {
-        navigate("/interface-cl");
-      }
+    const auth = isEsnLoggedIn();
+    const auth2 = isClientLoggedIn();
+    if (auth == true) {
+      navigate("/interface-en");
+    } else if (auth2 == true) {
+      navigate("/interface-cl");
     }
   }, []);
+
+  const selectUserType = (type) => {
+    setUserType(type);
+    setShowLoginForm(true);
+    // Update URL without reloading page
+    window.history.replaceState({}, '', `${window.location.pathname}?type=${type}`);
+  };
 
   const handleLogin = async (values) => {
     setLoading(true);
@@ -70,9 +79,7 @@ const LoginPage = () => {
         } else {
           // For ESN users
           localStorage.setItem("id", data.data[0].ID_ESN);
-          // localStorage.setItem("esnName", data.data[0].Nom_ESN);
-          // localStorage.setItem("siret", data.data[0].SIRET);
-          navigate("/interface-en"); // Adjust this route as needed
+          navigate("/interface-en");
         }
       } else {
         message.error(data.message || "Identifiants invalides");
@@ -84,6 +91,86 @@ const LoginPage = () => {
     }
   };
 
+  const goToRegister = () => {
+    navigate(`/regester?type=${userType}`);
+  };
+
+  const goBackToSelection = () => {
+    setShowLoginForm(false);
+    // Remove type from URL
+    window.history.replaceState({}, '', window.location.pathname);
+  };
+
+  // Display user type selection cards
+  if (!showLoginForm) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          background: "linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "20px",
+        }}
+      >
+        <Space direction="vertical" size="large" style={{ width: "100%", maxWidth: "900px" }}>
+          <div style={{ textAlign: "center", marginBottom: "24px" }}>
+            <Title level={1}>Bienvenue sur Maghrebit Connect</Title>
+            <Text type="secondary">Veuillez choisir votre type de compte</Text>
+          </div>
+
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "20px", justifyContent: "center" }}>
+            {/* Client Card */}
+            <Card
+              hoverable
+              style={{ width: 300, textAlign: "center" }}
+              cover={
+                <div style={{ fontSize: "60px", padding: "20px", color: "#1890ff" }}>
+                  <UserOutlined />
+                </div>
+              }
+              onClick={() => selectUserType("client")}
+            >
+              <Card.Meta
+                title="Client Final"
+                description="Accédez à votre espace client et gérez vos projets"
+              />
+              <div style={{ marginTop: "24px" }}>
+                <Button type="primary" size="large" block onClick={() => selectUserType("client")}>
+                  Continuer
+                </Button>
+              </div>
+            </Card>
+
+            {/* ESN Card */}
+            <Card
+              hoverable
+              style={{ width: 300, textAlign: "center" }}
+              cover={
+                <div style={{ fontSize: "60px", padding: "20px", color: "#1890ff" }}>
+                  <BankOutlined />
+                </div>
+              }
+              onClick={() => selectUserType("societe")}
+            >
+              <Card.Meta
+                title="Prestataire de Service"
+                description="Accédez à votre espace prestataire et gérez vos offres"
+              />
+              <div style={{ marginTop: "24px" }}>
+                <Button type="primary" size="large" block onClick={() => selectUserType("societe")}>
+                  Continuer
+                </Button>
+              </div>
+            </Card>
+          </div>
+        </Space>
+      </div>
+    );
+  }
+
+  // Display login form for selected user type
   return (
     <div
       style={{
@@ -105,31 +192,9 @@ const LoginPage = () => {
       >
         <div style={{ textAlign: "center", marginBottom: "24px" }}>
           <Title level={2} style={{ marginBottom: "8px" }}>
-            Bienvenue
+            {userType === "client" ? "Espace Client" : "Espace Prestataire"}
           </Title>
           <Text type="secondary">Connectez-vous à votre compte</Text>
-        </div>
-
-        <div style={{ marginBottom: "24px" }}>
-          <Radio.Group
-            value={userType}
-            onChange={(e) => setUserType(e.target.value)}
-            buttonStyle="solid"
-            style={{ width: "100%" }}
-          >
-            <Radio.Button
-              value="client"
-              style={{ width: "50%", textAlign: "center" }}
-            >
-              Client final
-            </Radio.Button>
-            <Radio.Button
-              value="societe"
-              style={{ width: "50%", textAlign: "center" }}
-            >
-              Prestataire de service
-            </Radio.Button>
-          </Radio.Group>
         </div>
 
         <Form
@@ -147,10 +212,7 @@ const LoginPage = () => {
           >
             <Input
               prefix={<UserOutlined />}
-              placeholder={
-                userType === "client" ? "Adresse email" : "Adresse email"
-              }
-              // maxLength={userType === "client" ? undefined : 14}
+              placeholder="Adresse email"
             />
           </Form.Item>
 
@@ -200,14 +262,13 @@ const LoginPage = () => {
             <div style={{ textAlign: "center" }}>
               <Text type="secondary">
                 Vous n'avez pas de compte ?{" "}
-                <Link
-                  onClick={() => {
-                    navigate("/regester");
-                  }}
-                >
-                  S'inscrire
-                </Link>
+                <Link onClick={goToRegister}>S'inscrire</Link>
               </Text>
+            </div>
+            <div style={{ textAlign: "center" }}>
+              <Link onClick={goBackToSelection}>
+                Retour à la sélection
+              </Link>
             </div>
           </Space>
         </Form>

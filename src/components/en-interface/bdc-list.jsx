@@ -26,11 +26,13 @@ import {
   DeleteOutlined,
   EditOutlined,
   FileDoneOutlined,
-  SendOutlined,
+  InfoCircleOutlined ,
   DollarOutlined,
   FileTextOutlined,
   DownloadOutlined,
   UserOutlined,
+  CheckCircleOutlined,
+  CloseCircleOutlined,
 } from "@ant-design/icons";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -213,6 +215,7 @@ const BonDeCommandeInterface = () => {
       pending_esn: "En attente de validation",
       accepted_esn: "Soumis",
       rejected_esn: "Rejeté",
+      Actif: "Actif",
     };
     return statusMap[status] || status;
   };
@@ -222,6 +225,7 @@ const BonDeCommandeInterface = () => {
       pending_esn: "warning",
       accepted_esn: "success",
       rejected_esn: "error",
+      Actif: "green",
     };
     return colors[status];
   };
@@ -287,7 +291,12 @@ const BonDeCommandeInterface = () => {
         statut: newStatus,
       });
       fetchPurchaseOrders();
-      message.success("Statut mis à jour avec succès");
+      message.success(`Statut mis à jour : ${getStatusLabel(newStatus)}`);
+      
+      // Close modal if it's open
+      if (isDetailsModalVisible) {
+        setIsDetailsModalVisible(false);
+      }
     } catch (error) {
       message.error("Échec de la mise à jour du statut");
     }
@@ -310,10 +319,10 @@ const BonDeCommandeInterface = () => {
       title: "Montant Total",
       dataIndex: "montant_total",
       key: "montant_total",
-      render: (amount) => (
+      render: (amount, record) => (
         <span className="font-medium">
           <DollarOutlined className="mr-1" />
-          {amount.toFixed(2)} €
+          {(amount - (record.benefit || 0)).toFixed(2)} €
         </span>
       ),
     },
@@ -339,56 +348,6 @@ const BonDeCommandeInterface = () => {
               }}
             />
           </Tooltip>
-          {/* <Tooltip title="Télécharger BDC">
-            <Button
-              icon={<DownloadOutlined />}
-              onClick={() => handleDownload(record)}
-              loading={downloadLoading[record.id_bdc]}
-            />
-          </Tooltip> */}
-          {/* {record.has_contract && (
-            <Tooltip title="Télécharger le contrat">
-              <Button
-                icon={<DownloadOutlined />}
-                onClick={() => downloadContract(record.has_contract)}
-                loading={downloadLoading[`contract_${record.has_contract}`]}
-              >
-                Contrat
-              </Button>
-            </Tooltip>
-          )} */}
-          {/* {record.statut !== 'accepted_esn' && (
-            <Button 
-              type="primary" 
-              icon={<EditOutlined />} 
-              onClick={() => handleEdit(record)}
-              title="Modifier"
-            />
-          )} */}
-
-          {record.statut === "pending_esn" && (
-            <>
-              <Button
-                type="primary"
-                onClick={() => handleUpdateStatus(record, "accepted_esn")}
-              >
-                Accepter
-              </Button>
-              <Button
-                danger
-                onClick={() => handleUpdateStatus(record, "rejected_esn")}
-              >
-                Refuser
-              </Button>
-            </>
-          )}
-          {/* <Button
-            danger
-            icon={<DeleteOutlined />}
-            onClick={() => handleDelete(record.id_bdc)}
-            disabled={record.statut === "accepted_esn"}
-            title="Supprimer"
-          /> */}
         </Space>
       ),
     },
@@ -593,10 +552,15 @@ const BonDeCommandeInterface = () => {
       {/* Details Modal */}
       <Modal
         title={
-          <Space>
+          <div className="flex items-center space-x-2">
             <FileTextOutlined />
-            Détails du Bon de Commande
-          </Space>
+            <span>Détails du Bon de Commande</span>
+            {currentPurchaseOrder && (
+              <Tag color={getStatusColor(currentPurchaseOrder.statut)} className="ml-2">
+                {getStatusLabel(currentPurchaseOrder.statut)}
+              </Tag>
+            )}
+          </div>
         }
         open={isDetailsModalVisible}
         onCancel={() => setIsDetailsModalVisible(false)}
@@ -609,47 +573,91 @@ const BonDeCommandeInterface = () => {
           >
             Télécharger
           </Button>,
+          currentPurchaseOrder?.statut === "pending_esn" && (
+            <Button
+              key="reject"
+              danger
+              icon={<CloseCircleOutlined />}
+              onClick={() => handleUpdateStatus(currentPurchaseOrder, "rejected_esn")}
+            >
+              Refuser
+            </Button>
+          ),
+          currentPurchaseOrder?.statut === "pending_esn" && (
+            <Button
+              key="accept"
+              type="primary"
+              icon={<CheckCircleOutlined />}
+              onClick={() => handleUpdateStatus(currentPurchaseOrder, "accepted_esn")}
+            >
+              Accepter
+            </Button>
+          ),
           <Button key="close" onClick={() => setIsDetailsModalVisible(false)}>
             Fermer
           </Button>,
-        ]}
+        ].filter(Boolean)}
         width={700}
       >
         {currentPurchaseOrder && (
-          <Descriptions bordered column={2}>
-            <Descriptions.Item label="Numéro BDC" span={2}>
-              {currentPurchaseOrder.numero_bdc}
-            </Descriptions.Item>
-            <Descriptions.Item label="Date de création">
-              {format(
-                new Date(currentPurchaseOrder.date_creation),
-                "dd MMMM yyyy",
-                {
-                  locale: fr,
-                }
-              )}
-            </Descriptions.Item>
-            <Descriptions.Item label="Statut">
-              <Tag color={getStatusColor(currentPurchaseOrder.statut)}>
-                {getStatusLabel(currentPurchaseOrder.statut)}
-              </Tag>
-            </Descriptions.Item>
-            <Descriptions.Item label="Montant total" span={2}>
-              <span className="font-medium text-green-600">
-                {currentPurchaseOrder.montant_total.toFixed(2)} €
-              </span>
-            </Descriptions.Item>
-            <Descriptions.Item label="Description" span={2}>
-              {currentPurchaseOrder.description}
-            </Descriptions.Item>
-            {currentPurchaseOrder.candidature_id && (
-              <Descriptions.Item label="Candidature associée" span={2}>
-                {candidates.find(
-                  (c) => c.id_cd === currentPurchaseOrder.candidature_id
-                )?.responsable_compte || "Non trouvé"}
+          <div className="space-y-6">
+            <Descriptions bordered column={2} size="small" className="rounded-lg overflow-hidden">
+              <Descriptions.Item label="Numéro BDC" span={2}>
+                {currentPurchaseOrder.numero_bdc}
               </Descriptions.Item>
+              <Descriptions.Item label="Date de création">
+                {format(
+                  new Date(currentPurchaseOrder.date_creation),
+                  "dd MMMM yyyy",
+                  {
+                    locale: fr,
+                  }
+                )}
+              </Descriptions.Item>
+              <Descriptions.Item label="Statut">
+                <Tag color={getStatusColor(currentPurchaseOrder.statut)}>
+                  {getStatusLabel(currentPurchaseOrder.statut)}
+                </Tag>
+              </Descriptions.Item>
+              <Descriptions.Item label="Montant total" span={2}>
+                <span className="font-medium text-green-600">
+                  {(
+                    currentPurchaseOrder.montant_total -
+                    (currentPurchaseOrder.benefit || 0)
+                  ).toFixed(2)}
+                  €
+                </span>
+              </Descriptions.Item>
+              <Descriptions.Item label="Description" span={2}>
+                {currentPurchaseOrder.description}
+              </Descriptions.Item>
+              {currentPurchaseOrder.candidature_id && (
+                <Descriptions.Item label="Candidature associée" span={2}>
+                  {candidates.find(
+                    (c) => c.id_cd === currentPurchaseOrder.candidature_id
+                  )?.responsable_compte || "Non trouvé"}
+                </Descriptions.Item>
+              )}
+            </Descriptions>
+
+            {currentPurchaseOrder.statut === "pending_esn" && (
+              <div className="bg-blue-50 p-4 rounded-lg border border-blue-200 mt-5">
+                <div className="flex items-start">
+                  <div className="text-blue-500 text-lg mt-1 mr-3">
+                    <InfoCircleOutlined />
+                  </div>
+                  <div className="">
+                    <h4 className="font-medium text-blue-700 m-0 ">
+                      Action requise
+                    </h4>
+                    <p className="text-blue-600 mt-1 mb-0">
+                      Ce bon de commande est en attente de votre validation. Veuillez l'accepter pour continuer le processus ou le refuser si nécessaire.
+                    </p>
+                  </div>
+                </div>
+              </div>
             )}
-          </Descriptions>
+          </div>
         )}
       </Modal>
     </Card>
