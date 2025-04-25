@@ -106,7 +106,7 @@ const ConsultantManagement = () => {
       render: (date) => date ? dayjs(date).format('DD/MM/YYYY') : 'Non renseigné',
     },
     {
-      title: 'Poste',
+      title: 'Fonction',
       dataIndex: 'Poste',
       key: 'Poste',
     },
@@ -193,7 +193,7 @@ const ConsultantManagement = () => {
                   </Tag>
                   {consultant.Poste && (
                     <div>
-                      <strong>Poste:</strong> {consultant.Poste}
+                      <strong>Fonction:</strong> {consultant.Poste}
                     </div>
                   )}
                   {consultant.Mobilité && (

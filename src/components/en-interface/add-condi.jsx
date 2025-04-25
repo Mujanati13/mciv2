@@ -19,8 +19,11 @@ import {
   Space,
   Divider,
   Tag,
-  Switch,
   InputNumber,
+  Table,
+  Radio,
+  Avatar,
+  Tooltip,
 } from "antd";
 import {
   InboxOutlined,
@@ -29,16 +32,17 @@ import {
   CalendarOutlined,
   UserOutlined,
   DollarOutlined,
-  CommentOutlined,
   InfoCircleOutlined,
   PlusOutlined,
   SwapOutlined,
   FilePdfOutlined,
   UploadOutlined,
-  MailOutlined,
-  PhoneOutlined,
-  GlobalOutlined,
-  BankOutlined,
+  SearchOutlined,
+  EditOutlined,
+  DeleteOutlined,
+  ExportOutlined,
+  ReloadOutlined,
+  CheckCircleOutlined,
 } from "@ant-design/icons";
 import axios from "axios";
 import dayjs from "dayjs";
@@ -47,8 +51,8 @@ import { Endponit, token } from "../../helper/enpoint";
 
 const { TextArea } = Input;
 const { Paragraph } = Typography;
-const { Dragger } = Upload;
 const { Option } = Select;
+const { Dragger } = Upload;
 const API_URL = Endponit() + "/api/collaborateur/";
 const UPLOAD_URL = Endponit() + "/api/saveDoc/";
 
@@ -61,155 +65,65 @@ const AppelDOffreInterface = () => {
   const [currentOffer, setCurrentOffer] = useState(null);
   const [applyForm] = Form.useForm();
   const [consultants, setConsultants] = useState([]);
+  const [responsables, setResponsables] = useState([]);
   const [nom_co, setNomCo] = useState("");
+  const [nom_resp, setNomResp] = useState("");
   const [expandedDescriptions, setExpandedDescriptions] = useState({});
   const [createNewConsultant, setCreateNewConsultant] = useState(false);
   const [createNewManager, setCreateNewManager] = useState(false);
   const [consultantCvFile, setConsultantCvFile] = useState(null);
   const [managerCvFile, setManagerCvFile] = useState(null);
   const [skills, setSkills] = useState([]);
-  const [searchText, setSearchText] = useState("");
+  const [isCollaboratorModalVisible, setIsCollaboratorModalVisible] =
+    useState(false);
+  const [isAddResponsableModalVisible, setIsAddResponsableModalVisible] =
+    useState(false);
+  const [isAddConsultantModalVisible, setIsAddConsultantModalVisible] =
+    useState(false);
+  const [addResponsableForm] = Form.useForm();
+  const [addConsultantForm] = Form.useForm();
+  const [uploading, setUploading] = useState(false);
+  const [fileList, setFileList] = useState([]);
+  const [uploadedFileUrl, setUploadedFileUrl] = useState("");
+  const [isFileUploaded, setIsFileUploaded] = useState(false);
+  const [consultantFileList, setConsultantFileList] = useState([]);
+  const [consultantUploadedFileUrl, setConsultantUploadedFileUrl] =
+    useState("");
+  const [isConsultantFileUploaded, setIsConsultantFileUploaded] =
+    useState(false);
 
-  const columns = [
-    {
-      title: "Nom Complet",
-      dataIndex: "fullName",
-      key: "fullName",
-      sorter: (a, b) => a.fullName.localeCompare(b.fullName),
-      filteredValue: searchText ? [searchText] : null,
-      onFilter: (value, record) =>
-        record.fullName.toLowerCase().includes(value.toLowerCase()),
-    },
-    {
-      title: "Poste",
-      dataIndex: "Poste",
-      key: "Poste",
-    },
-    {
-      title: "Date de recrutement",
-      dataIndex: "date_debut_activ",
-      key: "date_debut_activ",
-    },
-    {
-      title: "Statut",
-      dataIndex: "status",
-      key: "status",
-      render: (status) => (
-        <Tag color={status === "actif" ? "green" : "red"}>
-          {status === "actif" ? "Actif" : "Inactif"}
-        </Tag>
-      ),
-      filters: [
-        { text: "Actif", value: "actif" },
-        { text: "Inactif", value: "inactif" },
-      ],
-      onFilter: (value, record) => record.status === value,
-    },
-    {
-      title: "CV",
-      key: "cv",
-      render: (_, record) => (
-        <Button
-          type="link"
-          icon={<FilePdfOutlined />}
-          disabled={!record.CV}
-          onClick={() => {
-            if (record.CV) {
-              window.open(Endponit() + "/media/" + record.CV, "_blank");
-            }
-          }}
-        >
-          {record.CV ? "Voir CV" : "Pas de CV"}
-        </Button>
-      ),
-    },
-    {
-      title: "Actions",
-      key: "actions",
-      width: 120,
-      render: (_, record) => (
-        <ActionButtons
-          record={record}
-          handleDelete={handleDelete}
-          fetchCollaborators={fetchCollaborators}
-        />
-      ),
-    },
-  ];
-
-  // Calculates experience based on start date
-  const calculateExperience = (startDate) => {
-    if (!startDate) return 0;
-
-    const start = new Date(startDate);
-    const today = new Date();
-
-    let years = today.getFullYear() - start.getFullYear();
-    if (
-      today.getMonth() < start.getMonth() ||
-      (today.getMonth() === start.getMonth() &&
-        today.getDate() < start.getDate())
-    ) {
-      years--;
-    }
-
-    return Math.max(0, years);
+  // Function to show add new responsable modal
+  const showAddResponsableModal = () => {
+    // setIsAddResponsableModalVisible(true);
+    // addResponsableForm.resetFields();
+    // setFileList([]);
+    // setUploadedFileUrl("");
+    // setIsFileUploaded(false);
+    location.reload();
+    location.href = "/interface-en?menu=collaborateur";
   };
 
-  // Fetch available skills for dropdown
-  useEffect(() => {
-    const fetchSkills = async () => {
-      try {
-        const response = await axios.get(Endponit() + "/api/competences/");
-        if (response.data && response.data.data) {
-          setSkills(response.data.data.map((skill) => skill.nom));
-        }
-      } catch (error) {
-        console.error("Error fetching skills:", error);
-      }
-    };
+  // Function to show add new consultant modal
+  const showAddConsultantModal = () => {
+    // setIsAddConsultantModalVisible(true);
+    // addConsultantForm.resetFields();
+    // setConsultantFileList([]);
+    // setConsultantUploadedFileUrl("");
+    // setIsConsultantFileUploaded(false);
+    location.reload();
+    location.href = "/interface-en?menu=collaborateur";
+  };
 
+  useEffect(() => {
+    fetchData();
     fetchSkills();
   }, []);
-
-  const toggleDescription = (id) => {
-    setExpandedDescriptions((prev) => ({
-      ...prev,
-      [id]: !prev[id],
-    }));
-  };
-
-  const handleSelect = (value, option) => {
-    setNomCo(option.dataName);
-    console.log("Selected ID:", value);
-    console.log("Selected Name:", option.dataName);
-  };
-
-  const fetchConsultants = async (id_project) => {
-    const esnId = localStorage.getItem("id") || 3;
-    try {
-      const response = await axios.get(
-        `${Endponit()}/api/consultants-par-esn-et-projet/?esn_id=${esnId}&project_id=${id_project}`,
-        {
-          headers: {
-            Authorization: `${token()}`,
-          },
-        }
-      );
-      setConsultants(response.data.data);
-    } catch (error) {
-      message.error("Erreur lors du chargement des consultants");
-      console.error("Error fetching consultants:", error);
-    }
-  };
 
   const fetchData = async () => {
     setLoading(true);
     try {
       const response = await axios.get(Endponit() + "/api/appelOffre/", {
-        headers: {
-          Authorization: `${token()}`,
-        },
+        headers: { Authorization: `${token()}` },
       });
       setData(response.data.data || []);
     } catch (error) {
@@ -221,43 +135,75 @@ const AppelDOffreInterface = () => {
     }
   };
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  const fetchSkills = async () => {
+    try {
+      const response = await axios.get(Endponit() + "/api/competences/");
+      if (response.data && response.data.data) {
+        setSkills(response.data.data.map((skill) => skill.nom));
+      }
+    } catch (error) {
+      console.error("Error fetching skills:", error);
+    }
+  };
 
-  const handleSearch = async (value) => {
-    setLoading(true);
+  const fetchConsultants = async (id_project) => {
+    const esnId = localStorage.getItem("id") || 3;
     try {
       const response = await axios.get(
-        `${Endponit()}/api/appelOffre/?search=${value}`,
-        {
-          headers: {
-            Authorization: `${token()}`,
-          },
-        }
+        `${Endponit()}/api/consultants-par-esn-et-projet/?esn_id=${esnId}&project_id=${id_project}`,
+        { headers: { Authorization: `${token()}` } }
       );
-      setData(response.data.data);
+      setConsultants(response.data.data);
     } catch (error) {
-      message.error("Erreur lors de la recherche");
-    } finally {
-      setLoading(false);
+      message.error("Erreur lors du chargement des consultants");
+      console.error("Error fetching consultants:", error);
     }
+  };
+
+  // Function to fetch responsables (commercial role)
+  const fetchResponsables = async () => {
+    try {
+      const response = await axios.get(API_URL, {
+        headers: { Authorization: `${token()}` },
+      });
+
+      if (response.data && response.data.data) {
+        const commercials = response.data.data.filter(
+          (c) => c.Poste === "commercial" && c.Actif
+        );
+        setResponsables(commercials);
+      }
+    } catch (error) {
+      console.error("Error fetching responsables:", error);
+      message.error("Erreur lors du chargement des responsables");
+    }
+  };
+
+  const handleConsultantSelect = (value, option) => {
+    console.log(option.children.join(" ").replaceAll("  ", " "));
+    setNomCo(option.children.join(" ").replaceAll("  ", " "));
+  };
+
+  const handleResponsableSelect = (value, option) => {
+    setNomResp(option.children);
+  };
+
+  const toggleDescription = (id) => {
+    setExpandedDescriptions((prev) => ({
+      ...prev,
+      [id]: !prev[id],
+    }));
   };
 
   const handleApply = (record) => {
     setCurrentOffer(record);
     fetchConsultants(record.id);
+    fetchResponsables(); // Fetch responsables when applying
     applyForm.resetFields();
     applyForm.setFieldsValue({
       AO_id: record.id,
       date_disponibilite: dayjs().add(1, "week"),
-      new_consultant_date_recrutement: dayjs(),
-      new_manager_date_recrutement: dayjs(),
     });
-    setCreateNewConsultant(false);
-    setCreateNewManager(false);
-    setConsultantCvFile(null);
-    setManagerCvFile(null);
     setIsApplyModalVisible(true);
   };
 
@@ -270,360 +216,199 @@ const AppelDOffreInterface = () => {
     applyForm.submit();
   };
 
-  // File upload props for consultant CV
-  const consultantUploadProps = {
-    name: "uploadedFile",
-    multiple: false,
-    maxCount: 1,
-    accept: ".pdf,.doc,.docx",
-    customRequest: async ({ file, onSuccess, onError, onProgress }) => {
-      const formData = new FormData();
-      formData.append("uploadedFile", file);
-      formData.append("path", "./uploads/cv/");
-
-      try {
-        const saveDocResponse = await axios.post(UPLOAD_URL, formData, {
-          headers: {
-            "Content-Type": "multipart/form-data",
-            Authorization: `${token()}`,
-          },
-          onUploadProgress: (progressEvent) => {
-            const percent = Math.floor(
-              (progressEvent.loaded / progressEvent.total) * 100
-            );
-            onProgress({ percent });
-          },
-        });
-
-        if (saveDocResponse.data && saveDocResponse.data.path) {
-          setConsultantCvFile(file);
-          onSuccess(saveDocResponse.data);
-          message.success(`${file.name} téléchargé avec succès`);
-        }
-      } catch (error) {
-        console.error("Upload error:", error);
-        onError(error);
-        message.error(`${file.name} échec du téléchargement.`);
-      }
-    },
-    beforeUpload: (file) => {
-      // Check if file is PDF or Word
-      const isValidType =
-        file.type === "application/pdf" ||
-        file.type === "application/msword" ||
-        file.type ===
-          "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-
-      if (!isValidType) {
-        message.error("Seuls les fichiers PDF et DOC/DOCX sont acceptés!");
-        return Upload.LIST_IGNORE;
-      }
-
-      // Check file size (limit to 5MB)
-      const isLt5M = file.size / 1024 / 1024 < 5;
-      if (!isLt5M) {
-        message.error("Le CV doit être inférieur à 5MB!");
-        return Upload.LIST_IGNORE;
-      }
-
-      return true;
-    },
-    onChange: (info) => {
-      if (info.file.status === "error") {
-        message.error(`${info.file.name} échec du téléchargement.`);
-      }
-    },
-  };
-
-  // File upload props for manager CV
-  const managerUploadProps = {
-    name: "uploadedFile",
-    multiple: false,
-    maxCount: 1,
-    accept: ".pdf,.doc,.docx",
-    customRequest: async ({ file, onSuccess, onError, onProgress }) => {
-      const formData = new FormData();
-      formData.append("uploadedFile", file);
-      formData.append("path", "./uploads/cv/");
-
-      try {
-        const saveDocResponse = await axios.post(UPLOAD_URL, formData, {
-          headers: {
-            "Content-Type": "multipart/form-data",
-            Authorization: `${token()}`,
-          },
-          onUploadProgress: (progressEvent) => {
-            const percent = Math.floor(
-              (progressEvent.loaded / progressEvent.total) * 100
-            );
-            onProgress({ percent });
-          },
-        });
-
-        if (saveDocResponse.data && saveDocResponse.data.path) {
-          setManagerCvFile(file);
-          onSuccess(saveDocResponse.data);
-          message.success(`${file.name} téléchargé avec succès`);
-        }
-      } catch (error) {
-        console.error("Upload error:", error);
-        onError(error);
-        message.error(`${file.name} échec du téléchargement.`);
-      }
-    },
-    beforeUpload: (file) => {
-      // Check if file is PDF or Word
-      const isValidType =
-        file.type === "application/pdf" ||
-        file.type === "application/msword" ||
-        file.type ===
-          "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-
-      if (!isValidType) {
-        message.error("Seuls les fichiers PDF et DOC/DOCX sont acceptés!");
-        return Upload.LIST_IGNORE;
-      }
-
-      // Check file size (limit to 5MB)
-      const isLt5M = file.size / 1024 / 1024 < 5;
-      if (!isLt5M) {
-        message.error("Le CV doit être inférieur à 5MB!");
-        return Upload.LIST_IGNORE;
-      }
-
-      return true;
-    },
-    onChange: (info) => {
-      if (info.file.status === "error") {
-        message.error(`${info.file.name} échec du téléchargement.`);
-      }
-    },
-  };
-
-  // Helper function to upload CV
-  const uploadCV = async (file, collaborateurId, esnId) => {
-    if (!file) return null;
-
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("collaborateur_id", collaborateurId);
-      formData.append("esn_id", esnId);
-      formData.append("type", "cv");
-
-      const response = await axios.post(UPLOAD_URL, formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-          Authorization: `${token()}`,
-        },
-      });
-
-      return response.data;
-    } catch (error) {
-      console.error("Error uploading CV:", error);
-      throw new Error("Échec du téléchargement du CV");
-    }
-  };
-
-  // Handle form submission
   const onApplyFinish = async (values) => {
     setSubmitting(true);
     try {
+      // Application submission logic
       const esnId = localStorage.getItem("id") || 3;
-      let consultantId = values.id_consultant;
-      let responsableCompte = values.responsable_compte;
-      let consultantName = nom_co;
-
-      // Handle creation of new consultant if needed
-      if (createNewConsultant) {
-        try {
-          const newConsultantData = {
-            esn_id: esnId,
-            Nom: values.new_consultant_nom,
-            Prenom: values.new_consultant_prenom,
-            Email: values.new_consultant_email,
-            Telephone: values.new_consultant_telephone,
-            Poste: "consultant",
-            Actif: true,
-            status: "actif",
-            date_debut_activ: values.new_consultant_date_recrutement
-              ? values.new_consultant_date_recrutement.format("YYYY-MM-DD")
-              : dayjs().format("YYYY-MM-DD"),
-            Date_naissance: values.new_consultant_date_naissance
-              ? values.new_consultant_date_naissance.format("YYYY-MM-DD")
-              : null,
-            competences: values.new_consultant_skills
-              ? values.new_consultant_skills.join(",")
-              : "",
-            experience: values.new_consultant_experience || 0,
-            tjm_actuel: values.new_consultant_tjm || 0,
-            nationalite: values.new_consultant_nationalite || "",
-            adresse: values.new_consultant_adresse || "",
-            code_postal: values.new_consultant_code_postal || "",
-            ville: values.new_consultant_ville || "",
-            rib: values.new_consultant_rib || "",
-            LinkedIN: values.new_consultant_linkedin || "",
-            Mobilité: values.new_consultant_mobilite || "",
-          };
-
-          // Create the consultant
-          const consultantRes = await axios.post(API_URL, newConsultantData, {
-            headers: {
-              Authorization: `${token()}`,
-            },
-          });
-          consultantId = consultantRes.data.id;
-          consultantName = `${values.new_consultant_prenom} ${values.new_consultant_nom}`;
-
-          // Upload CV if provided
-          if (consultantCvFile) {
-            const formData = new FormData();
-            formData.append("file", consultantCvFile);
-            formData.append("collaborateur_id", consultantId);
-            formData.append("esn_id", esnId);
-            formData.append("type", "cv");
-
-            await axios.post(UPLOAD_URL, formData, {
-              headers: {
-                "Content-Type": "multipart/form-data",
-                Authorization: `${token()}`,
-              },
-            });
-          }
-
-          message.success(`Consultant ${consultantName} créé avec succès!`);
-        } catch (error) {
-          console.error("Error creating new consultant:", error);
-          message.error(
-            "Erreur lors de la création du consultant: " +
-              (error.response?.data?.message || error.message)
-          );
-          setSubmitting(false);
-          return;
-        }
-      }
-
-      // Handle creation of new account manager if needed
-      if (createNewManager) {
-        try {
-          const newManagerData = {
-            esn_id: esnId,
-            Nom: values.new_manager_nom,
-            Prenom: values.new_manager_prenom,
-            Email: values.new_manager_email,
-            Telephone: values.new_manager_telephone,
-            Poste: "commercial",
-            Actif: true,
-            status: "actif",
-            date_debut_activ: values.new_manager_date_recrutement
-              ? values.new_manager_date_recrutement.format("YYYY-MM-DD")
-              : dayjs().format("YYYY-MM-DD"),
-            Date_naissance: values.new_manager_date_naissance
-              ? values.new_manager_date_naissance.format("YYYY-MM-DD")
-              : null,
-            experience: values.new_manager_experience || 0,
-            nationalite: values.new_manager_nationalite || "",
-            adresse: values.new_manager_adresse || "",
-            code_postal: values.new_manager_code_postal || "",
-            ville: values.new_manager_ville || "",
-            LinkedIN: values.new_manager_linkedin || "",
-            Mobilité: values.new_manager_mobilite || "",
-          };
-
-          // Create the manager
-          const managerRes = await axios.post(API_URL, newManagerData, {
-            headers: {
-              Authorization: `${token()}`,
-            },
-          });
-          const managerId = managerRes.data.id;
-          responsableCompte = `${values.new_manager_prenom} ${values.new_manager_nom}`;
-
-          // Upload CV if provided
-          if (managerCvFile) {
-            const formData = new FormData();
-            formData.append("file", managerCvFile);
-            formData.append("collaborateur_id", managerId);
-            formData.append("esn_id", esnId);
-            formData.append("type", "cv");
-
-            await axios.post(UPLOAD_URL, formData, {
-              headers: {
-                "Content-Type": "multipart/form-data",
-                Authorization: `${token()}`,
-              },
-            });
-          }
-
-          message.success(
-            `Responsable de compte ${responsableCompte} créé avec succès!`
-          );
-        } catch (error) {
-          console.error("Error creating new account manager:", error);
-          message.error(
-            "Erreur lors de la création du responsable de compte: " +
-              (error.response?.data?.message || error.message)
-          );
-          setSubmitting(false);
-          return;
-        }
-      }
 
       // Submit candidature
       const formData = {
         AO_id: currentOffer.id,
         esn_id: esnId,
-        responsable_compte: responsableCompte,
-        id_consultant: consultantId,
+        responsable_compte: nom_resp,
+        id_consultant: values.id_consultant,
+        id_responsable: values.id_responsable,
         date_candidature: dayjs().format("YYYY-MM-DD"),
         statut: "En cours",
         tjm: values.tjm,
         date_disponibilite: values.date_disponibilite.format("YYYY-MM-DD"),
         commentaire: values.commentaire,
-        nom_cn: consultantName,
+        nom_cn: nom_co,
       };
 
       const res_data = await axios.post(
         Endponit() + "/api/candidature/",
         formData,
-        {
-          headers: {
-            Authorization: `${token()}`,
-          },
-        }
+        { headers: { Authorization: `${token()}` } }
       );
+      const id = res_data.data.id
+      await axios.post(`${Endponit()}/api/notify_new_candidature/`, {
+        appel_offre_id: currentOffer.id,
+        condidature_id: id,
+        esn_id : Number.parseInt(localStorage.getItem("id")),
+      });
 
-      // Send notification
-      await axios.post(
-        Endponit() + "/api/notify_new_candidature/",
-        {
-          condidature_id: res_data.data.id,
-          appel_offre_id: currentOffer.id,
-          client_id: currentOffer.id_client,
+      console.info("Notification sent to client:", res_data.data);
+      if (res_data.data.token != null) {
+        console.info("Sending notification to token:", res_data.data.token);
+        try {
+          await axios.post("http://51.38.99.75:3006/send-notification", {
+        deviceToken: res_data.data.token,
+        messagePayload: {
+          title: "Un nouvel appel",
+          body: "Un nouvel candidature est arrivé. Rafraîchissez pour voir",
         },
-        {
-          headers: {
-            Authorization: `${token()}`,
-          },
+          });
+        } catch (error) {
+          console.error(
+        `Failed to send notification to token ${res_data.data.token}:`,
+        error
+          );
         }
-      );
+      }
 
       message.success("Votre candidature a été soumise avec succès !");
-
-      // Reset file states when done
-      setConsultantCvFile(null);
-      setManagerCvFile(null);
-
       setIsApplyModalVisible(false);
       applyForm.resetFields();
     } catch (error) {
-      message.error(
-        "Erreur lors de la soumission de la candidature: " +
-          (error.response?.data?.message || error.message)
-      );
+      message.error("Erreur lors de la soumission de la candidature");
       console.error("Error submitting application:", error);
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleAddResponsable = async () => {
+    try {
+      const values = await addResponsableForm.validateFields();
+      setUploading(true);
+
+      if (!isFileUploaded || !uploadedFileUrl) {
+        message.error("Veuillez uploader un CV");
+        setUploading(false);
+        return;
+      }
+
+      // Create new collaborator with commercial role
+      const newCollaborator = {
+        ID_ESN: localStorage.getItem("id"),
+        Nom: values.nom,
+        Prenom: values.prenom,
+        Email: values.email,
+        Tel: values.telephone,
+        Poste: "commercial", // Set as commercial since it's a responsable compte
+        Actif: true,
+        CV: uploadedFileUrl,
+        date_debut_activ: values.date_debut_activ.format("YYYY-MM-DD"),
+      };
+
+      const response = await axios.post(API_URL, newCollaborator, {
+        headers: {
+          Authorization: `${token()}`,
+        },
+      });
+
+      if (response.data && response.data.error === false) {
+        message.success("Nouveau responsable de compte ajouté avec succès");
+
+        // Update the form with the new responsable
+        const newResponsable = response.data.data;
+
+        // Add to responsables array
+        setResponsables((prev) => [...prev, newResponsable]);
+
+        // Update the form
+        applyForm.setFieldsValue({
+          id_responsable: newResponsable.ID_collab,
+        });
+
+        setNomResp(`${newResponsable.Prenom} ${newResponsable.Nom}`);
+
+        setIsAddResponsableModalVisible(false);
+        addResponsableForm.resetFields();
+        setFileList([]);
+        setUploadedFileUrl("");
+        setIsFileUploaded(false);
+      } else {
+        throw new Error("Erreur lors de l'ajout du responsable");
+      }
+    } catch (error) {
+      console.error("Error adding responsable:", error);
+      message.error("Erreur lors de l'ajout du responsable de compte");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleAddConsultant = async () => {
+    try {
+      const values = await addConsultantForm.validateFields();
+      setUploading(true);
+
+      if (!isConsultantFileUploaded || !consultantUploadedFileUrl) {
+        message.error("Veuillez uploader un CV");
+        setUploading(false);
+        return;
+      }
+
+      // Create new collaborator with consultant role
+      const newCollaborator = {
+        ID_ESN: localStorage.getItem("id"),
+        Nom: values.nom,
+        Prenom: values.prenom,
+        Email: values.email,
+        Tel: values.telephone,
+        Poste: "consultant", // Set as consultant
+        Actif: true,
+        CV: consultantUploadedFileUrl,
+        date_debut_activ: values.date_debut_activ.format("YYYY-MM-DD"),
+      };
+
+      const response = await axios.post(API_URL, newCollaborator, {
+        headers: {
+          Authorization: `${token()}`,
+        },
+      });
+
+      if (response.data && response.data.error === false) {
+        message.success("Nouveau consultant ajouté avec succès");
+
+        // Update the consultant list and form selection
+        const newConsultant = response.data.data;
+
+        // Add to the consultants array
+        const updatedConsultants = [
+          ...consultants,
+          {
+            ...newConsultant,
+            ID_collab: newConsultant.ID_collab,
+            Poste: "consultant",
+          },
+        ];
+
+        setConsultants(updatedConsultants);
+
+        // Set the consultant in the form
+        applyForm.setFieldsValue({
+          id_consultant: newConsultant.ID_collab,
+        });
+
+        setNomCo(`${newConsultant.Prenom} ${newConsultant.Nom}`);
+
+        setIsAddConsultantModalVisible(false);
+        addConsultantForm.resetFields();
+        setConsultantFileList([]);
+        setConsultantUploadedFileUrl("");
+        setIsConsultantFileUploaded(false);
+      } else {
+        throw new Error("Erreur lors de l'ajout du consultant");
+      }
+    } catch (error) {
+      console.error("Error adding consultant:", error);
+      message.error("Erreur lors de l'ajout du consultant");
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -659,12 +444,438 @@ const AppelDOffreInterface = () => {
     );
   }
 
+  // File upload props for Add Responsable - Updated to match collaborateur.jsx
+  const uploadProps = {
+    name: "uploadedFile",
+    multiple: false,
+    maxCount: 1,
+    accept: ".pdf,.doc,.docx",
+    customRequest: async ({ file, onSuccess, onError, onProgress }) => {
+      const formData = new FormData();
+      formData.append("uploadedFile", file);
+      formData.append("path", "./uploads/cv/");
+
+      try {
+        setUploading(true);
+        const response = await axios.post(UPLOAD_URL, formData, {
+          headers: {
+            "Content-Type": "multipart/form-data",
+            Authorization: `${token()}`,
+          },
+          onUploadProgress: (progressEvent) => {
+            const percent = Math.round(
+              (progressEvent.loaded * 100) / progressEvent.total
+            );
+            onProgress({ percent });
+          },
+        });
+
+        if (response.data && response.data.url) {
+          setUploadedFileUrl(response.data.url);
+          setIsFileUploaded(true);
+          onSuccess(response.data);
+          message.success(`${file.name} chargé avec succès`);
+        } else {
+          throw new Error("URL de fichier non reçue");
+        }
+      } catch (error) {
+        console.error("Upload error:", error);
+        setIsFileUploaded(false);
+        onError(error);
+        message.error(`Échec de téléchargement de ${file.name}`);
+      } finally {
+        setUploading(false);
+      }
+    },
+    onChange: (info) => {
+      let newFileList = [...info.fileList];
+      newFileList = newFileList.slice(-1);
+      setFileList(newFileList);
+
+      // Reset the upload status if file list is cleared
+      if (newFileList.length === 0) {
+        setIsFileUploaded(false);
+        setUploadedFileUrl("");
+      }
+    },
+    beforeUpload: (file) => {
+      // Check file type
+      const isPDF = file.type === "application/pdf";
+      const isDoc =
+        file.type === "application/msword" ||
+        file.type ===
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+      const isValidType = isPDF || isDoc;
+
+      if (!isValidType) {
+        message.error("Veuillez télécharger un fichier PDF ou Word!");
+        return false;
+      }
+
+      // Check file size (limit to 5MB)
+      const isLt5M = file.size / 1024 / 1024 < 5;
+      if (!isLt5M) {
+        message.error("Le fichier doit être inférieur à 5MB!");
+        return false;
+      }
+
+      return isValidType && isLt5M;
+    },
+    fileList,
+    onRemove: () => {
+      setIsFileUploaded(false);
+      setUploadedFileUrl("");
+      setFileList([]);
+      return true;
+    },
+  };
+
+  // File upload props for Add Consultant - Updated to match collaborateur.jsx
+  const consultantUploadFormProps = {
+    name: "uploadedFile",
+    multiple: false,
+    maxCount: 1,
+    accept: ".pdf,.doc,.docx",
+    customRequest: async ({ file, onSuccess, onError, onProgress }) => {
+      const formData = new FormData();
+      formData.append("uploadedFile", file);
+      formData.append("path", "./uploads/cv/");
+
+      try {
+        setUploading(true);
+        const response = await axios.post(UPLOAD_URL, formData, {
+          headers: {
+            "Content-Type": "multipart/form-data",
+            Authorization: `${token()}`,
+          },
+          onUploadProgress: (progressEvent) => {
+            const percent = Math.round(
+              (progressEvent.loaded * 100) / progressEvent.total
+            );
+            onProgress({ percent });
+          },
+        });
+
+        if (response.data && response.data.url) {
+          setConsultantUploadedFileUrl(response.data.url);
+          setIsConsultantFileUploaded(true);
+          onSuccess(response.data);
+          message.success(`${file.name} chargé avec succès`);
+        } else {
+          throw new Error("URL de fichier non reçue");
+        }
+      } catch (error) {
+        console.error("Upload error:", error);
+        setIsConsultantFileUploaded(false);
+        onError(error);
+        message.error(`Échec de téléchargement de ${file.name}`);
+      } finally {
+        setUploading(false);
+      }
+    },
+    onChange: (info) => {
+      let newFileList = [...info.fileList];
+      newFileList = newFileList.slice(-1);
+      setConsultantFileList(newFileList);
+
+      // Reset the upload status if file list is cleared
+      if (newFileList.length === 0) {
+        setIsConsultantFileUploaded(false);
+        setConsultantUploadedFileUrl("");
+      }
+    },
+    beforeUpload: (file) => {
+      // Check file type
+      const isPDF = file.type === "application/pdf";
+      const isDoc =
+        file.type === "application/msword" ||
+        file.type ===
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+      const isValidType = isPDF || isDoc;
+
+      if (!isValidType) {
+        message.error("Veuillez télécharger un fichier PDF ou Word!");
+        return false;
+      }
+
+      // Check file size (limit to 5MB)
+      const isLt5M = file.size / 1024 / 1024 < 5;
+      if (!isLt5M) {
+        message.error("Le fichier doit être inférieur à 5MB!");
+        return false;
+      }
+
+      return isValidType && isLt5M;
+    },
+    fileList: consultantFileList,
+    onRemove: () => {
+      setIsConsultantFileUploaded(false);
+      setConsultantUploadedFileUrl("");
+      setConsultantFileList([]);
+      return true;
+    },
+  };
+
+  // Add Responsable Modal
+  const AddResponsableModal = () => {
+    return (
+      <Modal
+        title="Ajouter un Responsable compte"
+        open={isAddResponsableModalVisible}
+        onCancel={() => setIsAddResponsableModalVisible(false)}
+        footer={[
+          <Button
+            key="cancel"
+            onClick={() => setIsAddResponsableModalVisible(false)}
+          >
+            Annuler
+          </Button>,
+          <Button
+            key="submit"
+            type="primary"
+            onClick={handleAddResponsable}
+            loading={uploading}
+            disabled={!isFileUploaded}
+          >
+            Ajouter
+          </Button>,
+        ]}
+        width={600}
+      >
+        <Form
+          form={addResponsableForm}
+          layout="vertical"
+          initialValues={{
+            date_debut_activ: dayjs(),
+          }}
+        >
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item
+                name="nom"
+                label="Nom"
+                rules={[{ required: true, message: "Veuillez saisir le nom" }]}
+              >
+                <Input placeholder="Nom" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item
+                name="prenom"
+                label="Prénom"
+                rules={[
+                  { required: true, message: "Veuillez saisir le prénom" },
+                ]}
+              >
+                <Input placeholder="Prénom" />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item
+                name="email"
+                label="Email"
+                rules={[
+                  { required: true, message: "Veuillez saisir l'email" },
+                  { type: "email", message: "Format d'email invalide" },
+                ]}
+              >
+                <Input placeholder="Email" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item
+                name="telephone"
+                label="Téléphone"
+                rules={[
+                  { required: true, message: "Veuillez saisir le téléphone" },
+                ]}
+              >
+                <Input placeholder="Téléphone" />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Form.Item
+            name="date_debut_activ"
+            label="Date de recrutement"
+            rules={[
+              { required: true, message: "Veuillez sélectionner une date" },
+            ]}
+          >
+            <DatePicker className="w-full" format="DD/MM/YYYY" />
+          </Form.Item>
+
+          <Form.Item
+            name="cv"
+            label="CV"
+            rules={[{ required: true, message: "Veuillez uploader un CV" }]}
+            tooltip="Téléchargez le CV du responsable (format PDF ou Word, max 5MB)"
+            extra="Formats acceptés: PDF, DOC, DOCX - Taille maximale: 5MB"
+          >
+            <Upload.Dragger {...uploadProps} listType="picture">
+              <p className="ant-upload-drag-icon">
+                <InboxOutlined style={{ fontSize: "32px", color: "#1890ff" }} />
+              </p>
+              <p className="ant-upload-text">
+                Cliquez ou déposez un fichier ici
+              </p>
+            </Upload.Dragger>
+
+            {isFileUploaded && (
+              <div
+                className="mt-2 p-2"
+                style={{
+                  backgroundColor: "#f6ffed",
+                  borderRadius: "4px",
+                  border: "1px solid #b7eb8f",
+                }}
+              >
+                <CheckCircleOutlined style={{ color: "green" }} /> CV téléchargé
+                avec succès
+              </div>
+            )}
+          </Form.Item>
+        </Form>
+      </Modal>
+    );
+  };
+
+  // Add Consultant Modal
+  const AddConsultantModal = () => {
+    return (
+      <Modal
+        title="Ajouter un Consultant"
+        open={isAddConsultantModalVisible}
+        onCancel={() => setIsAddConsultantModalVisible(false)}
+        footer={[
+          <Button
+            key="cancel"
+            onClick={() => setIsAddConsultantModalVisible(false)}
+          >
+            Annuler
+          </Button>,
+          <Button
+            key="submit"
+            type="primary"
+            onClick={handleAddConsultant}
+            loading={uploading}
+            disabled={!isConsultantFileUploaded}
+          >
+            Ajouter
+          </Button>,
+        ]}
+        width={600}
+      >
+        <Form
+          form={addConsultantForm}
+          layout="vertical"
+          initialValues={{
+            date_debut_activ: dayjs(),
+          }}
+        >
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item
+                name="nom"
+                label="Nom"
+                rules={[{ required: true, message: "Veuillez saisir le nom" }]}
+              >
+                <Input placeholder="Nom" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item
+                name="prenom"
+                label="Prénom"
+                rules={[
+                  { required: true, message: "Veuillez saisir le prénom" },
+                ]}
+              >
+                <Input placeholder="Prénom" />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item
+                name="email"
+                label="Email"
+                rules={[
+                  { required: true, message: "Veuillez saisir l'email" },
+                  { type: "email", message: "Format d'email invalide" },
+                ]}
+              >
+                <Input placeholder="Email" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item
+                name="telephone"
+                label="Téléphone"
+                rules={[
+                  { required: true, message: "Veuillez saisir le téléphone" },
+                ]}
+              >
+                <Input placeholder="Téléphone" />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Form.Item
+            name="date_debut_activ"
+            label="Date de recrutement"
+            rules={[
+              { required: true, message: "Veuillez sélectionner une date" },
+            ]}
+          >
+            <DatePicker className="w-full" format="DD/MM/YYYY" />
+          </Form.Item>
+
+          <Form.Item
+            name="cv"
+            label="CV"
+            rules={[{ required: true, message: "Veuillez uploader un CV" }]}
+            tooltip="Téléchargez le CV du consultant (format PDF ou Word, max 5MB)"
+            extra="Formats acceptés: PDF, DOC, DOCX - Taille maximale: 5MB"
+          >
+            <Upload.Dragger {...consultantUploadFormProps} listType="picture">
+              <p className="ant-upload-drag-icon">
+                <InboxOutlined style={{ fontSize: "32px", color: "#1890ff" }} />
+              </p>
+              <p className="ant-upload-text">
+                Cliquez ou déposez un fichier ici
+              </p>
+            </Upload.Dragger>
+
+            {isConsultantFileUploaded && (
+              <div
+                className="mt-2 p-2"
+                style={{
+                  backgroundColor: "#f6ffed",
+                  borderRadius: "4px",
+                  border: "1px solid #b7eb8f",
+                }}
+              >
+                <CheckCircleOutlined style={{ color: "green" }} /> CV téléchargé
+                avec succès
+              </div>
+            )}
+          </Form.Item>
+        </Form>
+      </Modal>
+    );
+  };
+
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <Input.Search
           placeholder="Rechercher un appel d'offre"
-          onSearch={handleSearch}
+          onSearch={(value) => console.log(value)}
           className="w-64"
         />
       </div>
@@ -744,9 +955,6 @@ const AppelDOffreInterface = () => {
                       </p>
                       <p className="text-sm">
                         Date limite: {formatDate(item.date_limite)}
-                      </p>
-                      <p className="text-sm">
-                        Début: {formatDate(item.date_debut)}
                       </p>
                     </div>
                   }
@@ -841,38 +1049,17 @@ const AppelDOffreInterface = () => {
                 </div>
               </>
             )}
-
-            {currentOffer.contexte && (
-              <>
-                <Divider orientation="left">Contexte</Divider>
-                <Paragraph>{currentOffer.contexte}</Paragraph>
-              </>
-            )}
           </>
         )}
       </Modal>
 
+      {/* Apply Modal */}
       <Modal
         title="Soumettre une candidature"
         open={isApplyModalVisible}
-        onCancel={() => {
-          setIsApplyModalVisible(false);
-          setCreateNewConsultant(false);
-          setCreateNewManager(false);
-          setConsultantCvFile(null);
-          setManagerCvFile(null);
-        }}
+        onCancel={() => setIsApplyModalVisible(false)}
         footer={[
-          <Button
-            key="cancel"
-            onClick={() => {
-              setIsApplyModalVisible(false);
-              setCreateNewConsultant(false);
-              setCreateNewManager(false);
-              setConsultantCvFile(null);
-              setManagerCvFile(null);
-            }}
-          >
+          <Button key="cancel" onClick={() => setIsApplyModalVisible(false)}>
             Annuler
           </Button>,
           <Button
@@ -884,7 +1071,7 @@ const AppelDOffreInterface = () => {
             Soumettre
           </Button>,
         ]}
-        width={800} // Increased width for better form layout
+        width={800}
       >
         <Form
           form={applyForm}
@@ -893,8 +1080,6 @@ const AppelDOffreInterface = () => {
           initialValues={{
             date_candidature: dayjs(),
             date_disponibilite: dayjs().add(1, "week"),
-            new_consultant_date_recrutement: dayjs(),
-            new_manager_date_recrutement: dayjs(),
           }}
         >
           <Form.Item name="AO_id" hidden>
@@ -904,338 +1089,68 @@ const AppelDOffreInterface = () => {
           {/* Account Manager Section */}
           <div className="flex justify-between items-center mb-2">
             <Typography.Text strong>Responsable compte</Typography.Text>
-            <Button
-              type="link"
-              onClick={() => setCreateNewManager(!createNewManager)}
-              icon={createNewManager ? <SwapOutlined /> : <PlusOutlined />}
-            >
-              {createNewManager ? "Sélectionner existant" : "Ajouter nouveau"}
+            <Button type="primary" onClick={() => showAddResponsableModal()}>
+              <PlusOutlined /> Créer Responsable
             </Button>
           </div>
 
-          {!createNewManager ? (
-            <Form.Item
-              name="responsable_compte"
-              rules={[
-                {
-                  required: !createNewManager,
-                  message: "Sélectionnez un responsable de compte",
-                },
-              ]}
+          <Form.Item
+            name="id_responsable"
+            rules={[
+              {
+                required: true,
+                message: "Veuillez sélectionner un responsable de compte",
+              },
+            ]}
+          >
+            <Select
+              placeholder="Sélectionnez un responsable de compte"
+              optionFilterProp="children"
+              onChange={handleResponsableSelect}
+              showSearch
             >
-              <Select
-                placeholder="Sélectionnez un responsable de compte"
-                allowClear
-                optionFilterProp="children"
-              >
-                {consultants &&
-                  consultants.map((consultant) =>
-                    consultant.Poste === "commercial" ? (
-                      <Select.Option
-                        key={consultant.ID_collab}
-                        value={`${consultant.Nom} ${consultant.Prenom}`}
-                      >
-                        {consultant.Prenom} {consultant.Nom} -{" "}
-                        {consultant.Poste}
-                      </Select.Option>
-                    ) : null
-                  )}
-              </Select>
-            </Form.Item>
-          ) : (
-            <div className="bg-gray-50 p-3 rounded mb-4">
-              <Divider orientation="left">Informations personnelles</Divider>
-
-              <Row gutter={16}>
-                <Col span={12}>
-                  <Form.Item
-                    name="new_manager_nom"
-                    label="Nom"
-                    rules={[
-                      { required: createNewManager, message: "Nom requis" },
-                    ]}
-                  >
-                    <Input prefix={<UserOutlined />} placeholder="Nom" />
-                  </Form.Item>
-                </Col>
-                <Col span={12}>
-                  <Form.Item
-                    name="new_manager_prenom"
-                    label="Prénom"
-                    rules={[
-                      { required: createNewManager, message: "Prénom requis" },
-                    ]}
-                  >
-                    <Input prefix={<UserOutlined />} placeholder="Prénom" />
-                  </Form.Item>
-                </Col>
-              </Row>
-
-              <Row gutter={16}>
-                <Col span={12}>
-                  <Form.Item
-                    name="new_manager_date_naissance"
-                    label="Date de naissance"
-                    rules={[
-                      {
-                        validator: (_, value) => {
-                          if (!value) return Promise.resolve();
-                          const birthDate = new Date(value);
-                          const today = new Date();
-                          const ageInMilliseconds = today - birthDate;
-                          const ageInYears =
-                            ageInMilliseconds / (1000 * 60 * 60 * 24 * 365.25);
-                          if (ageInYears < 18) {
-                            return Promise.reject(
-                              "L'âge doit être supérieur ou égal à 18 ans"
-                            );
-                          }
-                          return Promise.resolve();
-                        },
-                      },
-                    ]}
-                  >
-                    <DatePicker
-                      placeholder="Date de naissance"
-                      format="DD/MM/YYYY"
-                      className="w-full"
-                      disabledDate={(current) =>
-                        current && current > moment().subtract(18, "years")
-                      }
-                    />
-                  </Form.Item>
-                </Col>
-              </Row>
-
-              <Divider orientation="left">
-                Informations professionnelles
-              </Divider>
-
-              <Row gutter={16}>
-                <Col span={12}>
-                  <Form.Item
-                    name="new_manager_date_recrutement"
-                    label="Date de recrutement"
-                    initialValue={dayjs()}
-                  >
-                    <DatePicker
-                      placeholder="Date de recrutement"
-                      format="DD/MM/YYYY"
-                      className="w-full"
-                    />
-                  </Form.Item>
-                </Col>
-              </Row>
-
-              <Row gutter={16}>
-                <Col span={12}>
-                  <Form.Item label="Mobilité" name="new_manager_mobilite">
-                    <Select placeholder="Sélectionnez la mobilité">
-                      <Select.Option value="National">National</Select.Option>
-                      <Select.Option value="International">
-                        International
-                      </Select.Option>
-                    </Select>
-                  </Form.Item>
-                </Col>
-                <Col span={12}>
-                  <Form.Item
-                    label="Profil LinkedIn"
-                    name="new_manager_linkedin"
-                  >
-                    <Input placeholder="https://www.linkedin.com/in/username" />
-                  </Form.Item>
-                </Col>
-              </Row>
-
-              <Form.Item
-                name="new_manager_cv"
-                label="CV"
-                tooltip="Téléchargez le CV du responsable (format PDF ou DOC/DOCX, max 5MB)"
-              >
-                <Upload {...managerUploadProps} listType="picture">
-                  <Button icon={<UploadOutlined />}>Télécharger CV</Button>
-                </Upload>
-                <div className="flex justify-end mt-2 mb-4">
-                  <Button
-                    type="primary"
-                    icon={<PlusOutlined />}
-                    onClick={() => setCreateNewManager(true)}
-                    // disabled={createNewManager}
-                  >
-                    Ajouter responsable de compte
-                  </Button>
-                </div>
-              </Form.Item>
-            </div>
-          )}
+              {responsables.map((responsable) => (
+                <Option
+                  key={responsable.ID_collab}
+                  value={responsable.ID_collab}
+                >
+                  {`${responsable.Prenom} ${responsable.Nom}`}
+                </Option>
+              ))}
+            </Select>
+          </Form.Item>
 
           {/* Consultant Section */}
           <div className="flex justify-between items-center mb-2 mt-4">
             <Typography.Text strong>Consultant</Typography.Text>
-            <Button
-              type="link"
-              onClick={() => setCreateNewConsultant(!createNewConsultant)}
-              icon={createNewConsultant ? <SwapOutlined /> : <PlusOutlined />}
-            >
-              {createNewConsultant
-                ? "Sélectionner existant"
-                : "Ajouter nouveau"}
+            <Button type="primary" onClick={() => showAddConsultantModal()}>
+              <PlusOutlined /> Créer Consultant
             </Button>
           </div>
 
-          {!createNewConsultant ? (
-            <Form.Item
-              name="id_consultant"
-              rules={[
-                {
-                  required: !createNewConsultant,
-                  message: "Sélectionnez un consultant",
-                },
-              ]}
+          <Form.Item
+            name="id_consultant"
+            rules={[{ required: true, message: "Sélectionnez un consultant" }]}
+          >
+            <Select
+              placeholder="Sélectionnez un consultant"
+              optionFilterProp="children"
+              onChange={handleConsultantSelect}
+              showSearch
             >
-              <Select
-                placeholder="Sélectionnez un consultant"
-                optionFilterProp="children"
-                onSelect={handleSelect}
-              >
-                {consultants &&
-                  consultants.map((consultant) =>
-                    consultant.Poste === "consultant" ? (
-                      <Select.Option
-                        key={consultant.ID_collab}
-                        value={consultant.ID_collab}
-                        dataName={`${consultant.Prenom} ${consultant.Nom}`}
-                      >
-                        {consultant.Prenom} {consultant.Nom} -{" "}
-                        {consultant.Poste}
-                      </Select.Option>
-                    ) : (
-                      ""
-                    )
-                  )}
-              </Select>
-            </Form.Item>
-          ) : (
-            <div className="bg-gray-50 p-3 rounded mb-4">
-              <Divider orientation="left">Informations personnelles</Divider>
-
-              <Row gutter={16}>
-                <Col span={12}>
-                  <Form.Item
-                    name="new_consultant_nom"
-                    label="Nom"
-                    rules={[
-                      { required: createNewConsultant, message: "Nom requis" },
-                    ]}
-                  >
-                    <Input prefix={<UserOutlined />} placeholder="Nom" />
-                  </Form.Item>
-                </Col>
-                <Col span={12}>
-                  <Form.Item
-                    name="new_consultant_prenom"
-                    label="Prénom"
-                    rules={[
-                      {
-                        required: createNewConsultant,
-                        message: "Prénom requis",
-                      },
-                    ]}
-                  >
-                    <Input prefix={<UserOutlined />} placeholder="Prénom" />
-                  </Form.Item>
-                </Col>
-              </Row>
-
-              <Row gutter={16}>
-                <Col span={12}>
-                  <Form.Item
-                    name="new_consultant_date_naissance"
-                    label="Date de naissance"
-                    rules={[
-                      {
-                        validator: (_, value) => {
-                          if (!value) return Promise.resolve();
-                          const birthDate = new Date(value);
-                          const today = new Date();
-                          const ageInMilliseconds = today - birthDate;
-                          const ageInYears =
-                            ageInMilliseconds / (1000 * 60 * 60 * 24 * 365.25);
-                          if (ageInYears < 18) {
-                            return Promise.reject(
-                              "L'âge doit être supérieur ou égal à 18 ans"
-                            );
-                          }
-                          return Promise.resolve();
-                        },
-                      },
-                    ]}
-                  >
-                    <DatePicker
-                      placeholder="Date de naissance"
-                      format="DD/MM/YYYY"
-                      className="w-full"
-                      disabledDate={(current) =>
-                        current && current > moment().subtract(18, "years")
-                      }
-                    />
-                  </Form.Item>
-                </Col>
-              </Row>
-
-              <Divider orientation="left">
-                Informations professionnelles
-              </Divider>
-
-              <Row gutter={16}>
-                <Col span={12}>
-                  <Form.Item
-                    name="new_consultant_date_recrutement"
-                    label="Date de recrutement"
-                    initialValue={dayjs()}
-                  >
-                    <DatePicker
-                      placeholder="Date de recrutement"
-                      format="DD/MM/YYYY"
-                      className="w-full"
-                    />
-                  </Form.Item>
-                </Col>
-              </Row>
-              <Row gutter={16}>
-                <Col span={12}>
-                  <Form.Item label="Mobilité" name="new_consultant_mobilite">
-                    <Select placeholder="Sélectionnez la mobilité">
-                      <Select.Option value="National">National</Select.Option>
-                      <Select.Option value="International">
-                        International
-                      </Select.Option>
-                    </Select>
-                  </Form.Item>
-                </Col>
-                <Col span={12}>
-                  <Form.Item
-                    label="Profil LinkedIn"
-                    name="new_consultant_linkedin"
-                  >
-                    <Input placeholder="https://www.linkedin.com/in/username" />
-                  </Form.Item>
-                </Col>
-              </Row>
-
-              {/* CV upload for consultant */}
-              <Form.Item
-                name="new_consultant_cv"
-                label="CV"
-                tooltip="Téléchargez le CV du consultant (format PDF ou DOC/DOCX, max 5MB)"
-              >
-                <Upload {...consultantUploadProps} listType="picture">
-                  <Button icon={<UploadOutlined />}>Télécharger CV</Button>
-                </Upload>
-              </Form.Item>
-            </div>
-          )}
+              {consultants &&
+                consultants
+                  .filter((consultant) => consultant.Poste === "consultant")
+                  .map((consultant) => (
+                    <Option
+                      key={consultant.ID_collab}
+                      value={consultant.ID_collab}
+                    >
+                      {consultant.Prenom} {consultant.Nom}
+                    </Option>
+                  ))}
+            </Select>
+          </Form.Item>
 
           {/* Application Details */}
           <Divider orientation="left">Détails de la candidature</Divider>
@@ -1243,23 +1158,7 @@ const AppelDOffreInterface = () => {
           <Form.Item
             name="tjm"
             label="TJM proposé"
-            rules={[
-              { required: true, message: "Veuillez saisir le TJM" },
-              {
-                validator: (_, value) => {
-                  if (
-                    value &&
-                    (value < currentOffer?.tjm_min ||
-                      value > currentOffer?.tjm_max)
-                  ) {
-                    return Promise.reject(
-                      `Le TJM doit être entre ${currentOffer?.tjm_min}€ et ${currentOffer?.tjm_max}€`
-                    );
-                  }
-                  return Promise.resolve();
-                },
-              },
-            ]}
+            rules={[{ required: true, message: "Veuillez saisir le TJM" }]}
           >
             <InputNumber
               prefix={<DollarOutlined />}
@@ -1278,16 +1177,6 @@ const AppelDOffreInterface = () => {
               {
                 required: true,
                 message: "Veuillez sélectionner une date de disponibilité",
-              },
-              {
-                validator: (_, value) => {
-                  if (value && value.isBefore(moment().startOf("day"))) {
-                    return Promise.reject(
-                      "La date de disponibilité doit être dans le futur"
-                    );
-                  }
-                  return Promise.resolve();
-                },
               },
             ]}
           >
@@ -1315,6 +1204,12 @@ const AppelDOffreInterface = () => {
           </Form.Item>
         </Form>
       </Modal>
+
+      {/* Add Responsable Modal */}
+      <AddResponsableModal />
+
+      {/* Add Consultant Modal */}
+      <AddConsultantModal />
     </div>
   );
 };

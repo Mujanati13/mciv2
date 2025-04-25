@@ -69,7 +69,7 @@ const CollaboratorList = () => {
   const calculateProfileCompletion = (collaborator) => {
     const documentWeight = 0.4; // Uncomment this line
     const profileWeight = 1; // Change to 0.6 for proper weighting
-  
+
     // Define required fields for a complete profile (60% of total score)
     const requiredFields = [
       "Raison_sociale",
@@ -85,26 +85,26 @@ const CollaboratorList = () => {
       "Banque",
       "responsible", // Added responsible person field
     ];
-  
+
     // Count filled profile fields
     const filledFields = requiredFields.filter(
       (field) =>
         collaborator[field] && collaborator[field].toString().trim() !== ""
     ).length;
-  
+
     // Calculate profile completion percentage (60% of total)
     const profileCompletion =
       (filledFields / requiredFields.length) * profileWeight * 100;
-  
+
     // Document completion calculation remains the same
     let documentCompletion = 0;
     if (esnsWithDocuments[collaborator.id]) {
       documentCompletion = documentWeight * 100; // Full 40% if documents exist
     }
-  
+
     // Total completion is the sum of profile completion and document completion
     const totalCompletion = Math.round(profileCompletion + documentCompletion);
-  
+
     // Cap at 100%
     return Math.min(totalCompletion, 100);
   };
@@ -1436,6 +1436,8 @@ const AddCollaboratorModal = ({
                   />
                 </Form.Item>
               </Col>
+              // Inside the AddCollaboratorModal component in the financial
+              information Row
               <Col span={8}>
                 <Form.Item
                   label={
@@ -1443,7 +1445,33 @@ const AddCollaboratorModal = ({
                   }
                   name="iban"
                 >
-                  <Input placeholder="Numéro IBAN" className="rounded-md" />
+                  <Input
+                    placeholder="Numéro IBAN"
+                    className="rounded-md"
+                    style={{ textTransform: "uppercase" }}
+                    onChange={(e) => {
+                      // Format IBAN with spaces for readability
+                      const value = e.target.value
+                        .replace(/\s/g, "")
+                        .toUpperCase();
+                      const formatted = value.replace(/(.{4})/g, "$1 ").trim();
+
+                      // Basic validation for visual feedback
+                      const isValid = validateIBANFormat(formatted);
+
+                      // Set field value with formatted value
+                      form.setFieldsValue({ iban: formatted });
+
+                      // Set validation status
+                      form.setFields([
+                        {
+                          name: "iban",
+                          value: formatted,
+                          errors: isValid ? [] : ["Format IBAN invalide"],
+                        },
+                      ]);
+                    }}
+                  />
                 </Form.Item>
               </Col>
               <Col span={8}>

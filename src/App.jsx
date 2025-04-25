@@ -7,10 +7,17 @@ import ClientProfile from './pages/interfaceClient';
 import AdminLoginPage from './pages/loginAdmin';
 import InterfaceEn from './pages/interfaceEn';
 import InterfaceAd from './pages/interfaceAd';
+// Import detail page components
+import AppelDOffreDetail from './components/dynamicPages/ad-client';
+import BonCommandeDetail from './components/dynamicPages/dbc';
+// Ensure these components are properly imported
+// import Dashboard from './pages/Dashboard';
+// import Profile from './pages/Profile';
+// import Settings from './pages/Settings';
+import NotFound from '../src/notFound';
 
 const App = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  
   
   const handleLogin = () => {
     setIsAuthenticated(true);
@@ -49,27 +56,41 @@ const App = () => {
             )
           }
         />
+
+        {/* Client Interface Routes */}
         <Route
-          path="/interface-cl"
+          path="/interface-cl/*"
           element={
             isAuthenticated ? (
               <Navigate to="/dashboard" replace />
             ) : (
-              <ClientProfile onLogin={handleLogin} />
+              <Routes>
+                <Route path="/" element={<ClientProfile onLogin={handleLogin} />} />
+                <Route path="appeldoffre/:id" element={<AppelDOffreDetail />} />
+                <Route path="boncommand/:id" element={<BonCommandeDetail />} />
+              </Routes>
             )
           }
         />
-         <Route
-          path="/interface-en"
+
+        {/* ESN Interface Routes */}
+        <Route
+          path="/interface-en/*"
           element={
             isAuthenticated ? (
               <Navigate to="/dashboard" replace />
             ) : (
-              <InterfaceEn onLogin={handleLogin} />
+              <Routes>
+                <Route path="/" element={<InterfaceEn onLogin={handleLogin} />} />
+                <Route path="appeldoffre/:id" element={<AppelDOffreDetail />} />
+                <Route path="boncommand/:id" element={<BonCommandeDetail />} />
+              </Routes>
             )
           }
         />
-         <Route
+
+        {/* Admin Interface Route */}
+        <Route
           path="/interface-ad"
           element={
             isAuthenticated ? (
@@ -79,6 +100,7 @@ const App = () => {
             )
           }
         />
+
         <Route
           path="/dashboard"
           element={
@@ -113,6 +135,9 @@ const App = () => {
           path="/"
           element={<Navigate to="/login" replace />}
         />
+        
+        {/* 404 route - This should be the last route */}
+        <Route path="*" element={<NotFound />} />
       </Routes>
     </Router>
   );

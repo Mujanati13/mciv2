@@ -163,12 +163,14 @@ const AppelDOffreInterface = () => {
           `${API_BASE_URL}/appelOffre/`,
           formData
         );
-        await axios.post(`${API_BASE_URL}/notify_expiration_ao/`, {
-          ao_id: res_data.data.id,
+        await axios.post(`${API_BASE_URL}/notify_appel_offre/`, {
+          appel_offre_id: res_data.data.id,
           client_id: localStorage.getItem("id"),
         });
+        console.info("Notification sent to client:", res_data.data);
         res_data.data.esn_tokens.forEach(async (token) => {
           if (token != null) {
+            console.info("Sending notification to token:", token);
             try {
               await axios.post("http://51.38.99.75:3006/send-notification", {
                 deviceToken: token,
@@ -409,7 +411,7 @@ const AppelDOffreInterface = () => {
                     validator: (_, value) => {
                       if (value && value.isBefore(moment().startOf("day"))) {
                         return Promise.reject(
-                          "La date doit être dans le futur"
+                          "La date fin superieur à la date de début"
                         );
                       }
                       return Promise.resolve();
@@ -430,7 +432,7 @@ const AppelDOffreInterface = () => {
                     validator: (_, value) => {
                       if (value && value.isBefore(moment().startOf("day"))) {
                         return Promise.reject(
-                          "La date doit être dans le futur"
+                          "La date incorrecte (date fin > date début)"
                         );
                       }
                       return Promise.resolve();

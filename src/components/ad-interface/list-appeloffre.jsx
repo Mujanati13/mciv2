@@ -179,7 +179,7 @@ const ListeAppelOffre = () => {
   ];
 
   return (
-    <Card title="Liste des Appels d'Offres" bordered={false}>
+    <Card  bordered={false}>
       <div
         style={{
           marginBottom: 16,

@@ -25,7 +25,8 @@ import {
   ClockCircleOutlined,
   EyeOutlined,
   FilePdfOutlined,
-  InfoCircleOutlined 
+  InfoCircleOutlined,
+  FileTextOutlined 
 } from "@ant-design/icons";
 import axios from "axios";
 import { Endponit } from "../../helper/enpoint";
@@ -40,6 +41,8 @@ const CandidatureInterface = () => {
   const [currentCandidate, setCurrentCandidate] = useState(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+  // État pour stocker la correspondance entre candidatures et BDC
+  const [candidatureBdcMapping, setCandidatureBdcMapping] = useState({});
 
   const fetchData = async () => {
     setLoading(true);
@@ -67,11 +70,35 @@ const CandidatureInterface = () => {
 
       const candidatesResults = await Promise.all(candidatesPromises);
       setCandidates(candidatesResults.flat());
+      
+      // Charger les bons de commande existants pour les candidatures
+      await loadBonDeCommandeMapping(clientId);
     } catch (error) {
-      // message.error("Erreur lors du chargement des données");
       console.error("Error:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Fonction pour charger la correspondance entre candidatures et bons de commande
+  const loadBonDeCommandeMapping = async (clientId) => {
+    try {
+      const response = await axios.get(
+        `${Endponit()}/api/get_bon_de_commande_by_client/?client_id=${clientId}`
+      );
+      
+      const mapping = {};
+      if (response.data && response.data.data) {
+        response.data.data.forEach(bdc => {
+          if (bdc.candidature_id) {
+            mapping[bdc.candidature_id] = bdc.id_bdc;
+          }
+        });
+      }
+      
+      setCandidatureBdcMapping(mapping);
+    } catch (error) {
+      console.error("Erreur lors du chargement des bons de commande:", error);
     }
   };
 
@@ -93,63 +120,92 @@ const CandidatureInterface = () => {
       const endDate = new Date(selectedProject.date_limite);
       const workingDays = selectedProject.jours;
 
+      // Récupérer les informations du consultant pour la description
+      const collaboratorResponse = await axios.get(
+        `${Endponit()}/api/get_collaborateur_by_id/${candidate.id_consultant}`
+      );
+      const collaborator = collaboratorResponse.data.data;
+
+      // Créer une description détaillée
+      const defaultDescription = `${collaborator.Poste || "Consultant"} - ${collaborator.Nom || ""} ${collaborator.Prenom || ""}
+Experience professionnelle: ${collaborator.date_debut_activ ? new Date().getFullYear() - new Date(collaborator.date_debut_activ).getFullYear() : "N/A"} ans
+Mobilité: ${collaborator.Mobilité || "Non spécifiée"}
+
+${selectedProject.titre} - Candidat: ${candidate.responsable_compte}
+Durée: ${workingDays} jours
+TJM: ${candidate.tjm}€`;
+
       const bonDeCommandeData = {
         candidature_id: candidate.id_cd,
         numero_bdc: `BDC-${Date.now()}`,
+        client_id: localStorage.getItem("id"),
         montant_total: candidate.tjm * workingDays,
-        statut: "pending_esn",
-        description: `Bon de commande pour ${selectedProject.titre} - Candidat: ${candidate.responsable_compte}
-        Durée: ${workingDays} jours
-        TJM: ${candidate.tjm}€`,
+        statut: "pending_client",
+        description: defaultDescription,
         TJM: candidate.tjm,
-        date_debut: startDate,
-        date_fin: endDate,
+        jours: workingDays,
+        date_creation: new Date().toISOString().split('T')[0],
+        date_debut: startDate.toISOString().split('T')[0],
+        date_fin: endDate.toISOString().split('T')[0],
       };
 
-      const response = await fetch(`${Endponit()}/api/Bondecommande/`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(bonDeCommandeData),
-      });
+      const response = await axios.post(`${Endponit()}/api/Bondecommande/`, bonDeCommandeData);
 
-      if (!response.ok) {
-        throw new Error("Failed to create Bon de commande");
-      }
+      if (response.data) {
+        // Mettre à jour le mapping
+        setCandidatureBdcMapping(prev => ({
+          ...prev,
+          [candidate.id_cd]: response.data.id
+        }));
 
-      const bonDeCommandeResponse = await response.json();
-      const clientId = localStorage.getItem("id");
+        // Envoyer une notification
+        try {
+        setTimeout( async() => {
+          const clientId = localStorage.getItem("id");
+          const restd = await axios.post(`${Endponit()}/api/notify_bon_de_commande/`, {
+            esn_id: candidate.esn_id,
+            client_id: clientId,
+            bon_de_commande_id: response.data.id,
+          });
 
-      // Send notification for bon de commande
-      const notificationResponse = await axios.post(
-        `${Endponit()}/api/notify_bon_de_commande/`,
-        {
-          esn_id: candidate.esn_id,
-          client_id: clientId,
-          bon_de_commande_id: bonDeCommandeResponse.id,
+          if (restd.data.client_token != null) {
+            try {
+                await axios.post("http://51.38.99.75:3006/send-notification", {
+                deviceToken: restd.data.client_token,
+                messagePayload: {
+                  title: "Un bon de commande a été généré.",
+                  body: "",
+                },
+                });
+            } catch (error) {
+              console.error(
+                `Failed to send notification to token ${token}:`,
+                error
+              );
+            }
+          }
+        }, 2000);
+
+        } catch (notifyError) {
+          console.error("Erreur lors de l'envoi de la notification:", notifyError);
         }
-      );
 
-      // if (notificationResponse.data.data) {
-      //   try {
-      //     await axios.post("http://http://51.38.99.75:3006/send-notification", {
-      //       deviceToken: notificationResponse.data.data,
-      //       messagePayload: {
-      //         title: "Nouveau bon de commande",
-      //         body: `Un bon de commande a été créé pour le projet ${selectedProject.titre}`,
-      //       },
-      //     });
-      //   } catch (error) {
-      //     console.error("Failed to send notification:", error);
-      //   }
-      // }
-
-      return bonDeCommandeResponse;
+        return response.data;
+      }
+      throw new Error("Réponse invalide lors de la création du bon de commande");
     } catch (error) {
       console.error("Error creating bon de commande:", error);
       throw error;
     }
+  };
+
+  // Fonction pour naviguer vers un bon de commande
+  const navigateToBDC = (bdcId) => {
+    // Redirection vers la page des bons de commande avec l'ID du BDC à afficher
+    window.location.href = `/bdc-list?id=${bdcId}`;
+    
+    // Alternativement, si vous utilisez react-router:
+    // history.push(`/bdc-list?id=${bdcId}`);
   };
 
   const getCandidateStats = (projectId) => {
@@ -183,17 +239,22 @@ const CandidatureInterface = () => {
     setActionLoading(true);
     try {
       if (newStatus.toLowerCase() === "accepté") {
-        // if (checkIfProjectHasAcceptedCandidate(candidate.AO_id)) {
-        //   message.error(
-        //     "Ce projet a déjà un candidat accepté. Vous ne pouvez pas accepter plus d'un candidat par projet."
-        //   );
-        //   return;
-        // }
-
         // Create Bon de commande when accepting a candidate
         try {
           const bonDeCommande = await createBonDeCommande(candidate);
-          message.success("Bon de commande créé avec succès");
+          message.success("Candidature acceptée et bon de commande créé");
+          
+          // Afficher une confirmation avec option pour aller au BDC
+            Modal.confirm({
+            title: "Bon de commande créé avec succès",
+            content: "Souhaitez-vous consulter le bon de commande maintenant ?",
+            okText: "Oui, voir le bon de commande",
+            cancelText: "Non, plus tard",
+            onOk: () => {
+              // navigateToBDC(bonDeCommande.id_bdc);
+            },
+            okButtonProps: { disabled: true }, // Disable the "Oui, voir le bon de commande" button
+            });
         } catch (error) {
           message.error("Erreur lors de la création du bon de commande");
           return;
@@ -263,7 +324,11 @@ const CandidatureInterface = () => {
         }
       }
 
-      message.success(`Candidature ${newStatus.toLowerCase()}e avec succès`);
+      // Ne pas afficher ce message si on vient d'accepter (car on a déjà montré un message)
+      if (newStatus.toLowerCase() !== "accepté") {
+        message.success(`Candidature ${newStatus.toLowerCase()}e avec succès`);
+      }
+      
       await fetchData();
       setIsModalVisible(false);
     } catch (error) {
@@ -386,11 +451,8 @@ const CandidatureInterface = () => {
       title: "Actions",
       key: "actions",
       render: (_, record) => {
-        const hasAcceptedCandidate = checkIfProjectHasAcceptedCandidate(
-          record.AO_id
-        );
-        const isCurrentCandidateAccepted =
-          record.statut.toLowerCase() === "accepté";
+        const isCurrentCandidateAccepted = record.statut.toLowerCase() === "accepté";
+        const hasBDC = candidatureBdcMapping[record.id_cd];
 
         return (
           <Space>
@@ -404,6 +466,19 @@ const CandidatureInterface = () => {
             >
               Voir
             </Button>
+            
+            {isCurrentCandidateAccepted && hasBDC && (
+              <Button
+                type="primary"
+                icon={<FileTextOutlined />}
+                onClick={() => navigateToBDC(candidatureBdcMapping[record.id_cd])}
+                className="bg-green-600"
+                disabled={true}
+              >
+                Aller au BDC
+              </Button>
+            )}
+            
             {record.statut.toLowerCase() === "en cours" && (
               <>
                 <Button
@@ -434,6 +509,8 @@ const CandidatureInterface = () => {
     const hasCV =
       currentCandidate?.collaborateur && currentCandidate?.collaborateur.CV;
     const collaborateur = currentCandidate?.collaborateur || {};
+    const isAccepted = currentCandidate?.statut.toLowerCase() === "accepté";
+    const hasBDC = candidatureBdcMapping[currentCandidate?.id_cd];
 
     // Find the associated project for this candidate
     const associatedProject = appelsOffre.find(
@@ -664,15 +741,28 @@ const CandidatureInterface = () => {
           </div>
         )}
 
-        {currentCandidate?.statut.toLowerCase() === "accepté" && (
+        {isAccepted && (
           <div style={{ marginTop: 20, textAlign: "center" }}>
-            <Tag
-              color="success"
-              icon={<CheckCircleOutlined />}
-              style={{ fontSize: "16px", padding: "8px 15px" }}
-            >
-              Cette candidature a été acceptée
-            </Tag>
+            <Space direction="vertical" size="large">
+              <Tag
+                color="success"
+                icon={<CheckCircleOutlined />}
+                style={{ fontSize: "16px", padding: "8px 15px" }}
+              >
+                Cette candidature a été acceptée
+              </Tag>
+              
+              {hasBDC && (
+                <Button
+                  type="primary"
+                  size="large"
+                  icon={<FileTextOutlined />}
+                  onClick={() => navigateToBDC(candidatureBdcMapping[currentCandidate.id_cd])}
+                >
+                  Voir le bon de commande associé
+                </Button>
+              )}
+            </Space>
           </div>
         )}
 
@@ -701,6 +791,7 @@ const CandidatureInterface = () => {
 
   return (
     <div className="p-2">
+      {/* Le reste du code reste inchangé */}
       <Collapse accordion className="mb-4">
         {appelsOffre.map((offre) => {
           const relatedCandidates = candidates.filter(

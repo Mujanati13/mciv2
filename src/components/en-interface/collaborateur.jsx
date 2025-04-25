@@ -149,7 +149,7 @@ const CollaboratorList = () => {
         record.fullName.toLowerCase().includes(value.toLowerCase()),
     },
     {
-      title: "Poste",
+      title: "Rôle",
       dataIndex: "Poste",
       key: "Poste",
     },
@@ -485,7 +485,7 @@ const CollaboratorList = () => {
                                     marginBottom: "4px",
                                   }}
                                 >
-                                  Poste
+                                  Rôle
                                 </div>
                                 <div
                                   style={{
@@ -596,7 +596,7 @@ const CollaboratorList = () => {
                                     marginBottom: "4px",
                                   }}
                                 >
-                                  Rôles
+                                  Rôle
                                 </div>
                                 <div
                                   style={{
@@ -954,12 +954,12 @@ const CollaboratorList = () => {
               <Col span={12}>
                 <Form.Item
                   name="Poste"
-                  label="Poste"
+                  label="Rôle"
                   rules={[
-                    { required: true, message: "Veuillez saisir le poste" },
+                    { required: true, message: "Veuillez saisir le Rôle" },
                   ]}
                 >
-                  <Select placeholder="Sélectionnez un poste">
+                  <Select placeholder="Sélectionnez un Rôle">
                     <Select.Option value="Développeur">
                       Développeur
                     </Select.Option>
@@ -1383,18 +1383,19 @@ const CollaboratorList = () => {
               </Col>
               <Col span={12}>
                 <Form.Item
-                  label="Poste"
+                  label="Rôle"
                   name="Poste"
                   rules={[
                     {
                       required: true,
-                      message: "Veuillez saisir le poste du collaborateur",
+                      message: "Veuillez saisir le Rôle du collaborateur",
                     },
                   ]}
                 >
-                  <Select placeholder="Sélectionnez un poste">
+                  <Select placeholder="Sélectionnez un Rôle">
                     <Select.Option value="consultant">Consultant</Select.Option>
                     <Select.Option value="commercial">Commercial</Select.Option>
+                    <Select.Option value="Administrateur ">Administrateur</Select.Option>
                   </Select>
                 </Form.Item>
               </Col>
@@ -1453,6 +1454,8 @@ const CollaboratorList = () => {
             <Form.Item
               label="CV"
               name="CV"
+              help={isFileUploaded ? null : "Ce champ est obligatoire"}
+              rules={[{ required: true, message: "Veuillez uploader un CV" }]}
               tooltip="Téléchargez le CV du collaborateur (format PDF, max 5MB)"
             >
               <Dragger {...props}>

@@ -34,8 +34,13 @@ import {
   Tooltip,
   Drawer,
   ConfigProvider,
+  notification,
 } from "antd";
 import { Endponit } from "../helper/enpoint";
+import { messaging, requestNotificationPermission } from "../helper/firebase/config";
+import { onMessage } from "firebase/messaging";
+import axios from "axios";
+import parse from 'html-react-parser';
 
 import ClientPlusInfo from "../components/cl-interface/plus-info";
 import EntrepriseServices from "../components/cl-interface/en-list";
@@ -60,7 +65,7 @@ const t = {
   partnerships: "Partenariats",
   tenders: "Appels d'Offres",
   myOffers: "Mes offres",
-  applications: "Mes Candidatures",
+  applications: "Réponses à mes Appel d'Offres",
   purchaseOrders: "Bons de Commande",
   contracts: "Contrats",
   documents: "Mes Documents",
@@ -93,6 +98,9 @@ const t = {
   completeYourProfile:
     "Complétez votre profil pour accéder à toutes les fonctionnalités",
   goToProfile: "Aller au profil",
+  notificationReceived: "Nouvelle notification reçue",
+  notificationPermissionDenied: "Permissions de notification refusées",
+  notificationError: "Erreur d'initialisation des notifications",
 };
 
 const NotificationInterface = ({
@@ -328,6 +336,7 @@ const ClientProfile = () => {
   const [esnStatus, setEsnStatus] = useState(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [attemptedMenu, setAttemptedMenu] = useState("");
+  const [fcmToken, setFcmToken] = useState(null);
 
   // Responsive states
   const [screenSize, setScreenSize] = useState({
@@ -414,7 +423,7 @@ const ClientProfile = () => {
         id: notification.id,
         type: notification.categorie.toLowerCase(),
         title: notification.categorie,
-        content: notification.message,
+        content: parse(notification.message),
         timestamp: notification.created_at,
         read: notification.status === "Read",
         dest_id: notification.dest_id,
@@ -431,48 +440,119 @@ const ClientProfile = () => {
     }
   };
 
-  const retrieveFCMToken = async () => {
+  // Register FCM token with backend
+  const registerTokenWithServer = async (token) => {
     try {
-      // Request permission for notifications
-      const permission = await Notification.requestPermission();
-      if (permission === "granted") {
-        // Token retrieval code would go here
-      } else {
-        console.log("Permission denied for notifications.");
-      }
+      const id = localStorage.getItem("id");
+      const type = "client"; // Set user type as client
+      
+      await axios.put(`${Endponit()}/api/update-token/`, {
+        id,
+        type,
+        token: token
+      });
+      
+      console.log("FCM token registered with server successfully");
     } catch (error) {
-      console.error("Error retrieving FCM token:", error);
+      console.error("Error registering FCM token with server:", error);
     }
   };
+
+  // Set up message handler for Firebase Cloud Messaging
+  const setupMessageHandler = () => {
+    if (!messaging) return null;
+    
+    // Handle foreground messages
+    const unsubscribe = onMessage(messaging, (payload) => {
+      console.log("Message received in foreground:", payload);
+      
+      // Display notification using Ant Design notification component
+      notification.open({
+        message: payload.notification?.title || t.notificationReceived,
+        description: payload.notification?.body || "",
+        icon: <NotificationOutlined style={{ color: '#10b981' }} />,
+        duration: 5,
+        onClick: () => {
+          // Navigate to notification tab when clicked
+          setCurrent("notification");
+          setSearchParams({ menu: "notification" });
+          const path = findMenuPath("notification");
+          if (path) {
+            setBreadcrumbItems(path);
+          }
+        },
+      });
+      
+      // Increment the badge count immediately
+      setUnreadNotificationsCount(prevCount => prevCount + 1);
+      
+      // Then fetch the updated notification list from the server
+      fetchNotifications();
+    });
+
+    // Return the unsubscribe function for cleanup
+    return unsubscribe;
+  };
+
+  // Track page visibility changes to refresh notifications when app returns from background
+  useEffect(() => {
+    // Function to handle visibility change
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        console.log('App returned to foreground, refreshing notifications');
+        // Fetch latest notifications to update the badge count
+        fetchNotifications();
+      }
+    };
+
+    // Add event listener for visibility changes
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    // Clean up event listener
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
 
   useEffect(() => {
     const auth = isClientLoggedIn();
     if (auth === false) {
       navigate("/Login");
+      return;
     }
-
-    // Check for pending notifications from background messages
-    const checkPendingNotifications = () => {
+    
+    // Initialize Firebase messaging and request permission
+    const initializeNotifications = async () => {
       try {
-        const pendingNotifications = JSON.parse(
-          localStorage.getItem("pendingNotifications") || "[]"
-        );
-        if (pendingNotifications.length > 0) {
-          setNotifications((prev) => [...pendingNotifications, ...prev]);
-          setUnreadNotificationsCount(
-            (prev) => prev + pendingNotifications.length
-          );
-          localStorage.removeItem("pendingNotifications");
+        // Use the requestNotificationPermission function from config file
+        const token = await requestNotificationPermission();
+        
+        if (token) {
+          console.log("FCM Token received:", token);
+          setFcmToken(token);
+          
+          // Register token with backend
+          await registerTokenWithServer(token);
         }
       } catch (error) {
-        console.error("Error checking pending notifications:", error);
+        console.error("Error initializing notifications:", error);
+        message.error(t.notificationError);
       }
     };
-
-    retrieveFCMToken();
+    
+    initializeNotifications();
     fetchNotifications();
-    checkPendingNotifications();
-  }, [navigate, update]);
+    
+    // Set up message handler and store cleanup function
+    const unsubscribe = setupMessageHandler();
+    
+    // Return cleanup function
+    return () => {
+      if (unsubscribe && typeof unsubscribe === 'function') {
+        unsubscribe();
+      }
+    };
+  }, [navigate, t.notificationError]);
 
   const handleNotificationsUpdate = (updatedNotifications) => {
     setNotifications(updatedNotifications);

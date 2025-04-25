@@ -198,15 +198,7 @@ const ESNCandidatureInterface = () => {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 p-4 bg-gray-50 rounded-lg">
                 <div>
                   <Text type="secondary">TJM Client:</Text>
-                  <div className="font-semibold">{`${mission.tjm_client} €`}</div>
-                </div>
-                <div>
-                  <Text type="secondary">Statut:</Text>
-                  <div>
-                    <Tag color={getStatusColor(mission.statut)}>
-                      {mission.statut}
-                    </Tag>
-                  </div>
+                  <div className="font-semibold">{`${mission.tjm_min}-${mission.tjm_max} €`}</div>
                 </div>
                 <div>
                   <Text type="secondary">Date début:</Text>
@@ -214,10 +206,7 @@ const ESNCandidatureInterface = () => {
                     {formatDate(mission.date_debut)}
                   </div>
                 </div>
-                <div>
-                  <Text type="secondary">Durée:</Text>
-                  {/* <div className="font-semibold">{`${mission.date_disponibilite}`}</div> */}
-                </div>
+              
               </div>
 
               <Table

@@ -587,13 +587,13 @@ Mobilité: ${response.data.data.Mobilité}
               }}
             />
           </Tooltip>
-          {/* <Tooltip title="Télécharger BDC PDF">
+          <Tooltip title="Télécharger BDC PDF">
             <Button
               icon={<DownloadOutlined />}
               onClick={() => handleDownload(record)}
               loading={downloadLoading[record.id_bdc]}
             />
-          </Tooltip> */}
+          </Tooltip>
           {record.statut === "pending_client" && (
             <>
               <Tooltip title="Accepter">
@@ -969,31 +969,31 @@ Mobilité: ${response.data.data.Mobilité}
               />
             </Form.Item>
             <Form.Item
-              label="Jours ouvrés"
+              label="Jours de travail"
               name="jours"
               initialValue={jours}
               rules={[
                 { required: true, message: "Veuillez entrer les jours ouvrés" },
-                () => ({
-                  validator(_, value) {
-                    const calculatedDays = calculateWorkingDays(
-                      new Date(form.getFieldValue("date_debut")),
-                      new Date(form.getFieldValue("date_fin"))
-                    );
-                    if (!value) {
-                      return Promise.resolve();
-                    }
-                    if (value > calculatedDays) {
-                      return Promise.reject(
-                        `Le nombre de jours saisi (${value}) ne peut pas être supérieur aux jours calculés (${calculatedDays})`
-                      );
-                    }
-                    // Update total amount when days change
-                    const tjm = form.getFieldValue("tjm") || 0;
-                    form.setFieldsValue({ montant_total: tjm * value });
-                    return Promise.resolve();
-                  },
-                }),
+                // () => ({
+                //   validator(_, value) {
+                //     const calculatedDays = calculateWorkingDays(
+                //       new Date(form.getFieldValue("date_debut")),
+                //       new Date(form.getFieldValue("date_fin"))
+                //     );
+                //     if (!value) {
+                //       return Promise.resolve();
+                //     }
+                //     // if (value > calculatedDays) {
+                //     //   return Promise.reject(
+                //     //     `Le nombre de jours saisi (${value}) ne peut pas être supérieur aux jours calculés (${calculatedDays})`
+                //     //   );
+                //     // }
+                //     // Update total amount when days change
+                //     const tjm = form.getFieldValue("tjm") || 0;
+                //     form.setFieldsValue({ montant_total: tjm * value });
+                //     return Promise.resolve();
+                //   },
+                // }),
               ]}
               help={`Jours calculés: ${calculateWorkingDays(
                 new Date(form.getFieldValue("date_debut")),

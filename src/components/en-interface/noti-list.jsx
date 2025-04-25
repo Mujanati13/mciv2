@@ -18,6 +18,7 @@ import {
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { Endponit } from "../../helper/enpoint";
+import parse from 'html-react-parser';
 
 const { TabPane } = Tabs;
 const { Title, Text } = Typography;
@@ -159,7 +160,7 @@ const NotificationInterface = () => {
                 {notification.type === "system" && <MailOutlined />}
                 <div>
                   <Title level={5}>{notification.title}</Title>
-                  <Text>{notification.content}</Text>
+                  <Text>{parse(notification.content)}</Text>
                   <div>
                     <Text type="secondary">
                       {format(
@@ -198,7 +199,7 @@ const NotificationInterface = () => {
                   <BellOutlined />
                   <div>
                     <Title level={5}>{notification.title}</Title>
-                    <Text>{notification.content}</Text>
+                    <Text>{parse(notification.content)}</Text>
                     <div>
                       <Text type="secondary">
                         {format(
@@ -237,7 +238,7 @@ const NotificationInterface = () => {
                   <MailOutlined />
                   <div>
                     <Title level={5}>{notification.title}</Title>
-                    <Text>{notification.content}</Text>
+                    <Text>{parse(notification.content)}</Text>
                     <div>
                       <Text type="secondary">
                         {format(

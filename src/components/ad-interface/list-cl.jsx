@@ -172,7 +172,7 @@ export const ClientList = () => {
         checkClientDocuments(clientIds);
       }
     } catch (error) {
-      message.error("Erreur lors du chargement des clients");
+      // message.error("Erreur lors du chargement des clients");
       console.error("Fetch error:", error);
     } finally {
       setLoading(false);

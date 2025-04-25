@@ -26,7 +26,7 @@ import {
   DeleteOutlined,
   EditOutlined,
   FileDoneOutlined,
-  InfoCircleOutlined ,
+  InfoCircleOutlined,
   DollarOutlined,
   FileTextOutlined,
   DownloadOutlined,
@@ -292,7 +292,107 @@ const BonDeCommandeInterface = () => {
       });
       fetchPurchaseOrders();
       message.success(`Statut mis à jour : ${getStatusLabel(newStatus)}`);
-      
+
+      if (newStatus === "accepted_esn") {
+        const resData = await axios.post(
+          `${Endponit()}/api/notify_esn_accept_bon_de_commande/`,
+          {
+            bon_de_commande_id: record.id_bdc,
+            esn_id: localStorage.getItem("id"),
+          }
+        );
+        if (resData.data.client_token) {
+          console.info(
+            "Sending notification to client token:",
+            resData.data.client_token
+          );
+          try {
+            await axios.post("http://51.38.99.75:3006/send-notification", {
+              deviceToken: resData.data.client_token,
+              messagePayload: {
+                title: "Un nouvel Notification",
+                body: "",
+              },
+            });
+          } catch (error) {
+            console.error(
+              `Failed to send notification to client token ${resData.data.client_token}:`,
+              error
+            );
+          }
+        }
+
+        if (resData.data.esn_token) {
+          console.info(
+            "Sending notification to ESN token:",
+            resData.data.esn_token
+          );
+          try {
+            await axios.post("http://51.38.99.75:3006/send-notification", {
+              deviceToken: resData.data.esn_token,
+              messagePayload: {
+                title: "Un nouvel Notification",
+                body: "",
+              },
+            });
+          } catch (error) {
+            console.error(
+              `Failed to send notification to ESN token ${resData.data.esn_token}:`,
+              error
+            );
+          }
+        }
+      } else if (newStatus === "rejected_esn") {
+        const resData = await axios.post(
+          `${Endponit()}/api/notify_esn_reject_bon_de_commande/`,
+          {
+            bon_de_commande_id: record.id_bdc,
+            esn_id: localStorage.getItem("id"),
+          }
+        );
+        if (resData.data.client_token) {
+          console.info(
+            "Sending notification to client token:",
+            resData.data.client_token
+          );
+          try {
+            await axios.post("http://51.38.99.75:3006/send-notification", {
+              deviceToken: resData.data.client_token,
+              messagePayload: {
+                title: "Un nouvel Notification",
+                body: "",
+              },
+            });
+          } catch (error) {
+            console.error(
+              `Failed to send notification to client token ${resData.data.client_token}:`,
+              error
+            );
+          }
+        }
+
+        if (resData.data.esn_token) {
+          console.info(
+            "Sending notification to ESN token:",
+            resData.data.esn_token
+          );
+          try {
+            await axios.post("http://51.38.99.75:3006/send-notification", {
+              deviceToken: resData.data.esn_token,
+              messagePayload: {
+                title: "Un nouvel Notification",
+                body: "",
+              },
+            });
+          } catch (error) {
+            console.error(
+              `Failed to send notification to ESN token ${resData.data.esn_token}:`,
+              error
+            );
+          }
+        }
+      }
+
       // Close modal if it's open
       if (isDetailsModalVisible) {
         setIsDetailsModalVisible(false);
@@ -368,16 +468,6 @@ const BonDeCommandeInterface = () => {
     setIsModalVisible(true);
   };
 
-  const handleDelete = async (id) => {
-    try {
-      await axios.delete(`${Endponit()}/api/Bondecommande/${id}`);
-      fetchPurchaseOrders();
-      message.success("Bon de commande supprimé avec succès");
-    } catch (error) {
-      message.error("Échec de la suppression du bon de commande");
-    }
-  };
-
   const handleSubmit = async (values) => {
     try {
       const clientId = localStorage.getItem("id");
@@ -398,6 +488,7 @@ const BonDeCommandeInterface = () => {
           ...formattedValues,
           statut: "pending_esn",
         });
+
         message.success("Nouveau bon de commande créé avec succès");
       }
       setIsModalVisible(false);
@@ -556,7 +647,10 @@ const BonDeCommandeInterface = () => {
             <FileTextOutlined />
             <span>Détails du Bon de Commande</span>
             {currentPurchaseOrder && (
-              <Tag color={getStatusColor(currentPurchaseOrder.statut)} className="ml-2">
+              <Tag
+                color={getStatusColor(currentPurchaseOrder.statut)}
+                className="ml-2"
+              >
                 {getStatusLabel(currentPurchaseOrder.statut)}
               </Tag>
             )}
@@ -578,7 +672,9 @@ const BonDeCommandeInterface = () => {
               key="reject"
               danger
               icon={<CloseCircleOutlined />}
-              onClick={() => handleUpdateStatus(currentPurchaseOrder, "rejected_esn")}
+              onClick={() =>
+                handleUpdateStatus(currentPurchaseOrder, "rejected_esn")
+              }
             >
               Refuser
             </Button>
@@ -588,7 +684,9 @@ const BonDeCommandeInterface = () => {
               key="accept"
               type="primary"
               icon={<CheckCircleOutlined />}
-              onClick={() => handleUpdateStatus(currentPurchaseOrder, "accepted_esn")}
+              onClick={() =>
+                handleUpdateStatus(currentPurchaseOrder, "accepted_esn")
+              }
             >
               Accepter
             </Button>
@@ -601,7 +699,12 @@ const BonDeCommandeInterface = () => {
       >
         {currentPurchaseOrder && (
           <div className="space-y-6">
-            <Descriptions bordered column={2} size="small" className="rounded-lg overflow-hidden">
+            <Descriptions
+              bordered
+              column={2}
+              size="small"
+              className="rounded-lg overflow-hidden"
+            >
               <Descriptions.Item label="Numéro BDC" span={2}>
                 {currentPurchaseOrder.numero_bdc}
               </Descriptions.Item>
@@ -651,7 +754,9 @@ const BonDeCommandeInterface = () => {
                       Action requise
                     </h4>
                     <p className="text-blue-600 mt-1 mb-0">
-                      Ce bon de commande est en attente de votre validation. Veuillez l'accepter pour continuer le processus ou le refuser si nécessaire.
+                      Ce bon de commande est en attente de votre validation.
+                      Veuillez l'accepter pour continuer le processus ou le
+                      refuser si nécessaire.
                     </p>
                   </div>
                 </div>

@@ -43,6 +43,7 @@ import {
   Tooltip,
   Drawer,
   Select,
+  notification,
 } from "antd";
 
 import { Endponit } from "../helper/enpoint";
@@ -58,8 +59,9 @@ import { isEsnLoggedIn, logoutEsn } from "../helper/db";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import ESNCandidatureInterface from "../components/en-interface/me-codi";
 import ESNProfilePageFrancais from "../components/en-interface/profile";
-// import { messaging } from "../helper/firebase/config";
-// import { onMessage, getToken } from "firebase/messaging";
+import { messaging, requestNotificationPermission } from "../helper/firebase/config";
+import { onMessage } from "firebase/messaging";
+import axios from "axios";
 
 // Language Context
 const LanguageContext = createContext();
@@ -105,6 +107,9 @@ const translations = {
     languageFr: "Français",
     languageEn: "English",
     breadcrumbHome: "Accueil",
+    notificationReceived: "Nouvelle notification reçue",
+    notificationPermissionDenied: "Permissions de notification refusées",
+    notificationError: "Erreur de notification",
   },
   en: {
     dashboard: "Dashboard",
@@ -141,6 +146,9 @@ const translations = {
     languageFr: "Français",
     languageEn: "English",
     breadcrumbHome: "Home",
+    notificationReceived: "New notification received",
+    notificationPermissionDenied: "Notification permission denied",
+    notificationError: "Notification error",
   },
 };
 
@@ -302,6 +310,7 @@ const InterfaceEn = () => {
   const [esnStatus, setEsnStatus] = useState(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [attemptedMenu, setAttemptedMenu] = useState("");
+  const [fcmToken, setFcmToken] = useState(null);
 
   // Language state
   const [language, setLanguage] = useState(() => {
@@ -418,18 +427,58 @@ const InterfaceEn = () => {
     }
   };
 
-  const retrieveFCMToken = async () => {
+  // Register FCM token with backend
+  const registerTokenWithServer = async (token) => {
     try {
-      // Request permission for notifications
-      const permission = await Notification.requestPermission();
-      if (permission === "granted") {
-        // Token retrieval code goes here...
-      } else {
-        console.log("Permission denied for notifications.");
-      }
+      const id = localStorage.getItem("id");
+      const type = "esn"; // Set user type as ESN
+      
+      await axios.put(`${Endponit()}/api/update-token/`, {
+        id,
+        type,
+        token: token
+      });
+      
+      console.log("FCM token registered with server successfully");
     } catch (error) {
-      console.error("Error retrieving FCM token:", error);
+      console.error("Error registering FCM token with server:", error);
     }
+  };
+
+  // Set up message handler for Firebase Cloud Messaging
+  const setupMessageHandler = () => {
+    if (!messaging) return null;
+    
+    // Handle foreground messages
+    const unsubscribe = onMessage(messaging, (payload) => {
+      console.log("Message received in foreground:", payload);
+      
+      // Display notification using Ant Design notification component
+      notification.open({
+        message: payload.notification?.title || t.notificationReceived,
+        description: payload.notification?.body || "",
+        icon: <NotificationOutlined style={{ color: '#1890ff' }} />,
+        duration: 5,
+        onClick: () => {
+          // Navigate to notification tab when clicked
+          setCurrent("notification");
+          setSearchParams({ menu: "notification" });
+          const path = findMenuPath("notification", getMenuItems());
+          if (path) {
+            setBreadcrumbItems(path);
+          }
+        },
+      });
+      
+      // Increment the badge count immediately
+      setUnreadNotificationsCount(prevCount => prevCount + 1);
+      
+      // Then fetch the updated notification list from the server
+      fetchNotifications();
+    });
+
+    // Return the unsubscribe function for cleanup
+    return unsubscribe;
   };
 
   useEffect(() => {
@@ -440,9 +489,40 @@ const InterfaceEn = () => {
     const auth = isEsnLoggedIn();
     if (auth === false) {
       navigate("/Login");
+      return;
     }
-    retrieveFCMToken();
-  }, [navigate]);
+    
+    // Initialize Firebase messaging and request permission
+    const initializeNotifications = async () => {
+      try {
+        // Use the requestNotificationPermission function from config file
+        const token = await requestNotificationPermission();
+        
+        if (token) {
+          console.log("FCM Token received:", token);
+          setFcmToken(token);
+          
+          // Register token with backend
+          await registerTokenWithServer(token);
+        }
+      } catch (error) {
+        console.error("Error initializing notifications:", error);
+        message.error(t.notificationError);
+      }
+    };
+    
+    initializeNotifications();
+    
+    // Set up message handler and store cleanup function
+    const unsubscribe = setupMessageHandler();
+    
+    // Return cleanup function
+    return () => {
+      if (unsubscribe && typeof unsubscribe === 'function') {
+        unsubscribe();
+      }
+    };
+  }, [navigate, t.notificationError]);
 
   const handleNotificationsUpdate = (updatedNotifications) => {
     setNotifications(updatedNotifications);
@@ -545,9 +625,10 @@ const InterfaceEn = () => {
       {
         label: (
           <Badge
-            style={{ opacity: 1, position: "relative", left: 0 }}
             count={unreadNotificationsCount}
             overflowCount={9}
+            offset={[5, 0]}
+            style={{ backgroundColor: '#ff4d4f' }}
           >
             {t.notifications}
           </Badge>
