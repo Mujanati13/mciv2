@@ -1421,69 +1421,7 @@ const AddCollaboratorModal = ({
               <span className="text-gray-600">Informations financières</span>
             </Divider>
 
-            <Row gutter={16}>
-              <Col span={8}>
-                <Form.Item
-                  label={
-                    <span className="font-medium text-gray-700">Banque</span>
-                  }
-                  name="banque"
-                >
-                  <Input
-                    prefix={<BankOutlined className="text-gray-400" />}
-                    placeholder="Nom de la banque"
-                    className="rounded-md"
-                  />
-                </Form.Item>
-              </Col>
-              // Inside the AddCollaboratorModal component in the financial
-              information Row
-              <Col span={8}>
-                <Form.Item
-                  label={
-                    <span className="font-medium text-gray-700">IBAN</span>
-                  }
-                  name="iban"
-                >
-                  <Input
-                    placeholder="Numéro IBAN"
-                    className="rounded-md"
-                    style={{ textTransform: "uppercase" }}
-                    onChange={(e) => {
-                      // Format IBAN with spaces for readability
-                      const value = e.target.value
-                        .replace(/\s/g, "")
-                        .toUpperCase();
-                      const formatted = value.replace(/(.{4})/g, "$1 ").trim();
-
-                      // Basic validation for visual feedback
-                      const isValid = validateIBANFormat(formatted);
-
-                      // Set field value with formatted value
-                      form.setFieldsValue({ iban: formatted });
-
-                      // Set validation status
-                      form.setFields([
-                        {
-                          name: "iban",
-                          value: formatted,
-                          errors: isValid ? [] : ["Format IBAN invalide"],
-                        },
-                      ]);
-                    }}
-                  />
-                </Form.Item>
-              </Col>
-              <Col span={8}>
-                <Form.Item
-                  label={<span className="font-medium text-gray-700">BIC</span>}
-                  name="bic"
-                >
-                  <Input placeholder="Code BIC" className="rounded-md" />
-                </Form.Item>
-              </Col>
-            </Row>
-
+    
             {editingCollaborator && (
               <Row className="mt-4">
                 <Col span={24}>

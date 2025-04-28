@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Input,
   Button,
@@ -21,9 +21,7 @@ import {
   Tag,
   InputNumber,
   Table,
-  Radio,
-  Avatar,
-  Tooltip,
+  Switch,
 } from "antd";
 import {
   InboxOutlined,
@@ -34,95 +32,73 @@ import {
   DollarOutlined,
   InfoCircleOutlined,
   PlusOutlined,
-  SwapOutlined,
-  FilePdfOutlined,
-  UploadOutlined,
-  SearchOutlined,
-  EditOutlined,
-  DeleteOutlined,
-  ExportOutlined,
-  ReloadOutlined,
   CheckCircleOutlined,
+  FilePdfOutlined,
+  CloseOutlined 
 } from "@ant-design/icons";
 import axios from "axios";
 import dayjs from "dayjs";
-import moment from "moment";
 import { Endponit, token } from "../../helper/enpoint";
 
 const { TextArea } = Input;
 const { Paragraph } = Typography;
 const { Option } = Select;
 const { Dragger } = Upload;
-const API_URL = Endponit() + "/api/collaborateur/";
-const UPLOAD_URL = Endponit() + "/api/saveDoc/";
+const API_URL = `${Endponit()}/api/collaborateur/`;
+const UPLOAD_URL = `${Endponit()}/api/saveDoc/`;
 
 const AppelDOffreInterface = () => {
+  // Main state
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [currentOffer, setCurrentOffer] = useState(null);
+  const [expandedDescriptions, setExpandedDescriptions] = useState({});
+  const [skills, setSkills] = useState([]);
+
+  // Modal visibility states
   const [isApplyModalVisible, setIsApplyModalVisible] = useState(false);
   const [isDetailsModalVisible, setIsDetailsModalVisible] = useState(false);
-  const [currentOffer, setCurrentOffer] = useState(null);
-  const [applyForm] = Form.useForm();
-  const [consultants, setConsultants] = useState([]);
-  const [responsables, setResponsables] = useState([]);
-  const [nom_co, setNomCo] = useState("");
-  const [nom_resp, setNomResp] = useState("");
-  const [expandedDescriptions, setExpandedDescriptions] = useState({});
-  const [createNewConsultant, setCreateNewConsultant] = useState(false);
-  const [createNewManager, setCreateNewManager] = useState(false);
-  const [consultantCvFile, setConsultantCvFile] = useState(null);
-  const [managerCvFile, setManagerCvFile] = useState(null);
-  const [skills, setSkills] = useState([]);
-  const [isCollaboratorModalVisible, setIsCollaboratorModalVisible] =
-    useState(false);
   const [isAddResponsableModalVisible, setIsAddResponsableModalVisible] =
     useState(false);
   const [isAddConsultantModalVisible, setIsAddConsultantModalVisible] =
     useState(false);
+
+  // Form instances
+  const [applyForm] = Form.useForm();
   const [addResponsableForm] = Form.useForm();
   const [addConsultantForm] = Form.useForm();
+
+  // Data for selection
+  const [consultants, setConsultants] = useState([]);
+  const [responsables, setResponsables] = useState([]);
+  const [nom_co, setNomCo] = useState("");
+  const [nom_resp, setNomResp] = useState("");
+
+  // File upload states for responsable
   const [uploading, setUploading] = useState(false);
   const [fileList, setFileList] = useState([]);
   const [uploadedFileUrl, setUploadedFileUrl] = useState("");
   const [isFileUploaded, setIsFileUploaded] = useState(false);
+
+  // File upload states for consultant
   const [consultantFileList, setConsultantFileList] = useState([]);
   const [consultantUploadedFileUrl, setConsultantUploadedFileUrl] =
     useState("");
   const [isConsultantFileUploaded, setIsConsultantFileUploaded] =
     useState(false);
 
-  // Function to show add new responsable modal
-  const showAddResponsableModal = () => {
-    // setIsAddResponsableModalVisible(true);
-    // addResponsableForm.resetFields();
-    // setFileList([]);
-    // setUploadedFileUrl("");
-    // setIsFileUploaded(false);
-    location.reload();
-    location.href = "/interface-en?menu=collaborateur";
-  };
-
-  // Function to show add new consultant modal
-  const showAddConsultantModal = () => {
-    // setIsAddConsultantModalVisible(true);
-    // addConsultantForm.resetFields();
-    // setConsultantFileList([]);
-    // setConsultantUploadedFileUrl("");
-    // setIsConsultantFileUploaded(false);
-    location.reload();
-    location.href = "/interface-en?menu=collaborateur";
-  };
-
+  // Fetch initial data
   useEffect(() => {
     fetchData();
     fetchSkills();
   }, []);
 
+  // Fetch all projects (appels d'offre)
   const fetchData = async () => {
     setLoading(true);
     try {
-      const response = await axios.get(Endponit() + "/api/appelOffre/", {
+      const response = await axios.get(`${Endponit()}/api/appelOffre/`, {
         headers: { Authorization: `${token()}` },
       });
       setData(response.data.data || []);
@@ -135,9 +111,10 @@ const AppelDOffreInterface = () => {
     }
   };
 
+  // Fetch skills list
   const fetchSkills = async () => {
     try {
-      const response = await axios.get(Endponit() + "/api/competences/");
+      const response = await axios.get(`${Endponit()}/api/competences/`);
       if (response.data && response.data.data) {
         setSkills(response.data.data.map((skill) => skill.nom));
       }
@@ -146,22 +123,23 @@ const AppelDOffreInterface = () => {
     }
   };
 
-  const fetchConsultants = async (id_project) => {
+  // Fetch consultants for a project
+  const fetchConsultants = useCallback(async (id_project) => {
     const esnId = localStorage.getItem("id") || 3;
     try {
       const response = await axios.get(
         `${Endponit()}/api/consultants-par-esn-et-projet/?esn_id=${esnId}&project_id=${id_project}`,
         { headers: { Authorization: `${token()}` } }
       );
-      setConsultants(response.data.data);
+      setConsultants(response.data.data || []);
     } catch (error) {
       message.error("Erreur lors du chargement des consultants");
       console.error("Error fetching consultants:", error);
     }
-  };
+  }, []);
 
-  // Function to fetch responsables (commercial role)
-  const fetchResponsables = async () => {
+  // Fetch responsables (commercial role)
+  const fetchResponsables = useCallback(async () => {
     try {
       const response = await axios.get(API_URL, {
         headers: { Authorization: `${token()}` },
@@ -177,17 +155,19 @@ const AppelDOffreInterface = () => {
       console.error("Error fetching responsables:", error);
       message.error("Erreur lors du chargement des responsables");
     }
-  };
+  }, []);
 
+  // Handle selection of consultant
   const handleConsultantSelect = (value, option) => {
-    console.log(option.children.join(" ").replaceAll("  ", " "));
     setNomCo(option.children.join(" ").replaceAll("  ", " "));
   };
 
+  // Handle selection of responsable
   const handleResponsableSelect = (value, option) => {
     setNomResp(option.children);
   };
 
+  // Toggle project description expand/collapse
   const toggleDescription = (id) => {
     setExpandedDescriptions((prev) => ({
       ...prev,
@@ -195,31 +175,56 @@ const AppelDOffreInterface = () => {
     }));
   };
 
-  const handleApply = (record) => {
-    setCurrentOffer(record);
-    fetchConsultants(record.id);
-    fetchResponsables(); // Fetch responsables when applying
-    applyForm.resetFields();
-    applyForm.setFieldsValue({
-      AO_id: record.id,
-      date_disponibilite: dayjs().add(1, "week"),
-    });
-    setIsApplyModalVisible(true);
-  };
+  // Open apply modal
+  const handleApply = useCallback(
+    (record) => {
+      setCurrentOffer(record);
+      fetchConsultants(record.id);
+      fetchResponsables();
 
+      applyForm.resetFields();
+      applyForm.setFieldsValue({
+        AO_id: record.id,
+        date_disponibilite: dayjs().add(1, "week"),
+      });
+      setIsApplyModalVisible(true);
+    },
+    [applyForm, fetchConsultants, fetchResponsables]
+  );
+
+  // Open details modal
   const handleViewDetails = (record) => {
     setCurrentOffer(record);
     setIsDetailsModalVisible(true);
   };
 
+  // Submit application form
   const handleApplySubmit = () => {
     applyForm.submit();
   };
 
+  // Function to show add new responsable modal
+  const showAddResponsableModal = useCallback(() => {
+    setIsAddResponsableModalVisible(true);
+    addResponsableForm.resetFields();
+    setFileList([]);
+    setUploadedFileUrl("");
+    setIsFileUploaded(false);
+  }, [addResponsableForm]);
+
+  // Function to show add new consultant modal
+  const showAddConsultantModal = useCallback(() => {
+    setIsAddConsultantModalVisible(true);
+    addConsultantForm.resetFields();
+    setConsultantFileList([]);
+    setConsultantUploadedFileUrl("");
+    setIsConsultantFileUploaded(false);
+  }, [addConsultantForm]);
+
+  // Handle application submission
   const onApplyFinish = async (values) => {
     setSubmitting(true);
     try {
-      // Application submission logic
       const esnId = localStorage.getItem("id") || 3;
 
       // Submit candidature
@@ -238,32 +243,32 @@ const AppelDOffreInterface = () => {
       };
 
       const res_data = await axios.post(
-        Endponit() + "/api/candidature/",
+        `${Endponit()}/api/candidature/`,
         formData,
         { headers: { Authorization: `${token()}` } }
       );
-      const id = res_data.data.id
+
+      const id = res_data.data.id;
       await axios.post(`${Endponit()}/api/notify_new_candidature/`, {
         appel_offre_id: currentOffer.id,
         condidature_id: id,
-        esn_id : Number.parseInt(localStorage.getItem("id")),
+        esn_id: Number.parseInt(localStorage.getItem("id")),
       });
 
-      console.info("Notification sent to client:", res_data.data);
-      if (res_data.data.token != null) {
-        console.info("Sending notification to token:", res_data.data.token);
+      // Send push notification if token exists
+      if (res_data.data.token) {
         try {
           await axios.post("http://51.38.99.75:3006/send-notification", {
-        deviceToken: res_data.data.token,
-        messagePayload: {
-          title: "Un nouvel appel",
-          body: "Un nouvel candidature est arrivé. Rafraîchissez pour voir",
-        },
+            deviceToken: res_data.data.token,
+            messagePayload: {
+              title: "Un nouvel appel",
+              body: "Un nouvel candidature est arrivé. Rafraîchissez pour voir",
+            },
           });
         } catch (error) {
           console.error(
-        `Failed to send notification to token ${res_data.data.token}:`,
-        error
+            `Failed to send notification to token ${res_data.data.token}:`,
+            error
           );
         }
       }
@@ -279,6 +284,133 @@ const AppelDOffreInterface = () => {
     }
   };
 
+  // Handle the file change for CV upload (responsable)
+  const handleResponsableFileChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Check file type and size
+    const isPDF = file.type === "application/pdf";
+    const isLt5M = file.size / 1024 / 1024 < 5;
+
+    if (!isPDF) {
+      message.error("Veuillez télécharger un fichier PDF!");
+      return;
+    }
+
+    if (!isLt5M) {
+      message.error("Le fichier doit être inférieur à 5MB!");
+      return;
+    }
+
+    // Create form data and upload
+    const formData = new FormData();
+    formData.append("uploadedFile", file);
+    formData.append("path", "./uploads/cv/");
+
+    setUploading(true);
+
+    try {
+      const response = await axios.post(UPLOAD_URL, formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+          Authorization: token(),
+        },
+      });
+
+      if (response.data?.path) {
+        setUploadedFileUrl(response.data.path);
+        setIsFileUploaded(true);
+        setFileList([file]); // Store file for display purposes
+        message.success(`${file.name} chargé avec succès`);
+      } else {
+        throw new Error("URL de fichier non reçue");
+      }
+    } catch (error) {
+      console.error("Upload error:", error);
+      message.error(`Échec de téléchargement de ${file.name}`);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  // Handle the file change for CV upload (consultant)
+  const handleConsultantFileChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Check file type and size
+    const isPDF = file.type === "application/pdf";
+    const isLt5M = file.size / 1024 / 1024 < 5;
+
+    if (!isPDF) {
+      message.error("Veuillez télécharger un fichier PDF!");
+      return;
+    }
+
+    if (!isLt5M) {
+      message.error("Le fichier doit être inférieur à 5MB!");
+      return;
+    }
+
+    // Create form data and upload
+    const formData = new FormData();
+    formData.append("uploadedFile", file);
+    formData.append("path", "./uploads/cv/");
+
+    setUploading(true);
+
+    try {
+      const response = await axios.post(UPLOAD_URL, formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+          Authorization: token(),
+        },
+      });
+
+      if (response.data?.path) {
+        setConsultantUploadedFileUrl(response.data.path);
+        setIsConsultantFileUploaded(true);
+        setConsultantFileList([file]); // Store file for display purposes
+        message.success(`${file.name} chargé avec succès`);
+      } else {
+        throw new Error("URL de fichier non reçue");
+      }
+    } catch (error) {
+      console.error("Upload error:", error);
+      message.error(`Échec de téléchargement de ${file.name}`);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  // Handle file removal for responsable
+  const handleClearResponsableFile = () => {
+    setIsFileUploaded(false);
+    setUploadedFileUrl("");
+    setFileList([]);
+
+    // This will clear the file input
+    const fileInput = document.getElementById("responsable-cv-upload");
+    if (fileInput) {
+      fileInput.value = "";
+    }
+  };
+
+  // Handle file removal for consultant
+  const handleClearConsultantFile = () => {
+    setIsConsultantFileUploaded(false);
+    setConsultantUploadedFileUrl("");
+    setConsultantFileList([]);
+
+    // This will clear the file input
+    const fileInput = document.getElementById("consultant-cv-upload");
+    if (fileInput) {
+      fileInput.value = "";
+    }
+  };
+  
+  // Handle adding a new responsable
   const handleAddResponsable = async () => {
     try {
       const values = await addResponsableForm.validateFields();
@@ -293,38 +425,39 @@ const AppelDOffreInterface = () => {
       // Create new collaborator with commercial role
       const newCollaborator = {
         ID_ESN: localStorage.getItem("id"),
-        Nom: values.nom,
-        Prenom: values.prenom,
-        Email: values.email,
-        Tel: values.telephone,
-        Poste: "commercial", // Set as commercial since it's a responsable compte
+        Nom: values.Nom,
+        Prenom: values.Prenom,
+        Tel: values.Tel,
+        Date_naissance: values.Date_naissance,
+        Poste: "commercial",
         Actif: true,
         CV: uploadedFileUrl,
-        date_debut_activ: values.date_debut_activ.format("YYYY-MM-DD"),
+        date_debut_activ: values.date_debut_activ,
+        Mobilité: values.Mobilité,
+        LinkedIN: values.LinkedIN,
       };
 
       const response = await axios.post(API_URL, newCollaborator, {
-        headers: {
-          Authorization: `${token()}`,
-        },
+        headers: { Authorization: `${token()}` },
       });
 
-      if (response.data && response.data.error === false) {
+      if (response.data) {
         message.success("Nouveau responsable de compte ajouté avec succès");
 
-        // Update the form with the new responsable
-        const newResponsable = response.data.data;
+        // Fetch fresh responsables list to update the dropdown
+        await fetchResponsables();
+        
+        // // Update the form with the new responsable ID
+        // const newResponsable = response.data.data;
+        
+        // // Update the form selection
+        // applyForm.setFieldsValue({
+        //   id_responsable: newResponsable.ID_collab,
+        // });
 
-        // Add to responsables array
-        setResponsables((prev) => [...prev, newResponsable]);
+        // setNomResp(`${newResponsable.Prenom} ${newResponsable.Nom}`);
 
-        // Update the form
-        applyForm.setFieldsValue({
-          id_responsable: newResponsable.ID_collab,
-        });
-
-        setNomResp(`${newResponsable.Prenom} ${newResponsable.Nom}`);
-
+        // Reset the form and close modal
         setIsAddResponsableModalVisible(false);
         addResponsableForm.resetFields();
         setFileList([]);
@@ -341,6 +474,7 @@ const AppelDOffreInterface = () => {
     }
   };
 
+  // Handle adding a new consultant
   const handleAddConsultant = async () => {
     try {
       const values = await addConsultantForm.validateFields();
@@ -355,47 +489,41 @@ const AppelDOffreInterface = () => {
       // Create new collaborator with consultant role
       const newCollaborator = {
         ID_ESN: localStorage.getItem("id"),
-        Nom: values.nom,
-        Prenom: values.prenom,
-        Email: values.email,
-        Tel: values.telephone,
-        Poste: "consultant", // Set as consultant
+        Nom: values.Nom,
+        Prenom: values.Prenom,
+        Tel: values.Tel,
+        Date_naissance: values.Date_naissance,
+        Poste: "consultant",
         Actif: true,
         CV: consultantUploadedFileUrl,
-        date_debut_activ: values.date_debut_activ.format("YYYY-MM-DD"),
+        date_debut_activ: values.date_debut_activ,
+        Mobilité: values.Mobilité,
+        LinkedIN: values.LinkedIN,
       };
 
       const response = await axios.post(API_URL, newCollaborator, {
-        headers: {
-          Authorization: `${token()}`,
-        },
+        headers: { Authorization: `${token()}` },
       });
 
-      if (response.data && response.data.error === false) {
+      if (response.data) {
         message.success("Nouveau consultant ajouté avec succès");
 
-        // Update the consultant list and form selection
-        const newConsultant = response.data.data;
+        // Fetch fresh consultants list to update the dropdown
+        if (currentOffer) {
+          await fetchConsultants(currentOffer.id);
+        }
+        
+        // // Update the consultant list and form selection
+        // const newConsultant = response.data.data;
 
-        // Add to the consultants array
-        const updatedConsultants = [
-          ...consultants,
-          {
-            ...newConsultant,
-            ID_collab: newConsultant.ID_collab,
-            Poste: "consultant",
-          },
-        ];
+        // // Set the consultant in the form
+        // applyForm.setFieldsValue({
+        //   id_consultant: newConsultant.ID_collab,
+        // });
 
-        setConsultants(updatedConsultants);
+        // setNomCo(`${newConsultant.Prenom} ${newConsultant.Nom}`);
 
-        // Set the consultant in the form
-        applyForm.setFieldsValue({
-          id_consultant: newConsultant.ID_collab,
-        });
-
-        setNomCo(`${newConsultant.Prenom} ${newConsultant.Nom}`);
-
+        // Reset form and close modal
         setIsAddConsultantModalVisible(false);
         addConsultantForm.resetFields();
         setConsultantFileList([]);
@@ -412,10 +540,12 @@ const AppelDOffreInterface = () => {
     }
   };
 
+  // Format date for display
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString("fr-FR");
   };
 
+  // Get status label from numeric status
   const getStatusLabel = (status) => {
     const statusMap = {
       0: "Brouillon",
@@ -426,6 +556,7 @@ const AppelDOffreInterface = () => {
     return statusMap[status] || status;
   };
 
+  // Get status color for tag
   const getStatusColor = (status) => {
     const statusColorMap = {
       0: "gray",
@@ -436,6 +567,7 @@ const AppelDOffreInterface = () => {
     return statusColorMap[status] || "default";
   };
 
+  // Loading spinner
   if (loading) {
     return (
       <div className="flex justify-center items-center h-screen">
@@ -444,431 +576,477 @@ const AppelDOffreInterface = () => {
     );
   }
 
-  // File upload props for Add Responsable - Updated to match collaborateur.jsx
-  const uploadProps = {
-    name: "uploadedFile",
-    multiple: false,
-    maxCount: 1,
-    accept: ".pdf,.doc,.docx",
-    customRequest: async ({ file, onSuccess, onError, onProgress }) => {
-      const formData = new FormData();
-      formData.append("uploadedFile", file);
-      formData.append("path", "./uploads/cv/");
-
-      try {
-        setUploading(true);
-        const response = await axios.post(UPLOAD_URL, formData, {
-          headers: {
-            "Content-Type": "multipart/form-data",
-            Authorization: `${token()}`,
-          },
-          onUploadProgress: (progressEvent) => {
-            const percent = Math.round(
-              (progressEvent.loaded * 100) / progressEvent.total
-            );
-            onProgress({ percent });
-          },
-        });
-
-        if (response.data && response.data.url) {
-          setUploadedFileUrl(response.data.url);
-          setIsFileUploaded(true);
-          onSuccess(response.data);
-          message.success(`${file.name} chargé avec succès`);
-        } else {
-          throw new Error("URL de fichier non reçue");
-        }
-      } catch (error) {
-        console.error("Upload error:", error);
-        setIsFileUploaded(false);
-        onError(error);
-        message.error(`Échec de téléchargement de ${file.name}`);
-      } finally {
-        setUploading(false);
-      }
-    },
-    onChange: (info) => {
-      let newFileList = [...info.fileList];
-      newFileList = newFileList.slice(-1);
-      setFileList(newFileList);
-
-      // Reset the upload status if file list is cleared
-      if (newFileList.length === 0) {
-        setIsFileUploaded(false);
-        setUploadedFileUrl("");
-      }
-    },
-    beforeUpload: (file) => {
-      // Check file type
-      const isPDF = file.type === "application/pdf";
-      const isDoc =
-        file.type === "application/msword" ||
-        file.type ===
-          "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-      const isValidType = isPDF || isDoc;
-
-      if (!isValidType) {
-        message.error("Veuillez télécharger un fichier PDF ou Word!");
-        return false;
-      }
-
-      // Check file size (limit to 5MB)
-      const isLt5M = file.size / 1024 / 1024 < 5;
-      if (!isLt5M) {
-        message.error("Le fichier doit être inférieur à 5MB!");
-        return false;
-      }
-
-      return isValidType && isLt5M;
-    },
-    fileList,
-    onRemove: () => {
-      setIsFileUploaded(false);
-      setUploadedFileUrl("");
-      setFileList([]);
-      return true;
-    },
-  };
-
-  // File upload props for Add Consultant - Updated to match collaborateur.jsx
-  const consultantUploadFormProps = {
-    name: "uploadedFile",
-    multiple: false,
-    maxCount: 1,
-    accept: ".pdf,.doc,.docx",
-    customRequest: async ({ file, onSuccess, onError, onProgress }) => {
-      const formData = new FormData();
-      formData.append("uploadedFile", file);
-      formData.append("path", "./uploads/cv/");
-
-      try {
-        setUploading(true);
-        const response = await axios.post(UPLOAD_URL, formData, {
-          headers: {
-            "Content-Type": "multipart/form-data",
-            Authorization: `${token()}`,
-          },
-          onUploadProgress: (progressEvent) => {
-            const percent = Math.round(
-              (progressEvent.loaded * 100) / progressEvent.total
-            );
-            onProgress({ percent });
-          },
-        });
-
-        if (response.data && response.data.url) {
-          setConsultantUploadedFileUrl(response.data.url);
-          setIsConsultantFileUploaded(true);
-          onSuccess(response.data);
-          message.success(`${file.name} chargé avec succès`);
-        } else {
-          throw new Error("URL de fichier non reçue");
-        }
-      } catch (error) {
-        console.error("Upload error:", error);
-        setIsConsultantFileUploaded(false);
-        onError(error);
-        message.error(`Échec de téléchargement de ${file.name}`);
-      } finally {
-        setUploading(false);
-      }
-    },
-    onChange: (info) => {
-      let newFileList = [...info.fileList];
-      newFileList = newFileList.slice(-1);
-      setConsultantFileList(newFileList);
-
-      // Reset the upload status if file list is cleared
-      if (newFileList.length === 0) {
-        setIsConsultantFileUploaded(false);
-        setConsultantUploadedFileUrl("");
-      }
-    },
-    beforeUpload: (file) => {
-      // Check file type
-      const isPDF = file.type === "application/pdf";
-      const isDoc =
-        file.type === "application/msword" ||
-        file.type ===
-          "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-      const isValidType = isPDF || isDoc;
-
-      if (!isValidType) {
-        message.error("Veuillez télécharger un fichier PDF ou Word!");
-        return false;
-      }
-
-      // Check file size (limit to 5MB)
-      const isLt5M = file.size / 1024 / 1024 < 5;
-      if (!isLt5M) {
-        message.error("Le fichier doit être inférieur à 5MB!");
-        return false;
-      }
-
-      return isValidType && isLt5M;
-    },
-    fileList: consultantFileList,
-    onRemove: () => {
-      setIsConsultantFileUploaded(false);
-      setConsultantUploadedFileUrl("");
-      setConsultantFileList([]);
-      return true;
-    },
-  };
-
-  // Add Responsable Modal
-  const AddResponsableModal = () => {
-    return (
-      <Modal
-        title="Ajouter un Responsable compte"
-        open={isAddResponsableModalVisible}
-        onCancel={() => setIsAddResponsableModalVisible(false)}
-        footer={[
-          <Button
-            key="cancel"
-            onClick={() => setIsAddResponsableModalVisible(false)}
-          >
-            Annuler
-          </Button>,
-          <Button
-            key="submit"
-            type="primary"
-            onClick={handleAddResponsable}
-            loading={uploading}
-            disabled={!isFileUploaded}
-          >
-            Ajouter
-          </Button>,
-        ]}
-        width={600}
-      >
-        <Form
-          form={addResponsableForm}
-          layout="vertical"
-          initialValues={{
-            date_debut_activ: dayjs(),
-          }}
+  // Add Responsable Modal Component
+  const AddResponsableModal = () => (
+    <Modal
+      title="Ajouter un Responsable compte"
+      open={isAddResponsableModalVisible}
+      onCancel={() => setIsAddResponsableModalVisible(false)}
+      footer={[
+        <Button
+          key="cancel"
+          onClick={() => setIsAddResponsableModalVisible(false)}
         >
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item
-                name="nom"
-                label="Nom"
-                rules={[{ required: true, message: "Veuillez saisir le nom" }]}
-              >
-                <Input placeholder="Nom" />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item
-                name="prenom"
-                label="Prénom"
-                rules={[
-                  { required: true, message: "Veuillez saisir le prénom" },
-                ]}
-              >
-                <Input placeholder="Prénom" />
-              </Form.Item>
-            </Col>
-          </Row>
+          Annuler
+        </Button>,
+        <Button
+          key="submit"
+          type="primary"
+          onClick={handleAddResponsable}
+          loading={uploading}
+          disabled={!isFileUploaded}
+        >
+          Ajouter
+        </Button>,
+      ]}
+      width={700}
+    >
+      <Form
+        form={addResponsableForm}
+        layout="vertical"
+        initialValues={{
+          date_debut_activ: new Date().toISOString().split("T")[0],
+        }}
+      >
+        <Row gutter={16}>
+          <Col span={12}>
+            <Form.Item
+              name="Nom"
+              label="Nom"
+              rules={[{ required: true, message: "Veuillez saisir le nom" }]}
+            >
+              <Input placeholder="Nom" />
+            </Form.Item>
+          </Col>
+          <Col span={12}>
+            <Form.Item
+              name="Prenom"
+              label="Prénom"
+              rules={[{ required: true, message: "Veuillez saisir le prénom" }]}
+            >
+              <Input placeholder="Prénom" />
+            </Form.Item>
+          </Col>
+        </Row>
 
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item
-                name="email"
-                label="Email"
-                rules={[
-                  { required: true, message: "Veuillez saisir l'email" },
-                  { type: "email", message: "Format d'email invalide" },
-                ]}
-              >
-                <Input placeholder="Email" />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item
-                name="telephone"
-                label="Téléphone"
-                rules={[
-                  { required: true, message: "Veuillez saisir le téléphone" },
-                ]}
-              >
-                <Input placeholder="Téléphone" />
-              </Form.Item>
-            </Col>
-          </Row>
+        {/* <Row gutter={16}>
+          <Col span={12}>
+            <Form.Item
+              name="Tel"
+              label="Téléphone"
+              rules={[
+                { required: true, message: "Veuillez saisir le téléphone" },
+              ]}
+            >
+              <Input placeholder="Téléphone" />
+            </Form.Item>
+          </Col>
+          <Col span={12}>
+            <Form.Item
+              label="Date de naissance"
+              name="Date_naissance"
+              rules={[
+                {
+                  required: true,
+                  message: "Veuillez saisir la date de naissance",
+                },
+                {
+                  validator: (_, value) => {
+                    if (!value) return Promise.resolve();
 
-          <Form.Item
-            name="date_debut_activ"
-            label="Date de recrutement"
-            rules={[
-              { required: true, message: "Veuillez sélectionner une date" },
-            ]}
-          >
-            <DatePicker className="w-full" format="DD/MM/YYYY" />
-          </Form.Item>
+                    const birthDate = new Date(value);
+                    const today = new Date();
 
-          <Form.Item
-            name="cv"
-            label="CV"
-            rules={[{ required: true, message: "Veuillez uploader un CV" }]}
-            tooltip="Téléchargez le CV du responsable (format PDF ou Word, max 5MB)"
-            extra="Formats acceptés: PDF, DOC, DOCX - Taille maximale: 5MB"
-          >
-            <Upload.Dragger {...uploadProps} listType="picture">
-              <p className="ant-upload-drag-icon">
-                <InboxOutlined style={{ fontSize: "32px", color: "#1890ff" }} />
+                    // Calculate age
+                    const ageInMilliseconds = today - birthDate;
+                    const ageInYears =
+                      ageInMilliseconds / (1000 * 60 * 60 * 24 * 365.25);
+
+                    if (ageInYears < 18) {
+                      return Promise.reject(
+                        "L'âge doit être supérieur ou égal à 18 ans"
+                      );
+                    }
+
+                    return Promise.resolve();
+                  },
+                },
+              ]}
+            >
+              <Input type="date" />
+            </Form.Item>
+          </Col>
+        </Row> */}
+
+        <Row gutter={16}>
+          <Col span={12}>
+            <Form.Item
+              name="date_debut_activ"
+              label="Date de recrutement"
+              rules={[
+                { required: true, message: "Veuillez sélectionner une date" },
+              ]}
+            >
+              <Input type="date" />
+            </Form.Item>
+          </Col>
+          <Col span={12}>
+            <Form.Item label="Mobilité" name="Mobilité">
+              <Select placeholder="Sélectionnez la mobilité">
+                <Option value="National">National</Option>
+                <Option value="International">International</Option>
+                <Option value="Régional">Régional</Option>
+                <Option value="Local">Local</Option>
+              </Select>
+            </Form.Item>
+          </Col>
+        </Row>
+
+        <Form.Item label="Profil LinkedIn" name="LinkedIN">
+          <Input placeholder="https://www.linkedin.com/in/username" />
+        </Form.Item>
+
+        <Form.Item
+          name="CV"
+          label="CV"
+          rules={[{ required: true, message: "Veuillez uploader un CV" }]}
+          tooltip="Téléchargez le CV du responsable (format PDF, max 5MB)"
+        >
+          <div className="upload-wrapper">
+            <div
+              className="upload-container"
+              style={{
+                border: "1px dashed #d9d9d9",
+                borderRadius: "8px",
+                padding: "20px",
+                textAlign: "center",
+                backgroundColor: "#fafafa",
+                cursor: "pointer",
+                position: "relative",
+              }}
+            >
+              <div className="upload-icon" style={{ marginBottom: "8px" }}>
+                <FilePdfOutlined
+                  style={{ fontSize: "48px", color: "#1890ff" }}
+                />
+              </div>
+
+              <p style={{ margin: "8px 0" }}>
+                Cliquez pour sélectionner ou déposez un fichier PDF ici
               </p>
-              <p className="ant-upload-text">
-                Cliquez ou déposez un fichier ici
+
+              <p style={{ fontSize: "12px", color: "#888" }}>
+                Format accepté: PDF - Taille maximale: 5MB
               </p>
-            </Upload.Dragger>
+
+              <input
+                id="responsable-cv-upload"
+                type="file"
+                accept=".pdf"
+                onChange={handleResponsableFileChange}
+                style={{
+                  opacity: 0,
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  width: "100%",
+                  height: "100%",
+                  cursor: "pointer",
+                }}
+              />
+            </div>
+
+            {fileList.length > 0 && (
+              <div className="file-list" style={{ marginTop: "16px" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    padding: "8px 12px",
+                    backgroundColor: "#f6ffed",
+                    borderRadius: "4px",
+                    border: "1px solid #b7eb8f",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center" }}>
+                    <FilePdfOutlined
+                      style={{
+                        fontSize: "16px",
+                        color: "green",
+                        marginRight: "8px",
+                      }}
+                    />
+                    <span>{fileList[0].name}</span>
+                  </div>
+                  <Button
+                    type="text"
+                    size="small"
+                    icon={<CloseOutlined />}
+                    onClick={handleClearResponsableFile}
+                  />
+                </div>
+              </div>
+            )}
 
             {isFileUploaded && (
               <div
                 className="mt-2 p-2"
                 style={{
+                  marginTop: "8px",
                   backgroundColor: "#f6ffed",
                   borderRadius: "4px",
                   border: "1px solid #b7eb8f",
+                  padding: "8px 12px",
                 }}
               >
-                <CheckCircleOutlined style={{ color: "green" }} /> CV téléchargé
-                avec succès
+                <CheckCircleOutlined
+                  style={{ color: "green", marginRight: "8px" }}
+                />
+                CV téléchargé avec succès
               </div>
             )}
-          </Form.Item>
-        </Form>
-      </Modal>
-    );
-  };
+          </div>
+        </Form.Item>
+      </Form>
+    </Modal>
+  );
 
-  // Add Consultant Modal
-  const AddConsultantModal = () => {
-    return (
-      <Modal
-        title="Ajouter un Consultant"
-        open={isAddConsultantModalVisible}
-        onCancel={() => setIsAddConsultantModalVisible(false)}
-        footer={[
-          <Button
-            key="cancel"
-            onClick={() => setIsAddConsultantModalVisible(false)}
-          >
-            Annuler
-          </Button>,
-          <Button
-            key="submit"
-            type="primary"
-            onClick={handleAddConsultant}
-            loading={uploading}
-            disabled={!isConsultantFileUploaded}
-          >
-            Ajouter
-          </Button>,
-        ]}
-        width={600}
-      >
-        <Form
-          form={addConsultantForm}
-          layout="vertical"
-          initialValues={{
-            date_debut_activ: dayjs(),
-          }}
+  // Add Consultant Modal Component
+  const AddConsultantModal = () => (
+    <Modal
+      title="Ajouter un Consultant"
+      open={isAddConsultantModalVisible}
+      onCancel={() => setIsAddConsultantModalVisible(false)}
+      footer={[
+        <Button
+          key="cancel"
+          onClick={() => setIsAddConsultantModalVisible(false)}
         >
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item
-                name="nom"
-                label="Nom"
-                rules={[{ required: true, message: "Veuillez saisir le nom" }]}
-              >
-                <Input placeholder="Nom" />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item
-                name="prenom"
-                label="Prénom"
-                rules={[
-                  { required: true, message: "Veuillez saisir le prénom" },
-                ]}
-              >
-                <Input placeholder="Prénom" />
-              </Form.Item>
-            </Col>
-          </Row>
+          Annuler
+        </Button>,
+        <Button
+          key="submit"
+          type="primary"
+          onClick={handleAddConsultant}
+          loading={uploading}
+          disabled={!isConsultantFileUploaded}
+        >
+          Ajouter
+        </Button>,
+      ]}
+      width={700}
+    >
+      <Form
+        form={addConsultantForm}
+        layout="vertical"
+        initialValues={{
+          date_debut_activ: new Date().toISOString().split("T")[0],
+        }}
+      >
+        <Row gutter={16}>
+          <Col span={12}>
+            <Form.Item
+              name="Nom"
+              label="Nom"
+              rules={[{ required: true, message: "Veuillez saisir le nom" }]}
+            >
+              <Input placeholder="Nom" />
+            </Form.Item>
+          </Col>
+          <Col span={12}>
+            <Form.Item
+              name="Prenom"
+              label="Prénom"
+              rules={[{ required: true, message: "Veuillez saisir le prénom" }]}
+            >
+              <Input placeholder="Prénom" />
+            </Form.Item>
+          </Col>
+        </Row>
 
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item
-                name="email"
-                label="Email"
-                rules={[
-                  { required: true, message: "Veuillez saisir l'email" },
-                  { type: "email", message: "Format d'email invalide" },
-                ]}
-              >
-                <Input placeholder="Email" />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item
-                name="telephone"
-                label="Téléphone"
-                rules={[
-                  { required: true, message: "Veuillez saisir le téléphone" },
-                ]}
-              >
-                <Input placeholder="Téléphone" />
-              </Form.Item>
-            </Col>
-          </Row>
+        {/* <Row gutter={16}>
+          <Col span={12}>
+            <Form.Item
+              name="Tel"
+              label="Téléphone"
+              rules={[
+                { required: true, message: "Veuillez saisir le téléphone" },
+              ]}
+            >
+              <Input placeholder="Téléphone" />
+            </Form.Item>
+          </Col>
+          <Col span={12}>
+            <Form.Item
+              label="Date de naissance"
+              name="Date_naissance"
+              rules={[
+                {
+                  required: true,
+                  message: "Veuillez saisir la date de naissance",
+                },
+                {
+                  validator: (_, value) => {
+                    if (!value) return Promise.resolve();
 
-          <Form.Item
-            name="date_debut_activ"
-            label="Date de recrutement"
-            rules={[
-              { required: true, message: "Veuillez sélectionner une date" },
-            ]}
-          >
-            <DatePicker className="w-full" format="DD/MM/YYYY" />
-          </Form.Item>
+                    const birthDate = new Date(value);
+                    const today = new Date();
 
-          <Form.Item
-            name="cv"
-            label="CV"
-            rules={[{ required: true, message: "Veuillez uploader un CV" }]}
-            tooltip="Téléchargez le CV du consultant (format PDF ou Word, max 5MB)"
-            extra="Formats acceptés: PDF, DOC, DOCX - Taille maximale: 5MB"
-          >
-            <Upload.Dragger {...consultantUploadFormProps} listType="picture">
-              <p className="ant-upload-drag-icon">
-                <InboxOutlined style={{ fontSize: "32px", color: "#1890ff" }} />
+                    // Calculate age
+                    const ageInMilliseconds = today - birthDate;
+                    const ageInYears =
+                      ageInMilliseconds / (1000 * 60 * 60 * 24 * 365.25);
+
+                    if (ageInYears < 18) {
+                      return Promise.reject(
+                        "L'âge doit être supérieur ou égal à 18 ans"
+                      );
+                    }
+
+                    return Promise.resolve();
+                  },
+                },
+              ]}
+            >
+              <Input type="date" />
+            </Form.Item>
+          </Col>
+        </Row> */}
+
+        <Row gutter={16}>
+          <Col span={12}>
+            <Form.Item
+              name="date_debut_activ"
+              label="Date de recrutement"
+              rules={[
+                { required: true, message: "Veuillez sélectionner une date" },
+              ]}
+            >
+              <Input type="date" />
+            </Form.Item>
+          </Col>
+          <Col span={12}>
+            <Form.Item label="Mobilité" name="Mobilité">
+              <Select placeholder="Sélectionnez la mobilité">
+                <Option value="National">National</Option>
+                <Option value="International">International</Option>
+                <Option value="Régional">Régional</Option>
+                <Option value="Local">Local</Option>
+              </Select>
+            </Form.Item>
+          </Col>
+        </Row>
+
+        <Form.Item label="Profil LinkedIn" name="LinkedIN">
+          <Input placeholder="https://www.linkedin.com/in/username" />
+        </Form.Item>
+
+        <Form.Item
+          name="CV"
+          label="CV"
+          rules={[{ required: true, message: "Veuillez uploader un CV" }]}
+          tooltip="Téléchargez le CV du consultant (format PDF, max 5MB)"
+        >
+          <div className="upload-wrapper">
+            <div
+              className="upload-container"
+              style={{
+                border: "1px dashed #d9d9d9",
+                borderRadius: "8px",
+                padding: "20px",
+                textAlign: "center",
+                backgroundColor: "#fafafa",
+                cursor: "pointer",
+                position: "relative",
+              }}
+            >
+              <div className="upload-icon" style={{ marginBottom: "8px" }}>
+                <FilePdfOutlined
+                  style={{ fontSize: "48px", color: "#1890ff" }}
+                />
+              </div>
+
+              <p style={{ margin: "8px 0" }}>
+                Cliquez pour sélectionner ou déposez un fichier PDF ici
               </p>
-              <p className="ant-upload-text">
-                Cliquez ou déposez un fichier ici
+
+              <p style={{ fontSize: "12px", color: "#888" }}>
+                Format accepté: PDF - Taille maximale: 5MB
               </p>
-            </Upload.Dragger>
+
+              <input
+                id="consultant-cv-upload"
+                type="file"
+                accept=".pdf"
+                onChange={handleConsultantFileChange}
+                style={{
+                  opacity: 0,
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  width: "100%",
+                  height: "100%",
+                  cursor: "pointer",
+                }}
+              />
+            </div>
+
+            {consultantFileList.length > 0 && (
+              <div className="file-list" style={{ marginTop: "16px" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    padding: "8px 12px",
+                    backgroundColor: "#f6ffed",
+                    borderRadius: "4px",
+                    border: "1px solid #b7eb8f",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center" }}>
+                    <FilePdfOutlined
+                      style={{
+                        fontSize: "16px",
+                        color: "green",
+                        marginRight: "8px",
+                      }}
+                    />
+                    <span>{consultantFileList[0].name}</span>
+                  </div>
+                  <Button
+                    type="text"
+                    size="small"
+                    icon={<CloseOutlined />}
+                    onClick={handleClearConsultantFile}
+                  />
+                </div>
+              </div>
+            )}
 
             {isConsultantFileUploaded && (
               <div
                 className="mt-2 p-2"
                 style={{
+                  marginTop: "8px",
                   backgroundColor: "#f6ffed",
                   borderRadius: "4px",
                   border: "1px solid #b7eb8f",
+                  padding: "8px 12px",
                 }}
               >
-                <CheckCircleOutlined style={{ color: "green" }} /> CV téléchargé
-                avec succès
+                <CheckCircleOutlined
+                  style={{ color: "green", marginRight: "8px" }}
+                />
+                CV téléchargé avec succès
               </div>
             )}
-          </Form.Item>
-        </Form>
-      </Modal>
-    );
-  };
+          </div>
+        </Form.Item>
+      </Form>
+    </Modal>
+  );
 
   return (
     <div className="p-6">
@@ -1089,7 +1267,7 @@ const AppelDOffreInterface = () => {
           {/* Account Manager Section */}
           <div className="flex justify-between items-center mb-2">
             <Typography.Text strong>Responsable compte</Typography.Text>
-            <Button type="primary" onClick={() => showAddResponsableModal()}>
+            <Button type="primary" onClick={showAddResponsableModal}>
               <PlusOutlined /> Créer Responsable
             </Button>
           </div>
@@ -1123,7 +1301,7 @@ const AppelDOffreInterface = () => {
           {/* Consultant Section */}
           <div className="flex justify-between items-center mb-2 mt-4">
             <Typography.Text strong>Consultant</Typography.Text>
-            <Button type="primary" onClick={() => showAddConsultantModal()}>
+            <Button type="primary" onClick={showAddConsultantModal}>
               <PlusOutlined /> Créer Consultant
             </Button>
           </div>
