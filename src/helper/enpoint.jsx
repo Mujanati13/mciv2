@@ -3,5 +3,5 @@ export const token = () => {
 };
 
 export const Endponit = (dev =  false) => {
-  return dev ? "http://localhost:8000" : "https://www.jyssrdev.ovh/api/api";
+  return dev ? "http://localhost:8000" : "https://www.jyssrdev.ovh/api";
 };
