@@ -783,7 +783,7 @@ const ClientPlusInfo = () => {
 
     try {
       // Fetch client profile data
-      const profileResponse = await axios.get(`${Endponit()}/api/getUserData`, {
+      const profileResponse = await axios.get(`${Endponit()}/api/api/getUserData`, {
         headers: {
           Authorization: `Bearer ${token()}`,
         },
