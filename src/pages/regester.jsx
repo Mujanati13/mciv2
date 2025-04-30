@@ -83,7 +83,7 @@ const SignupPage = () => {
       try {
         setCountriesLoading(true);
         const response = await axios.get(
-          `http://51.38.99.75:3100/api/countries`
+          `https://51.38.99.75:4444/api/countries`
         );
         if (response.data.success) {
           setCountries(response.data.data);

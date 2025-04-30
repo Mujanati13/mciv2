@@ -1028,7 +1028,7 @@ const AddCollaboratorModal = ({
   // Fetch Countries
   const fetchCountries = async () => {
     try {
-      const response = await axios.get("http://51.38.99.75:3100/api/countries");
+      const response = await axios.get("https://51.38.99.75:4444/api/countries");
       console.log(response);
 
       setCountries(response.data.data);
@@ -1042,7 +1042,7 @@ const AddCollaboratorModal = ({
   const fetchCities = async (countryName) => {
     try {
       const response = await axios.get(
-        `http://51.38.99.75:3100/api/cities/${countryName}`
+        `https://51.38.99.75:4444/api/cities/${countryName}`
       );
       setCities(response.data.data);
     } catch (error) {
