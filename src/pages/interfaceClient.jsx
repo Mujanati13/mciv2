@@ -422,7 +422,7 @@ const ClientProfile = () => {
       const transformedNotifications = data.data.map((notification) => ({
         id: notification.id,
         type: notification.categorie.toLowerCase(),
-        title: notification.categorie,
+        title: notification.event,
         content: parse(notification.message),
         timestamp: notification.created_at,
         read: notification.status === "Read",

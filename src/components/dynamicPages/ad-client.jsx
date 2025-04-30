@@ -95,7 +95,7 @@ const AppelDOffreDetail = () => {
       <Card className="shadow-sm">
         <Row justify="space-between" align="middle" style={{ marginBottom: "24px" }}>
           <Col>
-            <Link to="/appels-offres">
+            <Link to="/interface-en?menu=notification">
               <Button icon={<LeftOutlined />}>
                 Retour à la liste
               </Button>

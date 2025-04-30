@@ -286,7 +286,7 @@ const BonCommandeDetail = () => {
       <Card className="shadow-sm">
         <Row justify="space-between" align="middle" style={{ marginBottom: "24px" }}>
           <Col>
-            <Link to="/bons-commande">
+            <Link to="/interface-en?menu=Bon-de-Commande">
               <Button icon={<LeftOutlined />}>
                 Retour à la liste
               </Button>

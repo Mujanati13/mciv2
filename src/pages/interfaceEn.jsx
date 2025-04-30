@@ -47,6 +47,7 @@ import {
 } from "antd";
 
 import { Endponit } from "../helper/enpoint";
+import parse from 'html-react-parser';
 
 import { ClientList } from "../components/en-interface/gestionClient";
 import EmployeeManagement from "../components/en-interface/collaborateur";
@@ -409,8 +410,8 @@ const InterfaceEn = () => {
       const transformedNotifications = data.data.map((notification) => ({
         id: notification.id,
         type: notification.categorie.toLowerCase(),
-        title: notification.categorie,
-        content: notification.message,
+        title: notification.event,
+        content: parse(notification.message),
         timestamp: notification.created_at,
         read: notification.status === "Read",
         dest_id: notification.dest_id,
