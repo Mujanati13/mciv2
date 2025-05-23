@@ -9,8 +9,7 @@ import {
   LogoutOutlined,
   MacCommandOutlined,
   NotificationOutlined,
-  UserOutlined,
-  FileOutlined,
+  UserOutlined,  FileOutlined,
   UsergroupAddOutlined,
   DashboardOutlined,
   TeamOutlined,
@@ -27,7 +26,9 @@ import {
   WarningOutlined,
   MoreOutlined,
   MenuOutlined,
-  GlobalOutlined,
+  ReloadOutlined,
+  FilterOutlined,  CalendarOutlined,
+  SortAscendingOutlined
 } from "@ant-design/icons";
 import {
   Menu,
@@ -44,11 +45,19 @@ import {
   Drawer,
   Select,
   notification,
+  Empty,
+  Card,
+  Spin,
+  Space,
+  DatePicker,
+  Typography
 } from "antd";
 
 import { Endponit } from "../helper/enpoint";
-import parse from 'html-react-parser';
-
+import parse from "html-react-parser";
+const { RangePicker } = DatePicker;
+const { Text } = Typography;
+const { Option } = Select;
 import { ClientList } from "../components/en-interface/gestionClient";
 import EmployeeManagement from "../components/en-interface/collaborateur";
 import ClientDocumentManagement from "../components/en-interface/clientDocumen";
@@ -60,7 +69,12 @@ import { isEsnLoggedIn, logoutEsn } from "../helper/db";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import ESNCandidatureInterface from "../components/en-interface/me-codi";
 import ESNProfilePageFrancais from "../components/en-interface/profile";
-import { messaging, requestNotificationPermission } from "../helper/firebase/config";
+import CraValidation from "../components/en-interface/CraValidation";
+import ESNFinancialDashboard from "../components/en-interface/financial-dashboard";
+import {
+  messaging,
+  requestNotificationPermission,
+} from "../helper/firebase/config";
 import { onMessage } from "firebase/messaging";
 import axios from "axios";
 
@@ -79,13 +93,13 @@ const translations = {
     profile: "Mon Profil ESN",
     collaborators: "Gestion des Collaborateurs",
     clientManagement: "Mes Clients",
-    clientDirectory: "Répertoire Clients",
-    partnerships: "Partenariats",
+    clientDirectory: "Répertoire Clients",    partnerships: "Partenariats",
     commercialManagement: "Gestion Commerciale",
     tenders: "Appels d'Offres",
     applications: "Mes Candidatures",
     purchaseOrders: "Bons de Commande",
     contracts: "Contrats",
+    craValidation: "Validation des CRAs",
     documentation: "Mes Documents",
     clientDocuments: "Documents",
     notifications: "Notifications",
@@ -111,6 +125,22 @@ const translations = {
     notificationReceived: "Nouvelle notification reçue",
     notificationPermissionDenied: "Permissions de notification refusées",
     notificationError: "Erreur de notification",
+    // Nouvelles traductions pour l'interface de notification
+    searchNotifications: "Rechercher des notifications...",
+    filters: "Filtres",
+    period: "Période",
+    startDate: "Date début",
+    endDate: "Date fin",
+    sort: "Tri",
+    newestFirst: "Plus récentes d'abord",
+    oldestFirst: "Plus anciennes d'abord",
+    unreadFirst: "Non lues d'abord",
+    reset: "Réinitialiser",
+    apply: "Appliquer",
+    activeFilters: "Filtres actifs",
+    clearAll: "Effacer tous",
+    noNotifications: "Aucune notification",
+    refresh: "Actualiser",
   },
   en: {
     dashboard: "Dashboard",
@@ -118,13 +148,13 @@ const translations = {
     profile: "My ESN Profile",
     collaborators: "Collaborator Management",
     clientManagement: "Client Management",
-    clientDirectory: "Client Directory",
-    partnerships: "Partnerships",
+    clientDirectory: "Client Directory",    partnerships: "Partnerships",
     commercialManagement: "Commercial Management",
     tenders: "Tenders",
     applications: "My Applications",
     purchaseOrders: "Purchase Orders",
     contracts: "Contracts",
+    craValidation: "CRA Validation",
     documentation: "Documentation",
     clientDocuments: "Client Documents",
     notifications: "Notifications",
@@ -150,6 +180,22 @@ const translations = {
     notificationReceived: "New notification received",
     notificationPermissionDenied: "Notification permission denied",
     notificationError: "Notification error",
+    // New translations for notification interface
+    searchNotifications: "Search notifications...",
+    filters: "Filters",
+    period: "Period",
+    startDate: "Start date",
+    endDate: "End date",
+    sort: "Sort",
+    newestFirst: "Newest first",
+    oldestFirst: "Oldest first",
+    unreadFirst: "Unread first",
+    reset: "Reset",
+    apply: "Apply",
+    activeFilters: "Active filters",
+    clearAll: "Clear all",
+    noNotifications: "No notifications",
+    refresh: "Refresh",
   },
 };
 
@@ -160,9 +206,71 @@ const NotificationInterface = ({
   t,
 }) => {
   const [loading, setLoading] = useState(false);
+  const [searchText, setSearchText] = useState("");
+  const [dateRange, setDateRange] = useState(null);
+  const [sortOrder, setSortOrder] = useState("newest");
+  const [showFilters, setShowFilters] = useState(false);
+  const { language } = useContext(LanguageContext);
+
+  // Filter notifications based on search, date range, and sorting preference
+  const filteredNotifications = useMemo(() => {
+    return notifications
+      .filter((notification) => {
+        // Text search filter
+        const title = notification.title || "";
+        const content = notification.content || "";
+        const contentStr = typeof content === "object" ? "" : String(content);
+
+        const textMatch =
+          searchText === "" ||
+          title.toLowerCase().includes(searchText.toLowerCase()) ||
+          contentStr.toLowerCase().includes(searchText.toLowerCase());
+
+        // Date range filter
+        let dateMatch = true;
+        if (dateRange && dateRange[0] && dateRange[1]) {
+          try {
+            const notifDate = new Date(notification.timestamp);
+            const startDate = new Date(dateRange[0]);
+            startDate.setHours(0, 0, 0, 0);
+            const endDate = new Date(dateRange[1]);
+            endDate.setHours(23, 59, 59, 999);
+
+            dateMatch = notifDate >= startDate && notifDate <= endDate;
+          } catch (error) {
+            console.error("Error in date filtering:", error);
+            dateMatch = true;
+          }
+        }
+
+        return textMatch && dateMatch;
+      })
+      .sort((a, b) => {
+        // Sort based on user preference
+        const dateA = new Date(a.timestamp);
+        const dateB = new Date(b.timestamp);
+
+        if (sortOrder === "newest") {
+          return dateB - dateA;
+        } else if (sortOrder === "oldest") {
+          return dateA - dateB;
+        } else if (sortOrder === "unread") {
+          return a.read === b.read ? 0 : a.read ? 1 : -1;
+        }
+        return 0;
+      });
+  }, [notifications, searchText, dateRange, sortOrder]);
+
+  const resetFilters = () => {
+    setSearchText("");
+    setDateRange(null);
+    setSortOrder("newest");
+    setShowFilters(false);
+  };
 
   const markAsRead = async (notificationId) => {
     try {
+      setLoading(true);
       const response = await fetch(
         Endponit() + "/api/notification/" + notificationId.id,
         {
@@ -192,7 +300,7 @@ const NotificationInterface = ({
       message.success("Notification marked as read");
     } catch (error) {
       console.error("Error updating notification status:", error);
-      message.error("Impossible de marquer la notification comme lue");
+      message.error("Failed to mark notification as read");
     } finally {
       setLoading(false);
     }
@@ -200,7 +308,15 @@ const NotificationInterface = ({
 
   const markAllAsRead = async () => {
     try {
+      setLoading(true);
       const unreadNotifications = notifications.filter((n) => !n.read);
+
+      if (unreadNotifications.length === 0) {
+        message.info("No unread notifications");
+        setLoading(false);
+        return;
+      }
+
       const updatePromises = unreadNotifications.map((notification) =>
         fetch(Endponit() + "/api/updateNotificationStatus", {
           method: "POST",
@@ -232,74 +348,244 @@ const NotificationInterface = ({
     }
   };
 
+  const emptyState = (
+    <Empty
+      image={Empty.PRESENTED_IMAGE_SIMPLE}
+      description={t.noNotifications || "No notifications"}
+    >
+      <Button
+        type="primary"
+        onClick={() => setupdate(Math.random() * 100)}
+        icon={<ReloadOutlined />}
+      >
+        {t.refresh || "Refresh"}
+      </Button>
+    </Empty>
+  );
+
+  const formatDate = (dateString) => {
+    try {
+      const date = new Date(dateString);
+      return new Intl.DateTimeFormat(language === "fr" ? "fr-FR" : "en-US", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      }).format(date);
+    } catch (e) {
+      return dateString;
+    }
+  };
+
+  const formatTagDate = (date) => {
+    try {
+      if (!date) return "";
+      return new Date(date).toLocaleDateString(language === "fr" ? "fr-FR" : "en-US", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric"
+      });
+    } catch (e) {
+      console.error("Error formatting date:", e);
+      return "";
+    }
+  };
+
   return (
-    <div className="p-2">
-      <div className="flex justify-between items-center mb-4">
-        <Button
-          type="primary"
-          onClick={markAllAsRead}
-          loading={loading}
-          disabled={!notifications.some((n) => !n.read)}
-        >
-          {t.markAllAsRead}
-        </Button>
-      </div>
-      <List
-        itemLayout="horizontal"
-        dataSource={notifications}
-        renderItem={(item) => (
-          <List.Item
-            className={`rounded-lg mb-2 p-4 ${
-              item.read ? "bg-gray-50" : "bg-blue-50"
-            }`}
-            actions={[
-              !item.read && (
-                <Button
-                  key="mark-read"
-                  type="text"
-                  icon={<CheckOutlined />}
-                  onClick={() => markAsRead(item)}
-                  loading={loading}
-                >
-                  {t.markAsRead}
-                </Button>
-              ),
-            ]}
+    <Card className="shadow-md rounded-lg border border-gray-200">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-2">
+        <div className="flex items-center flex-grow md:flex-grow-0 w-full md:w-auto">
+          <Input
+            placeholder={t.searchNotifications || "Search notifications..."}
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+            prefix={<SearchOutlined />}
+            className="mr-4 w-full md:w-64"
+            allowClear
+          />
+          <Button
+            icon={<FilterOutlined />}
+            onClick={() => setShowFilters(!showFilters)}
+            type={showFilters ? "primary" : "default"}
+            className="mr-2"
           >
-            <List.Item.Meta
-              className="pl-4"
-              title={
-                <div className="flex items-center">
-                  {!item.read && (
-                    <Badge
-                      style={{ opacity: 0.5 }}
-                      status="processing"
-                      className="mr-2"
-                    />
-                  )}
-                  <span>{item.title}</span>
-                </div>
-              }
-              description={
-                <div className="">
-                  <p>{item.content}</p>
-                  <small className="text-gray-500">
-                    {new Date(item.timestamp).toLocaleString()}
-                  </small>
-                </div>
-              }
-            />
-          </List.Item>
+            {t.filters || "Filters"}
+          </Button>
+        </div>
+        <div className="flex space-x-3 w-full md:w-auto justify-end">
+          <Button
+            type="primary"
+            onClick={markAllAsRead}
+            loading={loading}
+            disabled={!notifications.some((n) => !n.read)}
+            icon={<CheckOutlined />}
+          >
+            {t.markAllAsRead}
+          </Button>
+        </div>
+      </div>
+
+      {showFilters && (
+        <div className="bg-gray-50 p-4 rounded mb-4 border border-gray-200">
+          <Space direction="vertical" className="w-full">
+            <div className="flex flex-col md:flex-row gap-4 mb-3">
+              <div className="flex-1">
+                <Text strong className="block mb-1">
+                  {t.period || "Period"}
+                </Text>
+                <RangePicker
+                  className="w-full"
+                  value={dateRange}
+                  onChange={setDateRange}
+                  placeholder={[
+                    t.startDate || "Start date",
+                    t.endDate || "End date",
+                  ]}
+                  allowClear
+                  format="DD/MM/YYYY"
+                />
+              </div>
+              <div>
+                <Text strong className="block mb-1">
+                  {t.sort || "Sort"}
+                </Text>
+                <Select
+                  value={sortOrder}
+                  onChange={setSortOrder}
+                  style={{ width: 200 }}
+                >
+                  <Option value="newest">
+                    {t.newestFirst || "Newest first"}
+                  </Option>
+                  <Option value="oldest">
+                    {t.oldestFirst || "Oldest first"}
+                  </Option>
+                  <Option value="unread">
+                    {t.unreadFirst || "Unread first"}
+                  </Option>
+                </Select>
+              </div>
+            </div>
+            <div className="flex justify-end">
+              <Button onClick={resetFilters} className="mr-2">
+                {t.reset || "Reset"}
+              </Button>
+              <Button type="primary" onClick={() => setShowFilters(false)}>
+                {t.apply || "Apply"}
+              </Button>
+            </div>
+          </Space>
+        </div>
+      )}
+
+      {(searchText || dateRange || sortOrder !== "newest") && (
+        <div className="flex flex-wrap items-center gap-2 mb-4 p-2 bg-gray-50 rounded-md">
+          <Text strong className="mr-1">
+            {t.activeFilters || "Active filters"}:
+          </Text>
+          {searchText && (
+            <Tag
+              closable
+              onClose={() => setSearchText("")}
+              icon={<SearchOutlined />}
+            >
+              {searchText}
+            </Tag>
+          )}
+          {dateRange && (
+            <Tag
+              closable
+              onClose={() => setDateRange(null)}
+              icon={<CalendarOutlined />}
+            >
+              {formatTagDate(dateRange[0])} - {formatTagDate(dateRange[1])}
+            </Tag>
+          )}
+          {sortOrder !== "newest" && (
+            <Tag
+              closable
+              onClose={() => setSortOrder("newest")}
+              icon={<SortAscendingOutlined />}
+            >
+              {sortOrder === "oldest"
+                ? t.oldestFirst || "Oldest first"
+                : t.unreadFirst || "Unread first"}
+            </Tag>
+          )}
+          <Button type="link" size="small" onClick={resetFilters}>
+            {t.clearAll || "Clear all"}
+          </Button>
+        </div>
+      )}
+
+      <Spin spinning={loading}>
+        {filteredNotifications.length === 0 ? (
+          emptyState
+        ) : (
+          <List
+            itemLayout="horizontal"
+            dataSource={filteredNotifications}
+            className="max-h-[600px] overflow-y-auto"
+            renderItem={(item) => (
+              <List.Item
+                className={`rounded-lg mb-2 p-4 hover:bg-gray-100 transition-colors duration-200 ${
+                  item.read ? "bg-gray-50" : "bg-blue-50"
+                }`}
+                actions={[
+                  !item.read && (
+                    <Button
+                      key="mark-read"
+                      type="text"
+                      icon={<CheckOutlined />}
+                      onClick={() => markAsRead(item)}
+                      loading={loading}
+                    >
+                      {t.markAsRead}
+                    </Button>
+                  ),
+                ]}
+              >
+                <List.Item.Meta
+                  className="pl-2"
+                  title={
+                    <div className="flex items-center">
+                      {!item.read && (
+                        <Badge status="processing" className="mr-2" />
+                      )}
+                      <span className="font-medium text-gray-800">
+                        {item.title}
+                      </span>
+                    </div>
+                  }
+                  description={
+                    <div className="mt-2">
+                      <div className="text-gray-700 whitespace-pre-wrap">
+                        {typeof item.content === "object"
+                          ? item.content
+                          : item.content}
+                      </div>
+                      <div className="mt-2">
+                        <small className="text-gray-500">
+                          {formatDate(item.timestamp)}
+                        </small>
+                      </div>
+                    </div>
+                  }
+                />
+              </List.Item>
+            )}
+          />
         )}
-      />
-    </div>
+      </Spin>
+    </Card>
   );
 };
 
 const InterfaceEn = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [current, setCurrent] = useState(() => {
-    const menuParam = searchParams.get('menu');
+    const menuParam = searchParams.get("menu");
     return menuParam || "dashboard";
   });
   const [searchValue, setSearchValue] = useState("");
@@ -354,7 +640,7 @@ const InterfaceEn = () => {
 
   // Set initial view based on URL query parameter
   useEffect(() => {
-    const menuParam = searchParams.get('menu');
+    const menuParam = searchParams.get("menu");
     if (menuParam) {
       setCurrent(menuParam);
       const path = findMenuPath(menuParam, getMenuItems());
@@ -382,7 +668,7 @@ const InterfaceEn = () => {
       console.log("ESN Status:", data.data[0].Statut);
     } catch (error) {
       console.error("Erreur de vérification du statut ESN:", error);
-      message.error("Impossible de vérifier le statut du compte");
+      // message.error("Impossible de vérifier le statut du compte");
     }
   };
 
@@ -433,13 +719,13 @@ const InterfaceEn = () => {
     try {
       const id = localStorage.getItem("id");
       const type = "esn"; // Set user type as ESN
-      
+
       await axios.put(`${Endponit()}/api/update-token/`, {
         id,
         type,
-        token: token
+        token: token,
       });
-      
+
       console.log("FCM token registered with server successfully");
     } catch (error) {
       console.error("Error registering FCM token with server:", error);
@@ -449,16 +735,16 @@ const InterfaceEn = () => {
   // Set up message handler for Firebase Cloud Messaging
   const setupMessageHandler = () => {
     if (!messaging) return null;
-    
+
     // Handle foreground messages
     const unsubscribe = onMessage(messaging, (payload) => {
       console.log("Message received in foreground:", payload);
-      
+
       // Display notification using Ant Design notification component
       notification.open({
         message: payload.notification?.title || t.notificationReceived,
         description: payload.notification?.body || "",
-        icon: <NotificationOutlined style={{ color: '#1890ff' }} />,
+        icon: <NotificationOutlined style={{ color: "#1890ff" }} />,
         duration: 5,
         onClick: () => {
           // Navigate to notification tab when clicked
@@ -470,10 +756,10 @@ const InterfaceEn = () => {
           }
         },
       });
-      
+
       // Increment the badge count immediately
-      setUnreadNotificationsCount(prevCount => prevCount + 1);
-      
+      setUnreadNotificationsCount((prevCount) => prevCount + 1);
+
       // Then fetch the updated notification list from the server
       fetchNotifications();
     });
@@ -492,17 +778,17 @@ const InterfaceEn = () => {
       navigate("/Login");
       return;
     }
-    
+
     // Initialize Firebase messaging and request permission
     const initializeNotifications = async () => {
       try {
         // Use the requestNotificationPermission function from config file
         const token = await requestNotificationPermission();
-        
+
         if (token) {
           console.log("FCM Token received:", token);
           setFcmToken(token);
-          
+
           // Register token with backend
           await registerTokenWithServer(token);
         }
@@ -511,15 +797,15 @@ const InterfaceEn = () => {
         message.error(t.notificationError);
       }
     };
-    
+
     initializeNotifications();
-    
+
     // Set up message handler and store cleanup function
     const unsubscribe = setupMessageHandler();
-    
+
     // Return cleanup function
     return () => {
-      if (unsubscribe && typeof unsubscribe === 'function') {
+      if (unsubscribe && typeof unsubscribe === "function") {
         unsubscribe();
       }
     };
@@ -589,9 +875,14 @@ const InterfaceEn = () => {
             disabled: !esnStatus,
           },
           {
-            label: t.purchaseOrders,
-            key: "Bon-de-Commande",
+            label: t.purchaseOrders,            key: "Bon-de-Commande",
             icon: <MacCommandOutlined />,
+            disabled: !esnStatus,
+          },
+          {
+            label: t.craValidation,
+            key: "cra-validation",
+            icon: <CalendarOutlined />,
             disabled: !esnStatus,
           },
           // {
@@ -629,7 +920,7 @@ const InterfaceEn = () => {
             count={unreadNotificationsCount}
             overflowCount={9}
             offset={[5, 0]}
-            style={{ backgroundColor: '#ff4d4f' }}
+            style={{ backgroundColor: "#ff4d4f" }}
           >
             {t.notifications}
           </Badge>
@@ -793,7 +1084,7 @@ const InterfaceEn = () => {
     }
     switch (current) {
       case "dashboard":
-        return null;
+        return <ESNFinancialDashboard />;
       case "Liste-des-Clients":
         return <ClientList />;
       case "Liste-des-Appels-d'Offres":
@@ -812,9 +1103,10 @@ const InterfaceEn = () => {
           />
         );
       case "Mes-condidateur":
-        return <ESNCandidatureInterface />;
-      case "Bon-de-Commande":
+        return <ESNCandidatureInterface />;      case "Bon-de-Commande":
         return <BonDeCommandeInterface />;
+      case "cra-validation":
+        return <CraValidation />;
       case "Contart":
         return <ContractList />;
       case "Partenariat":

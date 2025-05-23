@@ -116,7 +116,7 @@ const LoginPage = () => {
       >
         <Space direction="vertical" size="large" style={{ width: "100%", maxWidth: "900px" }}>
           <div style={{ textAlign: "center", marginBottom: "24px" }}>
-            <Title level={1}>Bienvenue sur Maghrebit Connect</Title>
+            <Title level={1}>Bienvenue sur Maghreb it Connect</Title>
             <Text type="secondary">Veuillez choisir votre type de compte</Text>
           </div>
 

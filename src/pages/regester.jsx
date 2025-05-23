@@ -117,7 +117,7 @@ const SignupPage = () => {
     try {
       setCitiesLoading(true);
       const response = await axios.get(
-        `https://51.38.99.75:4444/api/cities/${country}`
+        `http://51.38.99.75:3100/api/cities/${country}`
       );
       if (response.data.success) {
         setCities([]);

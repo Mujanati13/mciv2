@@ -1,0 +1,554 @@
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+import { Endponit, token } from '../../helper/enpoint';
+import {
+  Card,
+  Row,
+  Col,
+  Statistic,
+  Table,
+  Typography,
+  Spin,
+  Alert,
+  Tabs,
+  Divider,
+  Progress,
+  List,
+  Avatar,
+  Select
+} from 'antd';
+import {
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  Cell
+} from 'recharts';
+import {
+  UserOutlined,
+  TeamOutlined,
+  ProjectOutlined,
+  BankOutlined,
+  RiseOutlined,
+  ScheduleOutlined,
+  ClockCircleOutlined,
+  EuroOutlined,
+  PercentageOutlined
+} from '@ant-design/icons';
+
+const { Title, Text } = Typography;
+const { TabPane } = Tabs;
+
+// Custom colors for charts
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
+
+const ClientFinancialDashboard = () => {
+  const [financialData, setFinancialData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [selectedPeriod, setSelectedPeriod] = useState(null);
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      // Get client ID from local storage or session
+      const clientId = localStorage.getItem('clientId') || sessionStorage.getItem('clientId') || 101; // Default to 101 for testing
+      
+      // Build query parameters
+      const params = new URLSearchParams();
+      params.append('client_id', clientId);
+      if (selectedPeriod) {
+        params.append('period', selectedPeriod);
+      }
+      if (selectedYear) {
+        params.append('year', selectedYear);
+      }
+      
+      const response = await axios.get(`${Endponit()}/client-financial-dashboard/?${params.toString()}`, {
+        headers: {
+          Authorization: `Bearer ${token()}`
+        }
+      });
+      
+      if (response.data.status) {
+        setFinancialData(response.data);
+      } else {
+        setError("Failed to fetch financial data");
+      }
+      
+      setLoading(false);
+    } catch (err) {
+      setError(`Error: ${err.message}`);
+      setLoading(false);
+    }
+  };
+  
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  // Refetch data when period or year changes
+  useEffect(() => {
+    if (financialData) {
+      fetchData();
+    }
+  }, [selectedPeriod, selectedYear]);
+
+  const handleYearChange = (year) => {
+    setSelectedYear(year);
+  };
+
+  const handlePeriodChange = (period) => {
+    setSelectedPeriod(period);
+  };
+
+  if (loading) {
+    return (
+      <div style={{ textAlign: 'center', padding: '50px' }}>
+        <Spin size="large" />
+        <p>Loading financial dashboard...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <Alert
+        message="Error"
+        description={error}
+        type="error"
+        showIcon
+      />
+    );
+  }
+
+  if (!financialData) {
+    return (
+      <Alert
+        message="No Data"
+        description="No financial data available."
+        type="info"
+        showIcon
+      />
+    );
+  }
+
+  const { client, summary, esn_breakdown, project_breakdown, monthly_data } = financialData;
+
+  // Format for currency values
+  const formatCurrency = (value) => {
+    return new Intl.NumberFormat('fr-FR', {
+      style: 'currency',
+      currency: 'EUR',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(value);
+  };
+
+  // ESN breakdown table columns
+  const esnColumns = [
+    {
+      title: 'ESN',
+      dataIndex: 'esn_name',
+      key: 'esn_name',
+      render: (text) => <strong>{text}</strong>
+    },
+    {
+      title: 'Montant Total',
+      dataIndex: 'total_amount',
+      key: 'total_amount',
+      render: (value) => formatCurrency(value),
+      sorter: (a, b) => a.total_amount - b.total_amount
+    },
+    {
+      title: 'Heures',
+      dataIndex: 'total_hours',
+      key: 'total_hours',
+      sorter: (a, b) => a.total_hours - b.total_hours
+    },
+    {
+      title: 'Consultants',
+      dataIndex: 'consultant_count',
+      key: 'consultant_count',
+      sorter: (a, b) => a.consultant_count - b.consultant_count
+    },
+    {
+      title: 'Projets',
+      dataIndex: 'project_count',
+      key: 'project_count',
+      sorter: (a, b) => a.project_count - b.project_count
+    }
+  ];
+
+  // Project breakdown table columns
+  const projectColumns = [
+    {
+      title: 'Projet',
+      dataIndex: 'project_name',
+      key: 'project_name',
+      render: (text) => <strong>{text}</strong>
+    },
+    {
+      title: 'Montant Total',
+      dataIndex: 'total_amount',
+      key: 'total_amount',
+      render: (value) => formatCurrency(value),
+      sorter: (a, b) => a.total_amount - b.total_amount
+    },
+    {
+      title: 'Heures',
+      dataIndex: 'total_hours',
+      key: 'total_hours',
+      sorter: (a, b) => a.total_hours - b.total_hours
+    },
+    {
+      title: 'Consultants',
+      dataIndex: 'consultant_count',
+      key: 'consultant_count',
+      sorter: (a, b) => a.consultant_count - b.consultant_count
+    },
+    {
+      title: 'ESNs',
+      dataIndex: 'esn_count',
+      key: 'esn_count',
+      sorter: (a, b) => a.esn_count - b.esn_count
+    }
+  ];
+
+  return (
+    <div style={{ padding: '20px' }}>
+      <Title level={2}>Tableau de bord financier - {client.name}</Title>
+      
+      {/* Period Filter */}
+      <Row gutter={16} style={{ marginBottom: '20px' }}>
+        <Col>
+          <Card size="small" title="Filtres">
+            <Row gutter={16}>
+              <Col>
+                <Select
+                  placeholder="Année"
+                  style={{ width: 120, marginRight: 16 }}
+                  value={selectedYear}
+                  onChange={handleYearChange}
+                >
+                  {[2023, 2024, 2025, 2026].map(year => (
+                    <Select.Option key={year} value={year.toString()}>{year}</Select.Option>
+                  ))}
+                </Select>
+              </Col>
+              <Col>
+                <Select
+                  placeholder="Période"
+                  style={{ width: 120 }}
+                  value={selectedPeriod}
+                  onChange={handlePeriodChange}
+                  allowClear
+                >
+                  {Array.from({ length: 12 }, (_, i) => {
+                    const month = i + 1;
+                    const value = `${month.toString().padStart(2, '0')}_${selectedYear}`;
+                    return (
+                      <Select.Option key={month} value={value}>
+                        {month.toString().padStart(2, '0')}/{selectedYear}
+                      </Select.Option>
+                    );
+                  })}
+                </Select>
+              </Col>
+            </Row>
+          </Card>
+        </Col>
+      </Row>
+      
+      <Divider />
+      
+      {/* Key Performance Indicators */}
+      <Row gutter={[16, 16]} style={{ marginBottom: '20px' }}>
+        <Col xs={24} sm={12} md={8} lg={6}>
+          <Card>
+            <Statistic
+              title="Montant total des bons de commande"
+              value={summary.total_bdc_amount}
+              prefix={<EuroOutlined />}
+              formatter={(value) => formatCurrency(value)}
+            />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} md={8} lg={6}>
+          <Card>
+            <Statistic
+              title="Montant total des contrats"
+              value={summary.total_contract_amount}
+              prefix={<EuroOutlined />}
+              formatter={(value) => formatCurrency(value)}
+            />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} md={8} lg={6}>
+          <Card>
+            <Statistic
+              title="Heures totales"
+              value={summary.total_hours}
+              prefix={<ClockCircleOutlined />}
+            />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} md={8} lg={6}>
+          <Card>
+            <Statistic
+              title="Nombre de projets"
+              value={summary.project_count}
+              prefix={<ProjectOutlined />}
+            />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} md={8} lg={6}>
+          <Card>
+            <Statistic
+              title="Nombre d'ESNs"
+              value={summary.esn_count}
+              prefix={<BankOutlined />}
+            />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} md={8} lg={6}>
+          <Card>
+            <Statistic
+              title="Nombre de consultants"
+              value={summary.consultant_count}
+              prefix={<TeamOutlined />}
+            />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} md={8} lg={6}>
+          <Card>
+            <Statistic
+              title="Contrats actifs"
+              value={summary.active_contracts}
+              prefix={<ScheduleOutlined />}
+            />
+          </Card>
+        </Col>
+      </Row>
+
+      {/* Tabs for different sections */}
+      <Tabs defaultActiveKey="1">
+        {/* Monthly Evolution */}
+        <TabPane tab="Évolution Mensuelle" key="1">
+          <Card title="Évolution mensuelle des indicateurs clés">
+            <ResponsiveContainer width="100%" height={400}>
+              <LineChart data={monthly_data}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="period_formatted" />
+                <YAxis yAxisId="left" />
+                <YAxis yAxisId="right" orientation="right" />
+                <Tooltip formatter={(value, name) => {
+                  if (name.includes('montant')) {
+                    return formatCurrency(value);
+                  }
+                  return value;
+                }} />
+                <Legend />
+                <Line
+                  yAxisId="left"
+                  type="monotone"
+                  dataKey="total_amount"
+                  name="Montant total"
+                  stroke="#8884d8"
+                  activeDot={{ r: 8 }}
+                />
+                <Line
+                  yAxisId="right"
+                  type="monotone"
+                  dataKey="total_hours"
+                  name="Heures totales"
+                  stroke="#82ca9d"
+                />
+                <Line
+                  yAxisId="right"
+                  type="monotone"
+                  dataKey="consultant_count"
+                  name="Consultants"
+                  stroke="#ff7300"
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </Card>
+        </TabPane>
+
+        {/* ESN Breakdown */}
+        <TabPane tab="Répartition par ESN" key="2">
+          <Row gutter={[16, 16]}>
+            <Col span={16}>
+              <Card title="Liste des ESNs">
+                <Table
+                  dataSource={esn_breakdown}
+                  columns={esnColumns}
+                  rowKey="esn_id"
+                  pagination={{ pageSize: 5 }}
+                />
+              </Card>
+            </Col>
+            <Col span={8}>
+              <Card title="Répartition du montant par ESN">
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie
+                      data={esn_breakdown}
+                      dataKey="total_amount"
+                      nameKey="esn_name"
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={80}
+                      label={(entry) => entry.esn_name}
+                    >
+                      {esn_breakdown.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(value) => formatCurrency(value)} />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              </Card>
+            </Col>
+          </Row>
+        </TabPane>
+
+        {/* Project Breakdown */}
+        <TabPane tab="Répartition par Projet" key="3">
+          <Card title="Liste des projets">
+            <Table
+              dataSource={project_breakdown}
+              columns={projectColumns}
+              rowKey="project_id"
+              pagination={{ pageSize: 5 }}
+            />
+          </Card>
+          <Row gutter={[16, 16]} style={{ marginTop: '20px' }}>
+            <Col span={12}>
+              <Card title="Budget par projet">
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={project_breakdown}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="project_name" />
+                    <YAxis />
+                    <Tooltip formatter={(value) => formatCurrency(value)} />
+                    <Legend />
+                    <Bar dataKey="total_amount" name="Montant" fill="#8884d8" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </Card>
+            </Col>
+            <Col span={12}>
+              <Card title="Heures par projet">
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={project_breakdown}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="project_name" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Bar dataKey="total_hours" name="Heures totales" fill="#82ca9d" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </Card>
+            </Col>
+          </Row>
+        </TabPane>
+
+        {/* Resource Allocation */}
+        <TabPane tab="Allocation des Ressources" key="4">
+          <Row gutter={[16, 16]}>
+            <Col span={12}>
+              <Card title="Consultants par projet">
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart 
+                    data={project_breakdown}
+                    layout="vertical"
+                  >
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis type="number" />
+                    <YAxis dataKey="project_name" type="category" width={150} />
+                    <Tooltip />
+                    <Legend />
+                    <Bar dataKey="consultant_count" name="Nombre de consultants" fill="#0088FE" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </Card>
+            </Col>
+            <Col span={12}>
+              <Card title="ESNs par projet">
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart 
+                    data={project_breakdown}
+                    layout="vertical"
+                  >
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis type="number" />
+                    <YAxis dataKey="project_name" type="category" width={150} />
+                    <Tooltip />
+                    <Legend />
+                    <Bar dataKey="esn_count" name="Nombre d'ESNs" fill="#00C49F" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </Card>
+            </Col>
+          </Row>
+          <Row gutter={[16, 16]} style={{ marginTop: '20px' }}>
+            <Col span={24}>
+              <Card title="Distribution des consultants et ESNs par projet">
+                <List
+                  itemLayout="horizontal"
+                  dataSource={project_breakdown}
+                  renderItem={(item) => (
+                    <List.Item>
+                      <List.Item.Meta
+                        avatar={
+                          <Avatar style={{ backgroundColor: COLORS[project_breakdown.indexOf(item) % COLORS.length] }}>
+                            {item.project_name.charAt(0).toUpperCase()}
+                          </Avatar>
+                        }
+                        title={item.project_name}
+                        description={`Budget: ${formatCurrency(item.total_amount)} | Heures: ${item.total_hours}`}
+                      />
+                      <div style={{ width: '300px' }}>
+                        <div style={{ marginBottom: '8px' }}>
+                          <Text>Consultants: {item.consultant_count}</Text>
+                          <Progress 
+                            percent={Math.round((item.consultant_count / summary.consultant_count) * 100)} 
+                            size="small"
+                            strokeColor="#0088FE" 
+                          />
+                        </div>
+                        <div>
+                          <Text>ESNs: {item.esn_count}</Text>
+                          <Progress 
+                            percent={Math.round((item.esn_count / summary.esn_count) * 100)} 
+                            size="small"
+                            strokeColor="#00C49F"
+                          />
+                        </div>
+                      </div>
+                    </List.Item>
+                  )}
+                />
+              </Card>
+            </Col>
+          </Row>
+        </TabPane>
+      </Tabs>
+    </div>
+  );
+};
+
+export default ClientFinancialDashboard;

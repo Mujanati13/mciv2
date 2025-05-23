@@ -51,6 +51,9 @@ import PurchaseOrderInterface from "../components/cl-interface/bd-list";
 import ContractList from "../components/cl-interface/contart-cl";
 import PartenariatInterface from "../components/cl-interface/partenariat-list";
 import ConsultantManagement from "../components/cl-interface/list-consultant";
+import NotificationInterfaceClient from "../components/cl-interface/noti-list";
+import ClientCraValidation from "../components/cl-interface/ClientCraValidation";
+import ClientFinancialDashboard from "../components/cl-interface/financial-dashboard";
 import { isClientLoggedIn, logoutEsn } from "../helper/db";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
@@ -63,11 +66,11 @@ const t = {
   esnPartners: "List ESN",
   consultants: "Contrats",
   partnerships: "Partenariats",
-  tenders: "Appels d'Offres",
-  myOffers: "Mes offres",
+  tenders: "Appels d'Offres",  myOffers: "Mes offres",
   applications: "Réponses à mes Appel d'Offres",
   purchaseOrders: "Bons de Commande",
   contracts: "Contrats",
+  craValidation: "Validation des CRAs",
   documents: "Mes Documents",
   documentManagement: " Gestion Documentaire",
   notifications: "Notifications",
@@ -391,7 +394,7 @@ const ClientProfile = () => {
       );
     } catch (error) {
       console.error("Erreur de vérification du statut ESN:", error);
-      message.error("Impossible de vérifier le statut du compte");
+      // message.error("Impossible de vérifier le statut du compte");
     }
   };
 
@@ -440,25 +443,49 @@ const ClientProfile = () => {
     }
   };
 
-  // Register FCM token with backend
+  // Enhanced token registration function with retry logic
   const registerTokenWithServer = async (token) => {
-    try {
-      const id = localStorage.getItem("id");
-      const type = "client"; // Set user type as client
+    const MAX_RETRIES = 3;
+    let retries = 0;
+    
+    const attemptRegistration = async () => {
+      try {
+        const id = localStorage.getItem("id");
+        const type = "client";
+        
+        const response = await axios.put(`${Endponit()}/api/update-token/`, {
+          id,
+          type,
+          token: token
+        });
+        
+        if (response.status === 200) {
+          console.log("FCM token registered with server successfully");
+          return true;
+        } else {
+          throw new Error(`Server responded with status ${response.status}`);
+        }
+      } catch (error) {
+        console.error(`Error registering FCM token (attempt ${retries + 1}):`, error);
+        return false;
+      }
+    };
+    
+    while (retries < MAX_RETRIES) {
+      const success = await attemptRegistration();
+      if (success) return;
       
-      await axios.put(`${Endponit()}/api/update-token/`, {
-        id,
-        type,
-        token: token
-      });
-      
-      console.log("FCM token registered with server successfully");
-    } catch (error) {
-      console.error("Error registering FCM token with server:", error);
+      retries++;
+      if (retries < MAX_RETRIES) {
+        // Exponential backoff: wait longer between each retry
+        await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, retries)));
+      }
     }
+    
+    console.warn("Failed to register FCM token after maximum retry attempts");
   };
 
-  // Set up message handler for Firebase Cloud Messaging
+  // Enhanced message handler for different notification types
   const setupMessageHandler = () => {
     if (!messaging) return null;
     
@@ -466,24 +493,60 @@ const ClientProfile = () => {
     const unsubscribe = onMessage(messaging, (payload) => {
       console.log("Message received in foreground:", payload);
       
+      // Extract notification data
+      const notificationType = payload.data?.type || 'system';
+      const notificationId = payload.data?.id;
+      const notificationTitle = payload.notification?.title || t.notificationReceived;
+      const notificationBody = payload.notification?.body || "";
+      
+      // Choose icon based on notification type
+      let icon = <NotificationOutlined style={{ color: '#10b981' }} />;
+      if (notificationType === 'candidature') {
+        icon = <UsergroupAddOutlined style={{ color: '#1890ff' }} />;
+      } else if (notificationType === 'tender') {
+        icon = <ProjectOutlined style={{ color: '#722ed1' }} />;
+      }
+      
       // Display notification using Ant Design notification component
+      const notificationKey = `notification-${Date.now()}`;
       notification.open({
-        message: payload.notification?.title || t.notificationReceived,
-        description: payload.notification?.body || "",
-        icon: <NotificationOutlined style={{ color: '#10b981' }} />,
-        duration: 5,
+        key: notificationKey,
+        message: notificationTitle,
+        description: notificationBody,
+        icon: icon,
+        duration: 8,
+        placement: 'topRight',
         onClick: () => {
-          // Navigate to notification tab when clicked
+          // Navigate to notification tab or specific item based on payload
+          if (notificationId) {
+            // If we have a specific ID, we could navigate to that item
+            console.log("Navigating to specific notification:", notificationId);
+          }
           setCurrent("notification");
           setSearchParams({ menu: "notification" });
           const path = findMenuPath("notification");
           if (path) {
             setBreadcrumbItems(path);
           }
+          notification.close(notificationKey);
         },
+        btn: (
+          <Button 
+            type="primary" 
+            size="small" 
+            onClick={(e) => {
+              e.stopPropagation();
+              setCurrent("notification");
+              setSearchParams({ menu: "notification" });
+              notification.close(notificationKey);
+            }}
+          >
+            Voir
+          </Button>
+        )
       });
       
-      // Increment the badge count immediately
+      // Increment the badge count immediately for better UX
       setUnreadNotificationsCount(prevCount => prevCount + 1);
       
       // Then fetch the updated notification list from the server
@@ -492,6 +555,30 @@ const ClientProfile = () => {
 
     // Return the unsubscribe function for cleanup
     return unsubscribe;
+  };
+
+  // Track token refresh for long-lived sessions
+  const setupTokenRefresh = () => {
+    if (!messaging) return null;
+    
+    // Set up a listener for token refresh
+    try {
+      const unsubscribeFromTokenRefresh = messaging.onTokenRefresh(async () => {
+        try {
+          const refreshedToken = await messaging.getToken();
+          console.log('FCM Token refreshed:', refreshedToken);
+          setFcmToken(refreshedToken);
+          await registerTokenWithServer(refreshedToken);
+        } catch (error) {
+          console.error('Unable to refresh FCM token:', error);
+        }
+      });
+      
+      return unsubscribeFromTokenRefresh;
+    } catch (error) {
+      console.error('Error setting up token refresh listener:', error);
+      return null;
+    }
   };
 
   // Track page visibility changes to refresh notifications when app returns from background
@@ -536,23 +623,27 @@ const ClientProfile = () => {
         }
       } catch (error) {
         console.error("Error initializing notifications:", error);
-        message.error(t.notificationError);
+        // Silent failure - don't show error to user as notifications are optional
       }
     };
     
     initializeNotifications();
     fetchNotifications();
     
-    // Set up message handler and store cleanup function
-    const unsubscribe = setupMessageHandler();
+    // Set up message handler and token refresh listeners
+    const unsubscribeFromMessages = setupMessageHandler();
+    const unsubscribeFromTokenRefresh = setupTokenRefresh();
     
     // Return cleanup function
     return () => {
-      if (unsubscribe && typeof unsubscribe === 'function') {
-        unsubscribe();
+      if (unsubscribeFromMessages && typeof unsubscribeFromMessages === 'function') {
+        unsubscribeFromMessages();
+      }
+      if (unsubscribeFromTokenRefresh && typeof unsubscribeFromTokenRefresh === 'function') {
+        unsubscribeFromTokenRefresh();
       }
     };
-  }, [navigate, t.notificationError]);
+  }, [navigate]);
 
   const handleNotificationsUpdate = (updatedNotifications) => {
     setNotifications(updatedNotifications);
@@ -630,9 +721,14 @@ const ClientProfile = () => {
             disabled: !esnStatus,
           },
           {
-            label: t.purchaseOrders,
-            key: "Liste-BDC",
+            label: t.purchaseOrders,            key: "Liste-BDC",
             icon: <ShoppingOutlined />,
+            disabled: !esnStatus,
+          },
+          {
+            label: t.craValidation,
+            key: "cra-validation",
+            icon: <CheckOutlined />,
             disabled: !esnStatus,
           },
           // {
@@ -804,17 +900,12 @@ const ClientProfile = () => {
       case "Liste-Candidature":
         return <CandidatureInterface />;
       case "notification":
-        return (
-          <NotificationInterface
-            notifications={notifications}
-            onNotificationsUpdate={handleNotificationsUpdate}
-            setupdate={setupdate}
-          />
-        );
+        return <NotificationInterfaceClient />;
       case "Contart":
-        return <ContractList />;
-      case "Liste-BDC":
+        return <ContractList />;      case "Liste-BDC":
         return <PurchaseOrderInterface />;
+      case "cra-validation":
+        return <ClientCraValidation />;
       case "Partenariat":
         return <PartenariatInterface />;
       default:

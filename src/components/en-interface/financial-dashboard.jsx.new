@@ -1,0 +1,555 @@
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+import { Endponit, token } from '../../helper/enpoint';
+import {
+  Card,
+  Row,
+  Col,
+  Statistic,
+  Table,
+  Typography,
+  Spin,
+  Alert,
+  Tabs,
+  Divider,
+  Progress,
+  List,
+  Avatar,
+  Select
+} from 'antd';
+import {
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  Cell
+} from 'recharts';
+import {
+  UserOutlined,
+  TeamOutlined,
+  ProjectOutlined,
+  BankOutlined,
+  RiseOutlined,
+  FallOutlined,
+  ClockCircleOutlined,
+  EuroOutlined,
+  PercentageOutlined
+} from '@ant-design/icons';
+
+const { Title, Text } = Typography;
+const { TabPane } = Tabs;
+
+// Custom colors for charts
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
+
+const ESNFinancialDashboard = () => {
+  const [financialData, setFinancialData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [selectedPeriod, setSelectedPeriod] = useState(null);
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      // Get ESN ID from local storage or session
+      const esnId = localStorage.getItem('esnId') || sessionStorage.getItem('esnId') || 42; // Default to 42 for testing
+      
+      // Build query parameters
+      const params = new URLSearchParams();
+      params.append('esn_id', esnId);
+      if (selectedPeriod) {
+        params.append('period', selectedPeriod);
+      }
+      if (selectedYear) {
+        params.append('year', selectedYear);
+      }
+      
+      const response = await axios.get(`${Endponit()}/esn-financial-dashboard/?${params.toString()}`, {
+        headers: {
+          Authorization: `Bearer ${token()}`
+        }
+      });
+      
+      if (response.data.status) {
+        setFinancialData(response.data);
+      } else {
+        setError("Failed to fetch financial data");
+      }
+      
+      setLoading(false);
+    } catch (err) {
+      setError(`Error: ${err.message}`);
+      setLoading(false);
+    }
+  };
+  
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  // Refetch data when period or year changes
+  useEffect(() => {
+    if (financialData) {
+      fetchData();
+    }
+  }, [selectedPeriod, selectedYear]);
+  
+  const handleYearChange = (year) => {
+    setSelectedYear(year);
+  };
+
+  const handlePeriodChange = (period) => {
+    setSelectedPeriod(period);
+  };
+
+  if (loading) {
+    return (
+      <div style={{ textAlign: 'center', padding: '50px' }}>
+        <Spin size="large" />
+        <p>Loading financial dashboard...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <Alert
+        message="Error"
+        description={error}
+        type="error"
+        showIcon
+      />
+    );
+  }
+
+  if (!financialData) {
+    return (
+      <Alert
+        message="No Data"
+        description="No financial data available."
+        type="info"
+        showIcon
+      />
+    );
+  }
+
+  const { esn, summary, client_breakdown, consultant_breakdown, expense_breakdown, monthly_data } = financialData;
+
+  // Format for currency values
+  const formatCurrency = (value) => {
+    return new Intl.NumberFormat('fr-FR', {
+      style: 'currency',
+      currency: 'EUR',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(value);
+  };
+
+  // Add percentage symbol for percentage values
+  const formatPercent = (value) => `${value}%`;
+
+  // Client breakdown table columns
+  const clientColumns = [
+    {
+      title: 'Client',
+      dataIndex: 'client_name',
+      key: 'client_name',
+      render: (text) => <strong>{text}</strong>
+    },
+    {
+      title: 'Montant Total',
+      dataIndex: 'total_amount',
+      key: 'total_amount',
+      render: (value) => formatCurrency(value),
+      sorter: (a, b) => a.total_amount - b.total_amount
+    },
+    {
+      title: 'Heures',
+      dataIndex: 'total_hours',
+      key: 'total_hours',
+      sorter: (a, b) => a.total_hours - b.total_hours
+    },
+    {
+      title: 'Consultants',
+      dataIndex: 'consultant_count',
+      key: 'consultant_count',
+      sorter: (a, b) => a.consultant_count - b.consultant_count
+    },
+    {
+      title: 'Projets',
+      dataIndex: 'project_count',
+      key: 'project_count',
+      sorter: (a, b) => a.project_count - b.project_count
+    }
+  ];
+
+  // Consultant breakdown table columns
+  const consultantColumns = [
+    {
+      title: 'Consultant',
+      dataIndex: 'consultant_name',
+      key: 'consultant_name',
+      render: (text) => <strong>{text}</strong>
+    },
+    {
+      title: 'Poste',
+      dataIndex: 'poste',
+      key: 'poste'
+    },
+    {
+      title: 'Montant',
+      dataIndex: 'total_amount',
+      key: 'total_amount',
+      render: (value) => formatCurrency(value),
+      sorter: (a, b) => a.total_amount - b.total_amount
+    },
+    {
+      title: 'Heures',
+      dataIndex: 'total_hours',
+      key: 'total_hours',
+      sorter: (a, b) => a.total_hours - b.total_hours
+    },
+    {
+      title: "Taux d'utilisation",
+      dataIndex: 'utilization_rate',
+      key: 'utilization_rate',
+      render: (value) => `${value}%`,
+      sorter: (a, b) => a.utilization_rate - b.utilization_rate
+    },
+    {
+      title: 'Dépenses',
+      dataIndex: 'expense_amount',
+      key: 'expense_amount',
+      render: (value) => formatCurrency(value),
+      sorter: (a, b) => a.expense_amount - b.expense_amount
+    }
+  ];
+
+  return (
+    <div style={{ padding: '20px' }}>
+      <Title level={2}>Tableau de bord financier - {esn.name}</Title>
+      
+      {/* Period Filter */}
+      <Row gutter={16} style={{ marginBottom: '20px' }}>
+        <Col>
+          <Card size="small" title="Filtres">
+            <Row gutter={16}>
+              <Col>
+                <Select
+                  placeholder="Année"
+                  style={{ width: 120, marginRight: 16 }}
+                  value={selectedYear}
+                  onChange={handleYearChange}
+                >
+                  {[2023, 2024, 2025, 2026].map(year => (
+                    <Select.Option key={year} value={year.toString()}>{year}</Select.Option>
+                  ))}
+                </Select>
+              </Col>
+              <Col>
+                <Select
+                  placeholder="Période"
+                  style={{ width: 120 }}
+                  value={selectedPeriod}
+                  onChange={handlePeriodChange}
+                  allowClear
+                >
+                  {Array.from({ length: 12 }, (_, i) => {
+                    const month = i + 1;
+                    const value = `${month.toString().padStart(2, '0')}_${selectedYear}`;
+                    return (
+                      <Select.Option key={month} value={value}>
+                        {month.toString().padStart(2, '0')}/{selectedYear}
+                      </Select.Option>
+                    );
+                  })}
+                </Select>
+              </Col>
+            </Row>
+          </Card>
+        </Col>
+      </Row>
+      
+      <Divider />
+      
+      {/* Key Performance Indicators */}
+      <Row gutter={[16, 16]} style={{ marginBottom: '20px' }}>
+        <Col xs={24} sm={12} md={8} lg={6}>
+          <Card>
+            <Statistic
+              title="Montant total des bons de commande"
+              value={summary.total_bdc_amount}
+              prefix={<EuroOutlined />}
+              formatter={(value) => formatCurrency(value)}
+            />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} md={8} lg={6}>
+          <Card>
+            <Statistic
+              title="Montant total des contrats"
+              value={summary.total_contract_amount}
+              prefix={<EuroOutlined />}
+              formatter={(value) => formatCurrency(value)}
+            />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} md={8} lg={6}>
+          <Card>
+            <Statistic
+              title="Heures totales"
+              value={summary.total_hours}
+              prefix={<ClockCircleOutlined />}
+            />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} md={8} lg={6}>
+          <Card>
+            <Statistic
+              title="Marge bénéficiaire"
+              value={summary.profit_margin}
+              precision={2}
+              prefix={<PercentageOutlined />}
+              suffix="%"
+              valueStyle={{ color: summary.profit_margin > 50 ? '#3f8600' : '#cf1322' }}
+            />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} md={8} lg={6}>
+          <Card>
+            <Statistic
+              title="TJM moyen"
+              value={summary.avg_tjm}
+              prefix={<EuroOutlined />}
+              precision={2}
+              formatter={(value) => formatCurrency(value)}
+            />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} md={8} lg={6}>
+          <Card>
+            <Statistic
+              title="Nombre de consultants"
+              value={summary.consultant_count}
+              prefix={<TeamOutlined />}
+            />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} md={8} lg={6}>
+          <Card>
+            <Statistic
+              title="Consultants actifs"
+              value={summary.active_consultants}
+              prefix={<UserOutlined />}
+            />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} md={8} lg={6}>
+          <Card>
+            <Statistic
+              title="Taux d'utilisation"
+              value={summary.utilization_rate}
+              precision={2}
+              prefix={<PercentageOutlined />}
+              suffix="%"
+              valueStyle={{ color: summary.utilization_rate > 80 ? '#3f8600' : '#cf1322' }}
+            />
+          </Card>
+        </Col>
+      </Row>
+
+      {/* Tabs for different sections */}
+      <Tabs defaultActiveKey="1">
+        {/* Monthly Evolution */}
+        <TabPane tab="Évolution Mensuelle" key="1">
+          <Card title="Évolution mensuelle des indicateurs clés">
+            <ResponsiveContainer width="100%" height={400}>
+              <LineChart data={monthly_data}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="period_formatted" />
+                <YAxis yAxisId="left" />
+                <YAxis yAxisId="right" orientation="right" />
+                <Tooltip formatter={(value, name) => {
+                  if (name.includes('montant') || name.includes('profit') || name.includes('dépenses')) {
+                    return formatCurrency(value);
+                  } else if (name.includes('marge')) {
+                    return formatPercent(value);
+                  }
+                  return value;
+                }} />
+                <Legend />
+                <Line
+                  yAxisId="left"
+                  type="monotone"
+                  dataKey="total_amount"
+                  name="Montant total"
+                  stroke="#8884d8"
+                  activeDot={{ r: 8 }}
+                />
+                <Line
+                  yAxisId="left"
+                  type="monotone"
+                  dataKey="profit"
+                  name="Profit"
+                  stroke="#82ca9d"
+                />
+                <Line
+                  yAxisId="right"
+                  type="monotone"
+                  dataKey="margin"
+                  name="Marge (%)"
+                  stroke="#ff7300"
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </Card>
+        </TabPane>
+
+        {/* Client Breakdown */}
+        <TabPane tab="Répartition par Client" key="2">
+          <Row gutter={[16, 16]}>
+            <Col span={16}>
+              <Card title="Liste des clients">
+                <Table
+                  dataSource={client_breakdown}
+                  columns={clientColumns}
+                  rowKey="client_id"
+                  pagination={{ pageSize: 5 }}
+                />
+              </Card>
+            </Col>
+            <Col span={8}>
+              <Card title="Répartition du CA par client">
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie
+                      data={client_breakdown}
+                      dataKey="total_amount"
+                      nameKey="client_name"
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={80}
+                      label={(entry) => entry.client_name}
+                    >
+                      {client_breakdown.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(value) => formatCurrency(value)} />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              </Card>
+            </Col>
+          </Row>
+        </TabPane>
+
+        {/* Consultant Performance */}
+        <TabPane tab="Performance des Consultants" key="3">
+          <Card title="Détails des consultants">
+            <Table
+              dataSource={consultant_breakdown}
+              columns={consultantColumns}
+              rowKey="consultant_id"
+              pagination={{ pageSize: 5 }}
+            />
+          </Card>
+          <Row gutter={[16, 16]} style={{ marginTop: '20px' }}>
+            <Col span={12}>
+              <Card title="CA par consultant">
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={consultant_breakdown}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="consultant_name" />
+                    <YAxis />
+                    <Tooltip formatter={(value) => formatCurrency(value)} />
+                    <Legend />
+                    <Bar dataKey="total_amount" name="Montant" fill="#8884d8" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </Card>
+            </Col>
+            <Col span={12}>
+              <Card title="Taux d'utilisation par consultant">
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={consultant_breakdown}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="consultant_name" />
+                    <YAxis domain={[0, 100]} />
+                    <Tooltip formatter={(value) => `${value}%`} />
+                    <Legend />
+                    <Bar dataKey="utilization_rate" name="Taux d'utilisation" fill="#82ca9d" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </Card>
+            </Col>
+          </Row>
+        </TabPane>
+
+        {/* Expenses */}
+        <TabPane tab="Dépenses" key="4">
+          <Row gutter={[16, 16]}>
+            <Col span={12}>
+              <Card title="Répartition des dépenses">
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie
+                      data={expense_breakdown}
+                      dataKey="amount"
+                      nameKey="type"
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={80}
+                      label={(entry) => `${entry.type}: ${formatCurrency(entry.amount)}`}
+                    >
+                      {expense_breakdown.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(value) => formatCurrency(value)} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </Card>
+            </Col>
+            <Col span={12}>
+              <Card title="Détails des dépenses">
+                <List
+                  itemLayout="horizontal"
+                  dataSource={expense_breakdown}
+                  renderItem={(item) => (
+                    <List.Item>
+                      <List.Item.Meta
+                        avatar={<Avatar style={{ backgroundColor: COLORS[expense_breakdown.indexOf(item) % COLORS.length] }}>{item.type.charAt(0).toUpperCase()}</Avatar>}
+                        title={item.type.charAt(0).toUpperCase() + item.type.slice(1)}
+                        description={formatCurrency(item.amount)}
+                      />
+                      <div>
+                        <Progress 
+                          percent={Math.round((item.amount / summary.total_expenses) * 100)} 
+                          size="small" 
+                          status="active"
+                          strokeColor={COLORS[expense_breakdown.indexOf(item) % COLORS.length]}
+                        />
+                      </div>
+                    </List.Item>
+                  )}
+                />
+              </Card>
+            </Col>
+          </Row>
+        </TabPane>
+      </Tabs>
+    </div>
+  );
+};
+
+export default ESNFinancialDashboard;

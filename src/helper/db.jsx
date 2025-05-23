@@ -39,6 +39,64 @@ export const isAdminLoggedIn = () => {
     }
 };
 
+export const isConsultantLoggedIn = () => {
+    try {
+        const token = localStorage.getItem('consultantToken');
+        return !!token;
+    } catch (error) {
+        return false;
+    }
+};
+
+export const isCommercialLoggedIn = () => {
+    try {
+        const token = localStorage.getItem('unifiedToken');
+        const userRole = localStorage.getItem('userRole');
+        return !!(token && userRole === 'commercial');
+    } catch (error) {
+        return false;
+    }
+};
+
+export const isUnifiedUserLoggedIn = () => {
+    try {
+        const token = localStorage.getItem('unifiedToken');
+        const userId = localStorage.getItem('userId');
+        const userRole = localStorage.getItem('userRole');
+        return !!(token && userId && userRole);
+    } catch (error) {
+        return false;
+    }
+};
+
+export const isUnifiedConsultantLoggedIn = () => {
+    try {
+        const unifiedToken = localStorage.getItem('unifiedToken');
+        const userId = localStorage.getItem('userId');
+        const userRole = localStorage.getItem('userRole');
+        
+        return !!(unifiedToken && userId && userRole === 'consultant');
+    } catch (error) {
+        return false;
+    }
+};
+
+export const getAuthToken = () => {
+    // Return the appropriate token based on which login method was used
+    const consultantToken = localStorage.getItem('consultantToken');
+    const unifiedToken = localStorage.getItem('unifiedToken');
+    
+    return unifiedToken || consultantToken;
+};
+
+export const getUserId = () => {
+    // Return the appropriate user ID based on which login method was used
+    const consultantId = localStorage.getItem('consultantId');
+    const userId = localStorage.getItem('userId');
+    
+    return userId || consultantId;
+};
+
 export const logoutEsn = () => {
     try {
         localStorage.removeItem('token');
@@ -53,5 +111,35 @@ export const logoutEsn = () => {
     } catch (error) {
         console.error('Logout error:', error);
         return false;
+    }
+};
+
+export const logoutConsultant = (navigate) => {
+    const consultantToken = localStorage.getItem("consultantToken");
+    const unifiedToken = localStorage.getItem("unifiedToken");
+    
+    if (consultantToken) {
+        // Legacy logout
+        localStorage.removeItem("consultantToken");
+        localStorage.removeItem("consultantId");
+    }
+    
+    if (unifiedToken) {
+        // Unified login logout
+        localStorage.removeItem("unifiedToken");
+        localStorage.removeItem("userId");
+        localStorage.removeItem("userRole");
+        localStorage.removeItem("esnId");
+        localStorage.removeItem("userName");
+        localStorage.removeItem("userType");
+    }
+    
+    // Redirect to appropriate login page
+    if (navigate) {
+        if (unifiedToken) {
+            navigate("/unified-login");
+        } else {
+            navigate("/loginConsultant");
+        }
     }
 };
