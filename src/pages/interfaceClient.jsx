@@ -53,11 +53,10 @@ import PartenariatInterface from "../components/cl-interface/partenariat-list";
 import ConsultantManagement from "../components/cl-interface/list-consultant";
 import NotificationInterfaceClient from "../components/cl-interface/noti-list";
 import ClientCraValidation from "../components/cl-interface/ClientCraValidation";
+import ClientCraInterface from "../components/cl-interface/ClientCraInterface";
 import ClientFinancialDashboard from "../components/cl-interface/financial-dashboard";
 import { isClientLoggedIn, logoutEsn } from "../helper/db";
-import { useNavigate, useSearchParams } from "react-router-dom";
-
-// Text constants
+import { useNavigate, useSearchParams } from "react-router-dom";  // Text constants
 const t = {
   dashboard: "Tableau de Bord",
   mySpace: "Mon Espace",
@@ -71,6 +70,7 @@ const t = {
   purchaseOrders: "Bons de Commande",
   contracts: "Contrats",
   craValidation: "Validation des CRAs",
+  craManagement: "Gestion des CRAs",
   documents: "Mes Documents",
   documentManagement: " Gestion Documentaire",
   notifications: "Notifications",
@@ -724,11 +724,16 @@ const ClientProfile = () => {
             label: t.purchaseOrders,            key: "Liste-BDC",
             icon: <ShoppingOutlined />,
             disabled: !esnStatus,
-          },
-          {
+          },          {
             label: t.craValidation,
             key: "cra-validation",
             icon: <CheckOutlined />,
+            disabled: !esnStatus,
+          },
+          {
+            label: t.craManagement,
+            key: "cra-management",
+            icon: <FileDoneOutlined />,
             disabled: !esnStatus,
           },
           // {
@@ -898,14 +903,15 @@ const ClientProfile = () => {
       case "Appel-d'offres":
         return <AppelDOffreInterface />;
       case "Liste-Candidature":
-        return <CandidatureInterface />;
-      case "notification":
+        return <CandidatureInterface />;      case "notification":
         return <NotificationInterfaceClient />;
       case "Contart":
         return <ContractList />;      case "Liste-BDC":
         return <PurchaseOrderInterface />;
       case "cra-validation":
         return <ClientCraValidation />;
+      case "cra-management":
+        return <ClientCraInterface />;
       case "Partenariat":
         return <PartenariatInterface />;
       default:

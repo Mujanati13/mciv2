@@ -38,6 +38,7 @@ import axios from "axios";
 import { Endponit } from "../../helper/enpoint";
 import { useNavigate } from "react-router-dom";
 import "moment/locale/fr";
+import "./MonthlyActivityReport.css";
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -46,7 +47,7 @@ const { TextArea } = Input;
 
 const MonthlyActivityReport = () => {
   const navigate = useNavigate();
-  
+
   // Current date reference - using the current date instead of hardcoding future dates
   const currentDate = moment();
   // Get saved date from localStorage or use current date
@@ -93,6 +94,46 @@ const MonthlyActivityReport = () => {
   const [selectedCraEntry, setSelectedCraEntry] = useState(null);
   const [editForm] = Form.useForm();
   const [submissionForm] = Form.useForm();
+  // Add this with other state declarations at the top
+  const [contractStatuses, setContractStatuses] = useState({});
+
+  // Add this function to fetch contract statuses
+  const fetchContractStatuses = async (date) => {
+    try {
+      const consultantId = localStorage.getItem("userId");
+      if (!consultantId) return;
+
+      const period = date.format("MM_YYYY");
+
+      const response = await axios.get(`${Endponit()}/api/cra_consultant/`, {
+        params: {
+          consultant_id: consultantId,
+          period: period,
+        },
+      });
+
+      if (response.data?.status && response.data.data?.length > 0) {
+        // Create a map of contract ID to status
+        const statusMap = {};
+        response.data.data.forEach((cra) => {
+          if (cra.id_bdc) {
+            statusMap[cra.id_bdc] = {
+              statut: cra.statut,
+              n_jour: cra.n_jour,
+              commentaire: cra.commentaire,
+              id_CRA: cra.id_CRA,
+            };
+          }
+        });
+        setContractStatuses(statusMap);
+      } else {
+        setContractStatuses({});
+      }
+    } catch (error) {
+      console.error("Error fetching contract statuses:", error);
+      setContractStatuses({});
+    }
+  };
 
   // CRA status constants and state
   const CRA_STATUS = {
@@ -112,6 +153,7 @@ const MonthlyActivityReport = () => {
   useEffect(() => {
     fetchHolidays(selectedMonth);
     fetchMonthlyReport(selectedMonth);
+    fetchContractStatuses(selectedMonth); // Add this line
   }, [selectedMonth]);
 
   // State to track collapsed client groups
@@ -315,21 +357,74 @@ const MonthlyActivityReport = () => {
       updateCraDataWithHolidays(updatedDays);
     }
   };
+  // Add new function to fetch CRA status for the period
+  const fetchCraStatus = async (date) => {
+    try {
+      const consultantId = localStorage.getItem("userId");
+
+      if (!consultantId) {
+        console.error("Consultant ID not found");
+        return;
+      }
+
+      // Format period as MM_YYYY
+      const period = date.format("MM_YYYY");
+
+      // Use the CRA consultant API to get status
+      const response = await axios.get(`${Endponit()}/api/cra_consultant/`, {
+        params: {
+          consultant_id: consultantId,
+          period: period,
+        },
+      });
+
+      if (response.data?.status && response.data.data?.length > 0) {
+        // Get the CRA record for this period
+        const craRecord = response.data.data[0];
+
+        // Map API status to our internal status constants
+        const statusMapping = {
+          saisi: CRA_STATUS.A_SAISIR,
+          en_attente_prestataire: CRA_STATUS.EN_ATTENTE_PRESTATAIRE,
+          en_attente_client: CRA_STATUS.EN_ATTENTE_CLIENT,
+          valide: CRA_STATUS.VALIDE,
+        };
+
+        const mappedStatus =
+          statusMapping[craRecord.statut] || CRA_STATUS.A_SAISIR;
+        setMonthlyStatus(mappedStatus);
+
+        console.log("CRA Status for period:", period, "is:", mappedStatus);
+      } else {
+        // No CRA record exists for this period, default to "À saisir"
+        setMonthlyStatus(CRA_STATUS.A_SAISIR);
+        console.log(
+          "No CRA record found for period:",
+          period,
+          "defaulting to À saisir"
+        );
+      }
+    } catch (error) {
+      console.error("Error fetching CRA status:", error);
+      // Default to "À saisir" if API fails
+      setMonthlyStatus(CRA_STATUS.A_SAISIR);
+    }
+  };
 
   // Fetch consultant profile info using API endpoint
   const fetchConsultantInfo = async () => {
     try {
-      const consultantId = localStorage.getItem("consultantId");
-      const token = localStorage.getItem("consultantToken");
+      const consultantId = localStorage.getItem("id");
+      const token = localStorage.getItem("unifiedToken");
 
-      if (!consultantId || !token) {
+      if (!consultantId) {
         message.error("Information de connexion non trouvée");
         return;
       }
 
       const response = await axios.get(
-        `${Endponit()}/api/consultants/${consultantId}/profile/`,
-        { headers: { Authorization: `Bearer ${token}` } }
+        `${Endponit()}/api/consultants/${consultantId}/profile/`
+        // { headers: { Authorization: `Bearer ${token}` } }
       );
 
       if (response.data?.status) {
@@ -374,10 +469,10 @@ const MonthlyActivityReport = () => {
   // Fetch projects using the specified API and organize data for easy access
   const fetchProjects = async (date) => {
     try {
-      const consultantId = localStorage.getItem("consultantId");
-      const token = localStorage.getItem("consultantToken");
+      const consultantId = localStorage.getItem("userId");
+      // const token = localStorage.getItem("consultantToken");
 
-      if (!consultantId || !token) {
+      if (!consultantId) {
         message.error("Information de connexion non trouvée");
         return;
       }
@@ -388,7 +483,7 @@ const MonthlyActivityReport = () => {
       const response = await axios.get(
         `${Endponit()}/api/projects-by-consultant-period/`,
         {
-          headers: { Authorization: `Bearer ${token}` },
+          // headers: { Authorization: `Bearer ${token}` },
           params: {
             consultant_id: consultantId,
             period: period,
@@ -438,38 +533,36 @@ const MonthlyActivityReport = () => {
       message.error("Impossible de charger vos projets");
     }
   };
-
   const fetchMonthlyReport = async (date) => {
     setLoading(true);
     try {
-      const consultantId = localStorage.getItem("consultantId");
-      const token = localStorage.getItem("consultantToken");
+      const consultantId = localStorage.getItem("userId");
+      // const token = localStorage.getItem("consultantToken");
 
-      if (!consultantId || !token) {
+      if (!consultantId) {
         message.error("Information de connexion non trouvée");
         return;
       }
 
       // Format period as MM_YYYY instead of YYYY-MM
-      const period = date.format("MM_YYYY"); // Use the new cra-by-period endpoint with query parameters
+      const period = date.format("MM_YYYY");
+
+      // Fetch CRA status first
+      await fetchCraStatus(date);
+
+      // Use the new cra-by-period endpoint with query parameters
       const response = await axios.get(`${Endponit()}/api/cra-by-period/`, {
         params: {
           consultant_id: consultantId,
           period: period,
         },
         headers: {
-          Authorization: `Bearer ${token}`,
+          // Authorization: `Bearer ${token}`,
         },
       });
 
       if (response.data?.status) {
-        // Check if the response contains a status for the monthly report
-        if (response.data.cra_status) {
-          setMonthlyStatus(response.data.cra_status);
-        } else {
-          // Default to "À saisir" if API doesn't provide a status
-          setMonthlyStatus(CRA_STATUS.A_SAISIR);
-        }
+        // The CRA status is now fetched separately via fetchCraStatus
         // Get all CRA entries that can be submitted (i.e., those with status "À saisir")
         const entries = response.data.data || [];
         const submittableEntries = entries
@@ -633,14 +726,39 @@ const MonthlyActivityReport = () => {
       ) {
         dayData.isHoliday = true;
       }
-    });
-
-    // Calculate total work days (now accounting for partial days)
+    });    // Calculate total work days (now accounting for partial days)
     const totalDays = daysData.reduce((sum, day) => sum + day.total, 0);
 
     // Calculate potential work days (excluding weekends and holidays)
     const potentialWorkDays = daysData.filter(
       (day) => !day.isWeekend && !day.isHoliday
+    ).length;
+      // Calculate "Pas d'activité" days - count workdays with no activity or with absence/congé type
+    const noActivityDays = daysData.filter(
+      (day) => {
+        // Check if it's not a weekend or holiday
+        if (day.isWeekend || day.isHoliday) return false;
+        
+        // Count days with zero activity
+        if (day.total === 0) return true;
+        
+        // Check if all entries for this day are of type "absence" or "congé"
+        if (day.entries && day.entries.length > 0) {
+          // Check if any entry has type "absence", "congé" or type_imputation "Absence", "Congé"
+          const hasAbsenceOrCongeEntry = day.entries.some(
+            entry => (
+              entry.type === "absence" || 
+              entry.type_imputation === "Absence" ||
+              entry.type === "congé" || 
+              entry.type_imputation === "Congé"
+            )
+          );
+          
+          return hasAbsenceOrCongeEntry;
+        }
+        
+        return false;
+      }
     ).length;
 
     setCraData({
@@ -648,6 +766,7 @@ const MonthlyActivityReport = () => {
       clientWork: Object.values(clientWork),
       totalDays: totalDays,
       potentialWorkDays: potentialWorkDays,
+      noActivityDays: noActivityDays,
     });
 
     // Fetch holidays data after processing CRA data
@@ -658,10 +777,10 @@ const MonthlyActivityReport = () => {
   const submitCraEntry = async (values) => {
     setSubmitting(true);
     try {
-      const consultantId = localStorage.getItem("consultantId");
-      const token = localStorage.getItem("consultantToken");
+      const consultantId = localStorage.getItem("userId");
+      // const token = localStorage.getItem("consultantToken");
 
-      if (!consultantId || !token) {
+      if (!consultantId) {
         message.error("Information de connexion non trouvée");
         return;
       }
@@ -698,8 +817,8 @@ const MonthlyActivityReport = () => {
 
       const response = await axios.post(
         `${Endponit()}/api/cra_imputation`,
-        submitData,
-        { headers: { Authorization: `Bearer ${token}` } }
+        submitData
+        // { headers: { Authorization: `Bearer ${token}` } }
       );
       if (response.data?.status) {
         message.success("Imputation CRA ajoutée avec succès");
@@ -735,8 +854,8 @@ const MonthlyActivityReport = () => {
   const updateCraEntry = async (values) => {
     setSubmitting(true);
     try {
-      const consultantId = localStorage.getItem("consultantId");
-      const token = localStorage.getItem("consultantToken");
+      const consultantId = localStorage.getItem("userId");
+      const token = localStorage.getItem("unifiedToken");
 
       if (!consultantId || !token || !selectedCraEntry?.id_imputation) {
         message.error("Information de connexion ou d'entrée non trouvée");
@@ -812,7 +931,7 @@ const MonthlyActivityReport = () => {
   }; // Delete CRA entry
   const deleteCraEntry = async (entryId) => {
     try {
-      const token = localStorage.getItem("consultantToken");
+      const token = localStorage.getItem("userId");
 
       if (!token || !entryId) {
         message.error("Information de connexion ou d'entrée non trouvée");
@@ -869,73 +988,61 @@ const MonthlyActivityReport = () => {
     }
   };
 
-  const submitMonthlyReportForValidation = async (specific_entries = null) => {
+  const submitMonthlyReportForValidation = async (selectedEntries) => {
     setSubmitting(true);
     try {
-      const consultantId = localStorage.getItem("consultantId");
-      const token = localStorage.getItem("consultantToken");
+      const consultantId = localStorage.getItem("userId");
+      const token = localStorage.getItem("unifiedToken");
 
-      if (!consultantId || !token) {
+      if (!consultantId) {
         message.error("Information de connexion non trouvée");
         return;
       }
 
-      // Format period as MM_YYYY
       const formattedPeriod = `${selectedMonth.format(
         "MM"
       )}_${selectedMonth.format("YYYY")}`;
 
-      if (specific_entries && specific_entries.length > 0) {
-        // Update each selected entry's status
-        const updatePromises = specific_entries.map(async (entry) => {
-          // Determine the correct type - handle both type and type_imputation fields
-          const entryType = entry.type_imputation
-            ? entry.type_imputation.toLowerCase()
-            : entry.type || "travail";
+      // Get the project ID from the selected contract (using selectedContractId)
+      const projectId = selectedContractId;
 
-          console.log("Submitting entry:", {
-            id: entry.id_imputation,
-            type: entryType,
-            durée: entry.Durée,
-          });
+      if (!projectId) {
+        message.error("Aucun contrat sélectionné");
+        return;
+      }
 
-          const updateData = {
-            période: formattedPeriod,
-            jour: entry.jour,
-            type: entryType,
-            id_consultan: parseInt(consultantId),
-            id_esn: consultantProfile?.ID_ESN || null,
-            id_client: entry.id_client || null,
-            id_bdc: entry.id_bdc || null,
-            commentaire: entry.commentaire || "",
-            Durée: parseFloat(entry.Durée), // Include the Durée field - ensure it's a number
-            statut: CRA_STATUS.EN_ATTENTE_PRESTATAIRE,
-          };
+      // Find the specific CRA record for this contract
+      const contractStatus = contractStatuses[projectId];
 
-          return axios.put(
-            `${Endponit()}/api/cra_imputation/${entry.id_imputation}`,
-            updateData,
+      if (contractStatus && contractStatus.id_CRA) {
+        try {
+          const response = await axios.put(
+            `${Endponit()}/api/cra_consultant/${contractStatus.id_CRA}/`,
+            {
+              statut: "EVP",
+              commentaire: `CRA soumis pour validation - ${formattedPeriod}`,
+            },
             { headers: { Authorization: `Bearer ${token}` } }
           );
-        });
 
-        try {
-          await Promise.all(updatePromises);
+          console.log(
+            "CRA status updated successfully for contract:",
+            projectId,
+            response.data
+          );
           message.success("CRA soumis pour validation avec succès");
           setSubmissionModalVisible(false);
+          setSelectedContractId(null); // Reset after successful submission
 
-          // Force refresh to show updated status
-          setTimeout(() => {
-            window.location.reload();
-          }, 500);
-        } catch (err) {
-          console.error("Error in update promises:", err);
-          message.error(
-            "Erreur lors de la soumission de certaines imputations"
-          );
+          // Refresh the data to show updated status
+          await fetchContractStatuses(selectedMonth);
+          await fetchMonthlyReport(selectedMonth);
+        } catch (statusError) {
+          console.error("Error updating CRA status:", statusError);
+          message.error("Erreur lors de la mise à jour du statut du CRA");
         }
       } else {
-        message.error("Veuillez sélectionner au moins une imputation");
+        message.error(`Aucun CRA existant trouvé pour le contrat ${projectId}`);
       }
     } catch (error) {
       console.error("Error submitting CRA for validation:", error);
@@ -952,7 +1059,32 @@ const MonthlyActivityReport = () => {
       return;
     }
     setSubmissionModalVisible(true);
-  };
+  };  // Add a new function for immediate refresh without page reload
+  const handleMonthChangeWithRefresh = async (date) => {
+    // Save the selected date in localStorage
+    localStorage.setItem("selectedMonthCRA", date.format("YYYY-MM"));
+    
+    // Update state
+    setSelectedMonth(date);
+    setLoading(true);
+
+    try {
+      // Fetch all necessary data for the new period
+      await fetchContractStatuses(date);
+      await fetchCraStatus(date);
+      await fetchProjects(date);
+      await fetchMonthlyReport(date);
+      await fetchHolidays(date);
+      
+      // Display success message
+      message.success(`Période mise à jour: ${date.format('MMMM YYYY')}`);
+    } catch (error) {
+      console.error("Error refreshing data:", error);
+      message.error("Erreur lors du chargement des données pour cette période");
+    } finally {
+      setLoading(false);
+    }
+  };  // Use the original handleMonthChange function that reloads the page
   const handleMonthChange = (date) => {
     // Save the selected date in localStorage
     localStorage.setItem("selectedMonthCRA", date.format("YYYY-MM"));
@@ -1109,9 +1241,15 @@ const MonthlyActivityReport = () => {
 
   // Open edit form for a specific entry
   const editCraEntry = (entry) => {
-    // Check if entry can be edited (only if status is A_SAISIR or undefined)
-    if (entry.statut && entry.statut !== CRA_STATUS.A_SAISIR) {
-      message.error("Impossible de modifier une imputation déjà soumise.");
+    // Check if entry can be edited based on CRA consultant status
+    const contractStatus = contractStatuses[entry.id_bdc];
+    if (
+      contractStatus &&
+      (contractStatus.statut === "EVC" || contractStatus.statut === "EVP")
+    ) {
+      message.error(
+        "Impossible de modifier une imputation avec le statut CRA EVC ou EVP."
+      );
       return;
     }
 
@@ -1128,11 +1266,11 @@ const MonthlyActivityReport = () => {
       id_client: entry.id_client,
       id_bdc: entry.id_bdc,
       type_imputation: typeImputation,
-      Durée: entry.Durée, // Changed from 'durée' to 'Durée' to match the form field name
+      Durée: entry.Durée,
       commentaire: entry.commentaire,
     });
   };
-  // Update the renderCellContent function
+
   const renderCellContent = (day, client) => {
     if (!day) return "";
     if (day.isWeekend) return null;
@@ -1158,7 +1296,7 @@ const MonthlyActivityReport = () => {
         : "1";
     }
 
-    // For "Pas d'activité" row - Show remaining time (out of 1) for each specific day
+    // For "Pas d'activité" row - Show ONLY remaining time (rest of 1) for each specific day
     if (client === null) {
       // Check if the day is in the future
       const dayDate = moment(
@@ -1169,49 +1307,7 @@ const MonthlyActivityReport = () => {
       // If it's a future date, show nothing
       if (isFutureDate) return "";
 
-      // Check if this day has absence entries and calculate their total duration
-      const absenceEntries =
-        day.entries?.filter(
-          (entry) =>
-            entry.type_imputation === "Congé" ||
-            entry.type_imputation === "Maladie" ||
-            entry.type_imputation === "Absence" ||
-            entry.type === "congé" ||
-            entry.type === "maladie" ||
-            entry.type === "absence"
-        ) || [];
-
-      // If there are absence entries, show type indicator + duration
-      if (absenceEntries.length > 0) {
-        const absenceDuration = absenceEntries.reduce(
-          (sum, entry) => sum + parseFloat(entry.Durée || 0),
-          0
-        );
-
-        // Check entry types to determine indicator
-        const hasConge = absenceEntries.some(
-          (entry) => entry.type_imputation === "Congé" || entry.type === "congé"
-        );
-
-        const hasAbsence = absenceEntries.some(
-          (entry) =>
-            entry.type_imputation === "Absence" ||
-            entry.type_imputation === "Maladie" ||
-            entry.type === "absence" ||
-            entry.type === "maladie"
-        );
-
-        // Create indicator based on types
-        let indicator = "";
-        if (hasConge && !hasAbsence) indicator = "C";
-        else if (!hasConge && hasAbsence) indicator = "A";
-        else if (hasConge && hasAbsence) indicator = "C,A";
-
-        // Return indicator + duration
-        return `${indicator} ${absenceDuration.toString().replace(".", ",")}`;
-      }
-
-      // Otherwise, calculate remaining duration as before
+      // Calculate total duration from ALL entries for this day (work + absences)
       const totalDuration =
         day.entries?.reduce(
           (sum, entry) => sum + parseFloat(entry.Durée || 0),
@@ -1226,9 +1322,11 @@ const MonthlyActivityReport = () => {
         ? remainingDuration.toString().replace(".", ",")
         : "0";
     }
+
     // Empty cell for all other cases
     return "";
   };
+
   const createColumns = () => {
     if (!craData) return [];
 
@@ -1239,114 +1337,72 @@ const MonthlyActivityReport = () => {
     };
 
     const columns = [
-      {
-        title: "Client",
-        dataIndex: "sem",
-        key: "sem",
-        width: 150,
-        fixed: "left",
-        render: (text, record) => {
-          // If it's a client group header, display the client name with proper styling
-          if (record.type === "client_group_header") {
-            return (
-              <div
-                onClick={() => toggleGroupCollapse(record.groupId)}
-                style={{
-                  fontSize: "16px",
-                  color: "#1890ff",
-                  display: "flex",
-                  alignItems: "center",
-                  cursor: "pointer",
-                }}
-              >
-                {" "}
-                <span
+           // Update the Client column render function
+        {
+          title: "Client",
+          dataIndex: "sem",
+          key: "sem",
+          width: 200,
+          fixed: "left",
+          render: (text, record) => {
+            // Add validation button for each individual contract in Client column
+            if (
+              record.type === "client" &&
+              monthlyStatus === CRA_STATUS.A_SAISIR
+            ) {
+              // Check if this contract can be submitted - Updated to include "annule"
+              const canSubmit =
+                !record.contractStatus ||
+                record.contractStatus?.statut === "saisi" ||
+                record.contractStatus?.statut === "annule";
+
+              return (
+                <div
                   style={{
-                    marginRight: "8px",
-                    transition: "transform 0.2s",
-                    display: "inline-block",
-                    transform: record.isCollapsed
-                      ? "rotate(0deg)"
-                      : "rotate(90deg)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    flexWrap: "wrap",
+                    gap: "4px",
                   }}
                 >
-                  {record.isCollapsed ? "▶" : "🔽"}
-                </span>
-                {text}
-              </div>
-            );
-          }
-
-          // For ALL project rows (removed the !record.isFirstInGroup condition)
-          if (record.type === "client") {
-            return (
-              <div style={{ paddingLeft: "26px" }}>
-                <Tooltip title="Soumettre par contrat">
-                  <Button
-                    type="link"
-                    size="small"
-                    icon={<CheckOutlined />}
-                    onClick={(e) => {
-                      e.stopPropagation(); // Prevent row click event
-
-                      // Get the specific project ID for this row
-                      const projectId = record.client.projectId;
-                      console.log("Submitting for contract ID:", projectId);
-
-                      // Filter entries ONLY for this specific contract
-                      const contractEntries = craEntriesToSubmit.filter(
-                        (entry) =>
-                          entry.id_bdc === projectId &&
-                          (!entry.statut ||
-                            entry.statut === CRA_STATUS.A_SAISIR)
-                      );
-
-                      if (contractEntries.length === 0) {
-                        message.info(
-                          "Aucune imputation à soumettre pour ce contrat"
-                        );
-                        return;
+                  <div style={{ flex: 1 }}>{text}</div>
+                  {canSubmit && (
+                    <Button
+                      type="primary"
+                      size="small"
+                      onClick={() => {
+                        // Set the selected contract ID before opening modal
+                        setSelectedContractId(record.contractId);
+                        openSubmissionModalForContracts([record.contractId]);
+                      }}
+                      style={{
+                        fontSize: "11px",
+                        padding: "0 8px",
+                        height: "24px",
+                      }}
+                      title={
+                        record.contractStatus?.statut === "annule"
+                          ? "Renvoyer le CRA annulé pour validation"
+                          : "Envoyer le CRA pour validation"
                       }
-
-                      // Reset all entries to unselected first
-                      const updatedEntries = [...craEntriesToSubmit].map(
-                        (entry) => ({
-                          ...entry,
-                          selected: false,
-                        })
-                      );
-
-                      // Then mark ONLY this contract's entries as selected
-                      contractEntries.forEach((contractEntry) => {
-                        const index = updatedEntries.findIndex(
-                          (entry) =>
-                            entry.id_imputation === contractEntry.id_imputation
-                        );
-                        if (index !== -1) {
-                          updatedEntries[index].selected = true;
-                        }
-                      });
-
-                      setCraEntriesToSubmit(updatedEntries);
-                      setSubmissionModalVisible(true);
-                    }}
-                    style={{ fontSize: "16px", padding: "0", height: "auto" }}
-                  />
-                </Tooltip>
-              </div>
-            );
-          }
-
-          // Otherwise, show the normal text
-          return text;
+                    >
+                      Envoyer
+                    </Button>
+                  )}
+                </div>
+              );
+            }
+            return text;
+          },
         },
-      },
       {
         title: "Contrat",
         dataIndex: "contrat",
         key: "contrat",
         width: 220,
         fixed: "left",
+        // Remove the render function from Contrat column - just show text
       },
       {
         title: (
@@ -1365,26 +1421,25 @@ const MonthlyActivityReport = () => {
     ];
 
     // Add day columns in a single row instead of grouping by weeks
-    craData.days.forEach((day) => {
+    craData.days.forEach((dayData) => {
       const date = moment(
-        new Date(selectedMonth.year(), selectedMonth.month(), day.day)
+        new Date(selectedMonth.year(), selectedMonth.month(), dayData.day)
       );
 
       // Check if the day is in the future
       const isFutureDate = date.isAfter(currentDate, "day");
+
       columns.push({
         title: (
           <div>
-            <div>{day.day}</div>
+            <div>{dayData.day}</div>
             <div>{getWeekdayLetter(date)}</div>
           </div>
         ),
-        dataIndex: `day_${day.day}`,
-        key: `day_${day.day}`,
+        dataIndex: `day_${dayData.day}`,
+        key: `day_${dayData.day}`,
         align: "center",
         width: 40,
-        // Inside the createColumns function, modify the render function of each day column:
-
         render: (text, record) => {
           // For client group header rows, show empty cells
           if (record.type === "client_group_header") {
@@ -1393,80 +1448,25 @@ const MonthlyActivityReport = () => {
 
           const content =
             record.type === "client"
-              ? renderCellContent(day, record.client)
+              ? renderCellContent(dayData, record.client)
               : record.type === "noactivity"
-              ? renderCellContent(day, null)
+              ? renderCellContent(dayData, null)
               : "";
 
           // Add tooltip for holiday days to show the holiday name
-          if (day.isHoliday && day.holidayName) {
-            return <Tooltip title={day.holidayName}>{content}</Tooltip>;
+          if (dayData.isHoliday && dayData.holidayName) {
+            return <Tooltip title={dayData.holidayName}>{content}</Tooltip>;
           }
 
-          // Special handling for "noactivity" row cells that aren't weekends and have content
-          if (record.type === "noactivity" && !day.isWeekend && content) {
-            // Check if this day has congé entries
-            const hasConge = day.entries?.some(
-              (entry) =>
-                entry.type_imputation === "Congé" || entry.type === "congé"
-            );
-
-            // Check if this day has absence entries
-            const hasAbsence = day.entries?.some(
-              (entry) =>
-                entry.type_imputation === "Absence" ||
-                entry.type_imputation === "Maladie" ||
-                entry.type === "absence" ||
-                entry.type === "maladie"
-            );
-
-            // Calculate total duration
-            const totalDuration =
-              day.entries?.reduce(
-                (sum, entry) => sum + parseFloat(entry.Durée || 0),
-                0
-              ) || 0;
-
-            // Determine which CSS class to use
-            let cellClass = "";
-            if (hasConge && !hasAbsence) {
-              cellClass = "absence-check-cell conge";
-            } else if (!hasConge && hasAbsence) {
-              cellClass = "absence-check-cell";
-            } else if (hasConge && hasAbsence) {
-              cellClass = "absence-check-cell mixed";
-            } else if (parseFloat(content) > 0) {
-              cellClass = "available-cell";
-            } else {
-              cellClass = "no-remaining-cell";
-            }
-
-            // Display the actual letter (C or A) before the duration
-            let displayContent = totalDuration.toString().replace(".", ",");
-            if (hasConge && !hasAbsence) {
-              displayContent = "C " + displayContent;
-            } else if (!hasConge && hasAbsence) {
-              displayContent = "A " + displayContent;
-            } else if (hasConge && hasAbsence) {
-              displayContent = "C,A " + displayContent;
-            }
-
-            return (
-              <div className={cellClass} style={{ padding: "8px" }}>
-                {displayContent}
-              </div>
-            );
-          }
-
-          // Default rendering for other cells
+          // Simple rendering - just show the content
           return content;
         },
-        className: day.isWeekend
+        className: dayData.isWeekend
           ? "weekend-cell"
-          : day.isHoliday
+          : dayData.isHoliday
           ? "holiday-cell"
-          : day.entries &&
-            day.entries.some(
+          : dayData.entries &&
+            dayData.entries.some(
               (entry) =>
                 entry.type_imputation === "Congé" ||
                 entry.type_imputation === "Maladie" ||
@@ -1476,32 +1476,33 @@ const MonthlyActivityReport = () => {
                 entry.type === "absence"
             )
           ? "absence-cell"
-          : day.entries &&
-            day.entries.some((entry) => entry.status === CRA_STATUS.A_SAISIR)
+          : dayData.entries &&
+            dayData.entries.some(
+              (entry) => entry.status === CRA_STATUS.A_SAISIR
+            )
           ? "cra-status-saisir"
-          : day.entries &&
-            day.entries.some(
+          : dayData.entries &&
+            dayData.entries.some(
               (entry) => entry.status === CRA_STATUS.EN_ATTENTE_PRESTATAIRE
             )
           ? "cra-status-prestataire"
-          : day.entries &&
-            day.entries.some(
+          : dayData.entries &&
+            dayData.entries.some(
               (entry) => entry.status === CRA_STATUS.EN_ATTENTE_CLIENT
             )
           ? "cra-status-client"
-          : day.entries &&
-            day.entries.some((entry) => entry.status === CRA_STATUS.VALIDE)
+          : dayData.entries &&
+            dayData.entries.some((entry) => entry.status === CRA_STATUS.VALIDE)
           ? "cra-status-valide"
           : isFutureDate
           ? "future-date-cell"
           : "",
-        // Modify the onCell property in the createColumns function
         onCell: (record) => {
           return {
             onClick: () => {
               // Skip weekends and client group headers
               if (
-                day.isWeekend ||
+                dayData.isWeekend ||
                 record.type === "client_group_header" ||
                 record.type === "section"
               )
@@ -1524,23 +1525,29 @@ const MonthlyActivityReport = () => {
                 console.log("Clicked on client cell:", clickedRecord);
 
                 // First handle any existing entries
-                const dayData = craData.days.find((d) => d.day === day.day);
-                if (dayData && dayData.hasEntry && dayData.entries.length > 0) {
-                  openEditDrawer(dayData, clickedRecord);
+                const dayDataForClick = craData.days.find(
+                  (d) => d.day === dayData.day
+                );
+                if (
+                  dayDataForClick &&
+                  dayDataForClick.hasEntry &&
+                  dayDataForClick.entries.length > 0
+                ) {
+                  openEditDrawer(dayDataForClick, clickedRecord);
                 } else {
                   // Direct call to openAddCraModal for new entries
-                  openAddCraModal(day, clickedRecord);
+                  openAddCraModal(dayData, clickedRecord);
                 }
               } else if (record.type === "noactivity") {
                 // For "pas d'activité" cells, open add modal with absence/congé type preset
                 const clickedRecord = { type: "noactivity", client: null };
-                openAddCraModal(day, clickedRecord);
+                openAddCraModal(dayData, clickedRecord);
               } else {
-                openEditDrawer(day);
+                openEditDrawer(dayData);
               }
             },
             style: {
-              cursor: day.isWeekend ? "default" : "pointer",
+              cursor: dayData.isWeekend ? "default" : "pointer",
               position: "relative",
               backgroundColor:
                 record.type === "noactivity"
@@ -1558,13 +1565,11 @@ const MonthlyActivityReport = () => {
     return columns;
   };
 
-  // Create data rows for the table
-  // In createTableData function - add grandTotal calculation:
   const createTableData = () => {
     if (!craData) return [];
 
     const data = [];
-    let grandTotal = 0; // We don't need to add a separate header row since the columns already have headers
+    let grandTotal = 0;
 
     // Map to track projects already added from CRA data
     const addedProjectIds = {};
@@ -1592,13 +1597,66 @@ const MonthlyActivityReport = () => {
           };
         }
 
+        // Get contract status from the API
+        const contractStatus = contractStatuses[projectId];
+
         // Add project to client group
         clientGroups[clientId].projects.push({
           key: `client_${projectId}`,
           type: "client",
           client: client,
-          sem: project?.client_name || client.clientName,
-          contrat: project
+          sem: contractStatus ? (
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>              <Tag
+                color={
+                  contractStatus.statut === "saisi"
+                    ? "blue"
+                    : contractStatus.statut === "EVP"
+                    ? "orange"
+                    : contractStatus.statut === "EVC"
+                    ? "purple"
+                    : contractStatus.statut === "annule"
+                    ? "red"
+                    : contractStatus.statut === "en_attente_prestataire"
+                    ? "orange"
+                    : contractStatus.statut === "en_attente_client"
+                    ? "purple"
+                    : contractStatus.statut === "valide"
+                    ? "green"
+                    : "default"
+                }
+                title={contractStatus.statut === "annule" && contractStatus.commentaire ? 
+                  (() => {
+                    try {
+                      const commentObj = JSON.parse(contractStatus.commentaire);
+                      return `Annulé le ${commentObj.timestamp} par ${commentObj.user.name} (${commentObj.user.role})
+Raison: ${commentObj.reason}
+Statut précédent: ${commentObj.previousStatus}`;
+                    } catch (e) {
+                      return contractStatus.commentaire;
+                    }
+                  })() 
+                  : undefined}
+              >
+                {contractStatus.statut === "saisi"
+                  ? "À saisir"
+                  : contractStatus.statut === "EVP"
+                  ? "En validation prestataire"
+                  : contractStatus.statut === "EVC"
+                  ? "En validation client"
+                  : contractStatus.statut === "annule"
+                  ? "Annulé"
+                  : contractStatus.statut === "en_attente_prestataire"
+                  ? "En attente prestataire"
+                  : contractStatus.statut === "en_attente_client"
+                  ? "En attente client"
+                  : contractStatus.statut === "valide"
+                  ? "Validé"
+                  : contractStatus.statut}
+              </Tag>
+            </div>
+          ) : (
+            project?.client_name || client.clientName
+          ),          contrat: project
             ? `${project.titre} ${
                 project.candidature?.statut === "Sélectionnée"
                   ? `[${project.candidature.tjm}€/j]`
@@ -1612,8 +1670,9 @@ const MonthlyActivityReport = () => {
           ),
           projectTotal: parseFloat(client.total || 0),
           isFirstInGroup: false,
+          contractId: projectId,
+          contractStatus: contractStatus,
         });
-
         // Add to client total
         clientGroups[clientId].total += parseFloat(client.total || 0);
 
@@ -1654,12 +1713,47 @@ const MonthlyActivityReport = () => {
         days: [],
       };
 
+      // Get contract status for projects without CRA entries
+      const contractStatus = contractStatuses[project.id];
+
       // Add project to client group
       clientGroups[clientId].projects.push({
         key: `empty_client_${project.id}`,
         type: "client",
         client: emptyClient,
-        sem: project.client_name,
+        sem: contractStatus ? (
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <span>{project.client_name}</span>
+            <Tag
+              color={
+                contractStatus.statut === "saisi"
+                  ? "blue"
+                  : contractStatus.statut === "en_attente_prestataire"
+                  ? "orange"
+                  : contractStatus.statut === "en_attente_client"
+                  ? "purple"
+                  : contractStatus.statut === "valide"
+                  ? "green"
+                  : "default"
+              }
+            >
+              {contractStatus.statut === "saisi"
+                ? "À saisir"
+                : contractStatus.statut === "en_attente_prestataire"
+                ? "En attente prestataire"
+                : contractStatus.statut === "en_attente_client"
+                ? "En attente client"
+                : contractStatus.statut === "valide"
+                ? "Validé"
+                : contractStatus.statut}
+            </Tag>
+            {contractStatus.n_jour && (
+              <Tag color="cyan">{contractStatus.n_jour}j</Tag>
+            )}
+          </div>
+        ) : (
+          project.client_name
+        ),
         contrat: `${project.titre} ${
           project.candidature?.statut === "Sélectionnée"
             ? `[${project.candidature.tjm}€/j]`
@@ -1668,8 +1762,11 @@ const MonthlyActivityReport = () => {
         total: <span style={{ color: "#999" }}>0,0</span>,
         projectTotal: 0,
         isFirstInGroup: false,
+        contractId: project.id,
+        contractStatus: contractStatus,
       });
     });
+
     // Add client groups to data array
     Object.values(clientGroups).forEach((clientGroup, index) => {
       // Apply client filter if set
@@ -1699,9 +1796,8 @@ const MonthlyActivityReport = () => {
                 cursor: "pointer",
               }}
             >
-              {" "}
               <span style={{ marginRight: "8px" }}>
-                {/* {collapsedGroups[index] ? "▶" : "🔽"} */}
+                {/* Icon handled in render function */}
               </span>
               {clientGroup.name}
               {clientGroup.projects.length > 1 && (
@@ -1740,15 +1836,14 @@ const MonthlyActivityReport = () => {
           clientGroup.projects[0].isFirstInGroup = true;
         }
       }
+
       // Add all projects in this client group if not collapsed
       if (!collapsedGroups[index]) {
         clientGroup.projects.forEach((project) => {
           data.push(project);
         });
       }
-    });
-
-    // Add a total row if there are any projects
+    });    // Add a total row if there are any projects
     if (data.length > 1) {
       data.push({
         key: "grand_total",
@@ -1763,37 +1858,85 @@ const MonthlyActivityReport = () => {
           </strong>
         ),
       });
-    } // Calculate total absences
-    const totalAbsences =
-      craData?.days?.reduce((total, day) => {
-        // Count absences (congé, maladie, absence)
-        const hasAbsence = day.entries?.some(
-          (entry) =>
-            entry.type_imputation === "Congé" ||
-            entry.type_imputation === "Maladie" ||
-            entry.type_imputation === "Absence" ||
-            entry.type === "congé" ||
-            entry.type === "maladie" ||
-            entry.type === "absence"
-        );
-        return total + (hasAbsence ? 1 : 0);
-      }, 0) || 0;
+    }
 
-    // Add "Pas d'activité" row
-    data.push({
+    // Calculate total remaining time for "Pas d'activité" row
+    const totalRemainingTime =
+      craData?.days?.reduce((total, day) => {
+        // Skip weekends and holidays
+        if (day.isWeekend || day.isHoliday) return total;
+
+        // Check if the day is in the future
+        const dayDate = moment(
+          new Date(selectedMonth.year(), selectedMonth.month(), day.day)
+        );
+        const isFutureDate = dayDate.isAfter(currentDate, "day");
+        if (isFutureDate) return total;
+
+        // Calculate total duration from ALL entries for this day (work + absences)
+        const totalDuration =
+          day.entries?.reduce(
+            (sum, entry) => sum + parseFloat(entry.Durée || 0),
+            0
+          ) || 0;
+
+        // Calculate remaining time for this day
+        const remainingDuration = Math.max(0, 1 - totalDuration);
+
+        return total + remainingDuration;      }, 0) || 0;    // Add "Pas d'activité" row with total remaining time and display number of days without activity
+    data.push({      
       key: "no_activity",
-      type: "noactivity",
+      type: "section", // Change to section type to match the grand_total row styling
       sem: (
-        <span style={{ color: "#1890ff", fontWeight: "bold" }}>
-          Pas d'activité
+        <span style={{ 
+          color: craData.noActivityDays > 0 ? "#ff4d4f" : "#1890ff",
+          fontWeight: "bold" 
+        }}>
+          Pas d'activité ({craData.noActivityDays} jours)
         </span>
       ),
       contrat: "",
-      total: totalAbsences.toString(),
+      total: (
+        <span style={{ 
+          fontWeight: "bold",
+          color: craData.noActivityDays > 0 ? "#ff4d4f" : "inherit"
+        }}>
+          {totalRemainingTime.toFixed(1).replace(".", ",")}
+        </span>
+      ),
     });
 
     return data;
-  }; // Update the renderLegend function to include all cell types with matching colors
+  };
+
+  // Add new function to handle contract-specific validation
+  const openSubmissionModalForContracts = (contractIds) => {
+    // Filter CRA entries for the specific contracts
+    const contractEntries = craEntriesToSubmit.filter(
+      (entry) =>
+        contractIds.includes(entry.id_bdc) &&
+        (!entry.statut || entry.statut === CRA_STATUS.A_SAISIR)
+    );
+
+    if (contractEntries.length === 0) {
+      message.info("Aucune entrée CRA à soumettre pour ce contrat");
+      return;
+    }
+
+    // Mark all contract entries as selected
+    const updatedEntries = craEntriesToSubmit.map((entry) => ({
+      ...entry,
+      selected:
+        contractIds.includes(entry.id_bdc) &&
+        (!entry.statut || entry.statut === CRA_STATUS.A_SAISIR),
+    }));
+
+    setCraEntriesToSubmit(updatedEntries);
+    setSelectedContractId(contractIds[0]); // Set for modal title
+    setSubmissionModalVisible(true);
+  };
+
+  // Update the renderLegend function to include all cell types with matching colors
   const renderLegend = () => (
     <div style={{ marginTop: 16, display: "flex", flexWrap: "wrap", gap: 16 }}>
       <div>
@@ -1803,7 +1946,7 @@ const MonthlyActivityReport = () => {
       </div>
       <div>
         <Tag color="#fffbe6" style={{ marginRight: 8, color: "black" }}>
-          Congé 
+          Congé
         </Tag>
       </div>
       <div>
@@ -1878,11 +2021,10 @@ const MonthlyActivityReport = () => {
                     <Text>{consultantProfile.Role}</Text>
                   </div>
                 )}
-              </Col>
-              <Col span={8}>
+              </Col>              <Col span={8}>
                 <div className="info-block">
                   <Text strong>Période : </Text>
-                  <Text>{selectedMonth.format("MMMM YYYY")}</Text>
+                  <Text style={{ textTransform: 'capitalize' }}>{selectedMonth.format("MMMM YYYY")}</Text>
                 </div>
                 {consultantProfile?.Technologie && (
                   <div className="info-block">
@@ -1890,8 +2032,7 @@ const MonthlyActivityReport = () => {
                     <Text>{consultantProfile.Technologie}</Text>
                   </div>
                 )}
-              </Col>{" "}
-              <Col span={8}>
+              </Col>{" "}              <Col span={8}>
                 <div className="info-block">
                   <Text strong>Jours potentiels : </Text>
                   <Text>{craData?.potentialWorkDays || 0}</Text>
@@ -1905,51 +2046,34 @@ const MonthlyActivityReport = () => {
                 )}
               </Col>
             </Row>
-          </div>{" "}
-          <div className="report-actions" style={{ marginBottom: 16 }}>
+          </div>{" "}          <div className="report-actions" style={{ marginBottom: 16 }}>
             <Row gutter={8} justify="space-between" align="middle">
-              <Col>
-                <div
-                  style={{ display: "flex", alignItems: "center", gap: "12px" }}
-                >
-                  <Button
-                    icon={<LeftOutlined />}
-                    onClick={() =>
-                      handleMonthChange(
-                        selectedMonth.clone().subtract(1, "month")
-                      )
-                    }
-                  >
-                    Précédent
-                  </Button>
-                  <input
-                    type="month"
-                    value={selectedMonth.format("YYYY-MM")}
-                    onChange={(e) => {
-                      const newDate = moment(e.target.value);
-                      // Save to localStorage before updating state
-                      localStorage.setItem(
-                        "selectedMonthCRA",
-                        newDate.format("YYYY-MM")
-                      );
-                      handleMonthChange(newDate);
-                    }}
-                    defaultValue={selectedMonth.format("YYYY-MM")}
-                    style={{
-                      padding: "4px 11px",
-                      borderRadius: "2px",
-                      border: "1px solid #d9d9d9",
-                      lineHeight: "1.5715",
-                    }}
-                  />{" "}
-                  <Button
-                    icon={<RightOutlined />}
-                    onClick={() =>
-                      handleMonthChange(selectedMonth.clone().add(1, "month"))
-                    }
-                  >
-                    Suivant
-                  </Button>{" "}
+              <Col>                <div className="month-selector">
+                  <Space>                    <Button
+                      icon={<LeftOutlined />}
+                      onClick={() => {
+                        const newDate = selectedMonth.clone().subtract(1, "month");
+                        handleMonthChange(newDate);
+                      }}
+                    />
+                    <input
+                      type="month"
+                      value={selectedMonth.format("YYYY-MM")}
+                      onChange={(e) => {
+                        const newDate = moment(e.target.value);
+                        if (newDate.isValid()) {
+                          handleMonthChange(newDate);
+                        }
+                      }}
+                    />
+                    <Button
+                      icon={<RightOutlined />}
+                      onClick={() => {
+                        const newDate = selectedMonth.clone().add(1, "month");
+                        handleMonthChange(newDate);
+                      }}
+                    />
+                  </Space>
                   <div
                     style={{
                       display: "flex",
@@ -2323,48 +2447,72 @@ const MonthlyActivityReport = () => {
                   <List.Item
                     key={entry.id_imputation}
                     actions={[
-                      (!entry.statut ||
-                        entry.statut === CRA_STATUS.A_SAISIR) && (
-                        <Button
-                          icon={<EditOutlined />}
-                          onClick={() => editCraEntry(entry)}
-                          type="link"
-                        >
-                          Modifier
-                        </Button>
-                      ),
-                      (!entry.statut ||
-                        entry.statut === CRA_STATUS.A_SAISIR) && (
-                        <Button
-                          type="link"
-                          danger
-                          onClick={() => {
-                            // Check status before confirming
-                            if (
-                              entry.statut &&
-                              entry.statut !== CRA_STATUS.A_SAISIR
-                            ) {
-                              message.error(
-                                "Impossible de supprimer une imputation déjà soumise."
-                              );
-                            } else {
-                              Modal.confirm({
-                                title:
-                                  "Êtes-vous sûr de vouloir supprimer cette imputation?",
-                                content: "Cette action est irréversible.",
-                                okText: "Supprimer",
-                                okType: "danger",
-                                cancelText: "Annuler",
-                                onOk() {
-                                  deleteCraEntry(entry.id_imputation);
-                                },
-                              });
-                            }
-                          }}
-                        >
-                          Supprimer
-                        </Button>
-                      ),
+                      // Check CRA consultant status instead of entry status - Updated to allow "annule"
+                      (() => {
+                        const contractStatus = contractStatuses[entry.id_bdc];
+                        const canEdit =
+                          !contractStatus ||
+                          contractStatus.statut === "saisi" ||
+                          contractStatus.statut === "annule" ||
+                          (contractStatus.statut !== "EVC" &&
+                            contractStatus.statut !== "EVP");
+
+                        return canEdit ? (
+                          <Button
+                            icon={<EditOutlined />}
+                            onClick={() => editCraEntry(entry)}
+                            type="link"
+                          >
+                            Modifier
+                          </Button>
+                        ) : null;
+                      })(),
+                      // Check CRA consultant status for delete button - Updated to allow "annule"
+                      (() => {
+                        const contractStatus = contractStatuses[entry.id_bdc];
+                        const canDelete =
+                          !contractStatus ||
+                          contractStatus.statut === "saisi" ||
+                          contractStatus.statut === "annule" ||
+                          (contractStatus.statut !== "EVC" &&
+                            contractStatus.statut !== "EVP");
+
+                        return canDelete ? (
+                          <Button
+                            type="link"
+                            danger
+                            onClick={() => {
+                              const contractStatus =
+                                contractStatuses[entry.id_bdc];
+                              if (
+                                contractStatus &&
+                                contractStatus.statut !== "saisi" &&
+                                contractStatus.statut !== "annule" &&
+                                (contractStatus.statut === "EVC" ||
+                                  contractStatus.statut === "EVP")
+                              ) {
+                                message.error(
+                                  "Impossible de supprimer une imputation avec le statut CRA EVC ou EVP."
+                                );
+                              } else {
+                                Modal.confirm({
+                                  title:
+                                    "Êtes-vous sûr de vouloir supprimer cette imputation?",
+                                  content: "Cette action est irréversible.",
+                                  okText: "Supprimer",
+                                  okType: "danger",
+                                  cancelText: "Annuler",
+                                  onOk() {
+                                    deleteCraEntry(entry.id_imputation);
+                                  },
+                                });
+                              }
+                            }}
+                          >
+                            Supprimer
+                          </Button>
+                        ) : null;
+                      })(),
                     ].filter(Boolean)}
                   >
                     {" "}
@@ -2376,29 +2524,6 @@ const MonthlyActivityReport = () => {
                             <Tag color="blue">
                               {dureeValue.toString().replace(".", ",")} jour
                             </Tag>
-                          </Col>
-                          <Col span={6} style={{ textAlign: "right" }}>
-                            {entry.statut ? (
-                              <Tag
-                                color={
-                                  entry.statut === CRA_STATUS.A_SAISIR
-                                    ? "blue"
-                                    : entry.statut ===
-                                      CRA_STATUS.EN_ATTENTE_PRESTATAIRE
-                                    ? "orange"
-                                    : entry.statut ===
-                                      CRA_STATUS.EN_ATTENTE_CLIENT
-                                    ? "purple"
-                                    : entry.statut === CRA_STATUS.VALIDE
-                                    ? "green"
-                                    : "default"
-                                }
-                              >
-                                {entry.statut}
-                              </Tag>
-                            ) : (
-                              <Tag color="blue">{CRA_STATUS.A_SAISIR}</Tag>
-                            )}
                           </Col>
                         </Row>
                       }
@@ -2444,12 +2569,20 @@ const MonthlyActivityReport = () => {
                     <Title level={5}>Modifier l'imputation</Title>
                   </Col>
                   <Col>
-                    {selectedCraEntry.statut &&
-                      selectedCraEntry.statut !== CRA_STATUS.A_SAISIR && (
-                        <Tag color="red">
-                          Cette imputation ne peut plus être modifiée
-                        </Tag>
-                      )}
+                    {(() => {
+                      const contractStatus =
+                        contractStatuses[selectedCraEntry.id_bdc];
+                      return (
+                        contractStatus &&
+                        (contractStatus.statut === "EVC" ||
+                          contractStatus.statut === "EVP") && (
+                          <Tag color="red">
+                            Cette imputation ne peut plus être modifiée (CRA{" "}
+                            {contractStatus.statut})
+                          </Tag>
+                        )
+                      );
+                    })()}
                   </Col>
                 </Row>
 
@@ -2461,10 +2594,15 @@ const MonthlyActivityReport = () => {
                     type_imputation: "Jour Travaillé",
                     Durée: 1,
                   }}
-                  disabled={
-                    selectedCraEntry.statut &&
-                    selectedCraEntry.statut !== CRA_STATUS.A_SAISIR
-                  }
+                  disabled={(() => {
+                    const contractStatus =
+                      contractStatuses[selectedCraEntry.id_bdc];
+                    return (
+                      contractStatus &&
+                      (contractStatus.statut === "EVC" ||
+                        contractStatus.statut === "EVP")
+                    );
+                  })()}
                 >
                   {" "}
                   <Row gutter={16}>
@@ -2785,7 +2923,7 @@ const MonthlyActivityReport = () => {
             </Col>
           </Row>
         </Form> */}
-      </Modal>{" "}
+      </Modal>
       <style jsx="true">{`
         .weekend-cell {
           background-color: #f0f0f0 !important;
@@ -2836,9 +2974,10 @@ const MonthlyActivityReport = () => {
           > td {
           background-color: #e6f7ff !important;
           transition: background-color 0.3s;
-        }
-        .no-activity-row {
+        }        .no-activity-row {
           background-color: #fff1f0 !important;
+          border-top: 2px dashed #ff4d4f !important;
+          border-bottom: 2px dashed #ff4d4f !important;
         }
         .available-cell {
           background-color: #f6ffed !important;
@@ -2947,7 +3086,6 @@ const MonthlyActivityReport = () => {
           font-weight: bold !important;
         }
       `}</style>
-      
     </div>
   );
 };
