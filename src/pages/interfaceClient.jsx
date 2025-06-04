@@ -19,6 +19,7 @@ import {
   WarningOutlined,
   MenuOutlined,
   MoreOutlined,
+  FileTextOutlined
 } from "@ant-design/icons";
 import {
   Menu,
@@ -55,8 +56,10 @@ import NotificationInterfaceClient from "../components/cl-interface/noti-list";
 import ClientCraValidation from "../components/cl-interface/ClientCraValidation";
 import ClientCraInterface from "../components/cl-interface/ClientCraInterface";
 import ClientFinancialDashboard from "../components/cl-interface/financial-dashboard";
+import ClientExpenseReportsValidation from "../components/cl-interface/ClientExpenseReportsValidation";
 import { isClientLoggedIn, logoutEsn } from "../helper/db";
 import { useNavigate, useSearchParams } from "react-router-dom";  // Text constants
+import InterfaceCraClient from "../components/cl-interface/interfaceCraClient";
 const t = {
   dashboard: "Tableau de Bord",
   mySpace: "Mon Espace",
@@ -67,10 +70,10 @@ const t = {
   partnerships: "Partenariats",
   tenders: "Appels d'Offres",  myOffers: "Mes offres",
   applications: "Réponses à mes Appel d'Offres",
-  purchaseOrders: "Bons de Commande",
-  contracts: "Contrats",
+  purchaseOrders: "Bons de Commande",  contracts: "Contrats",
   craValidation: "Validation des CRAs",
   craManagement: "Gestion des CRAs",
+  expenseReportsValidation: "Validation Notes de Frais",
   documents: "Mes Documents",
   documentManagement: " Gestion Documentaire",
   notifications: "Notifications",
@@ -729,11 +732,16 @@ const ClientProfile = () => {
             key: "cra-validation",
             icon: <CheckOutlined />,
             disabled: !esnStatus,
-          },
-          {
+          },          {
             label: t.craManagement,
             key: "cra-management",
             icon: <FileDoneOutlined />,
+            disabled: !esnStatus,
+          },
+          {
+            label: t.expenseReportsValidation,
+            key: "expense-reports-validation",
+            icon: <FileTextOutlined />,
             disabled: !esnStatus,
           },
           // {
@@ -909,9 +917,10 @@ const ClientProfile = () => {
         return <ContractList />;      case "Liste-BDC":
         return <PurchaseOrderInterface />;
       case "cra-validation":
-        return <ClientCraValidation />;
-      case "cra-management":
-        return <ClientCraInterface />;
+        return <ClientCraValidation />;      case "cra-management":
+        return <InterfaceCraClient />;
+      case "expense-reports-validation":
+        return <ClientExpenseReportsValidation />;
       case "Partenariat":
         return <PartenariatInterface />;
       default:

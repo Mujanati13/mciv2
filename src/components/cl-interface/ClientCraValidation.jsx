@@ -223,7 +223,8 @@ const ClientCraValidation = () => {
               .filter(Boolean)
               .map(JSON.stringify)
           ),
-        ].map(JSON.parse);        setConsultants(uniqueConsultants);
+        ].map(JSON.parse);
+        setConsultants(uniqueConsultants);
         setEsns(uniqueEsns);
         setPeriods(uniquePeriods);
         setProjects(uniqueProjects);
@@ -244,11 +245,13 @@ const ClientCraValidation = () => {
         ];
 
         // Fetch CRA status for each combination
-        const statusPromises = consultantPeriodCombinations.map(async (combination) => {
-          const [consultantId, period] = combination.split('_');
-          const status = await fetchCraStatus(consultantId, period);
-          return { key: combination, status };
-        });
+        const statusPromises = consultantPeriodCombinations.map(
+          async (combination) => {
+            const [consultantId, period] = combination.split("_");
+            const status = await fetchCraStatus(consultantId, period);
+            return { key: combination, status };
+          }
+        );
 
         const statusResults = await Promise.all(statusPromises);
         const newStatusMap = new Map();
@@ -256,7 +259,6 @@ const ClientCraValidation = () => {
           newStatusMap.set(key, status);
         });
         setCraStatusMap(newStatusMap);
-
       } else {
         throw new Error(
           response.data?.message || "Erreur lors de la récupération des CRAs"
@@ -276,36 +278,33 @@ const ClientCraValidation = () => {
   const fetchCraStatus = async (consultantId, period) => {
     try {
       const token = localStorage.getItem("token");
-      
+
       if (!consultantId || !period || !token) {
         return CRA_STATUS.A_SAISIR; // Default status
       }
 
-      const response = await axios.get(
-        `${Endponit()}/api/cra_consultant/`,
-        {
-          params: {
-            consultant_id: consultantId,
-            period: period,
-          },
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      const response = await axios.get(`${Endponit()}/api/cra_consultant/`, {
+        params: {
+          consultant_id: consultantId,
+          period: period,
+        },
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
       if (response.data?.status && response.data?.data) {
         const apiStatus = response.data.data.status;
-        
+
         // Map API status values to internal constants
         const statusMapping = {
-          'saisi': CRA_STATUS.A_SAISIR,
-          'en_attente_prestataire': CRA_STATUS.EN_ATTENTE_PRESTATAIRE,
-          'en_attente_client': CRA_STATUS.EN_ATTENTE_CLIENT,
-          'valide': CRA_STATUS.VALIDE,
+          saisi: CRA_STATUS.A_SAISIR,
+          en_attente_prestataire: CRA_STATUS.EN_ATTENTE_PRESTATAIRE,
+          en_attente_client: CRA_STATUS.EN_ATTENTE_CLIENT,
+          valide: CRA_STATUS.VALIDE,
         };
 
         return statusMapping[apiStatus] || CRA_STATUS.A_SAISIR;
       }
-      
+
       return CRA_STATUS.A_SAISIR; // Default if no record found
     } catch (error) {
       console.error("Error fetching CRA status:", error);
@@ -317,13 +316,13 @@ const ClientCraValidation = () => {
   const updateCraStatusMap = async (consultantId, period) => {
     const status = await fetchCraStatus(consultantId, period);
     const key = `${consultantId}_${period}`;
-    
-    setCraStatusMap(prevMap => {
+
+    setCraStatusMap((prevMap) => {
       const newMap = new Map(prevMap);
       newMap.set(key, status);
       return newMap;
     });
-    
+
     return status;
   };
 
@@ -607,7 +606,8 @@ const ClientCraValidation = () => {
         const type = text || "";
         return type.charAt(0).toUpperCase() + type.slice(1);
       },
-    },    {
+    },
+    {
       title: "Statut",
       key: "status",
       render: (record) => {
@@ -615,10 +615,10 @@ const ClientCraValidation = () => {
         const consultant = record.consultant || {};
         const consultantId = consultant.id;
         const periode = record.période || "";
-        
+
         // Get CRA status from API or use default
         const craStatus = getCraStatus(consultantId, periode);
-        
+
         let color = "default";
         let displayStatus = craStatus;
 
@@ -635,7 +635,8 @@ const ClientCraValidation = () => {
 
         return <Tag color={color}>{displayStatus || "Non défini"}</Tag>;
       },
-    },    {
+    },
+    {
       title: "Actions",
       key: "action",
       render: (_, record) => {
@@ -643,10 +644,10 @@ const ClientCraValidation = () => {
         const consultant = record.consultant || {};
         const consultantId = consultant.id;
         const periode = record.période || "";
-        
+
         // Get CRA status from API
         const craStatus = getCraStatus(consultantId, periode);
-        
+
         return (
           <Space size="middle">
             {craStatus === CRA_STATUS.EN_ATTENTE_CLIENT && (
@@ -686,11 +687,13 @@ const ClientCraValidation = () => {
                   onClick={() => {
                     setSelectedCra(record);
                     Modal.confirm({
-                      title: "Refuser le CRA",                      content: (
+                      title: "Refuser le CRA",
+                      content: (
                         <div>
                           <p>Êtes-vous sûr de vouloir refuser ce CRA ?</p>
                           <p>
-                            Le CRA sera renvoyé au prestataire pour modification.
+                            Le CRA sera renvoyé au prestataire pour
+                            modification.
                           </p>
                           <Input.TextArea
                             placeholder="Veuillez indiquer la raison du refus"
@@ -1000,12 +1003,6 @@ const ClientCraValidation = () => {
                           <p>
                             Êtes-vous sûr de vouloir valider cette imputation ?
                           </p>
-                          {/* <Input.TextArea
-                            placeholder="Ajouter un commentaire (optionnel)"
-                            rows={4}
-                            value={validationNote}
-                            onChange={(e) => setValidationNote(e.target.value)}
-                          /> */}
                         </div>
                       ),
                       okText: "Valider",

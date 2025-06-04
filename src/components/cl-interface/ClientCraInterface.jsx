@@ -127,15 +127,17 @@ const ClientCraInterface = () => {
   const [collapsedGroups, setCollapsedGroups] = useState({});
   const [clientFilter, setClientFilter] = useState("");
   const [validationLoading, setValidationLoading] = useState(false);
-  const [selectedEntries, setSelectedEntries] = useState([]);  const [validationModalVisible, setValidationModalVisible] = useState(false);
-  const [contractStatuses, setContractStatuses] = useState({});  const [submissionModalVisible, setSubmissionModalVisible] = useState(false);
+  const [selectedEntries, setSelectedEntries] = useState([]);
+  const [validationModalVisible, setValidationModalVisible] = useState(false);
+  const [contractStatuses, setContractStatuses] = useState({});
+  const [submissionModalVisible, setSubmissionModalVisible] = useState(false);
   const [selectedContractId, setSelectedContractId] = useState(null);
   const [craEntriesToSubmit, setCraEntriesToSubmit] = useState([]);
   const [submitting, setSubmitting] = useState(false);
-  
+
   // State variables for cancel modal
   const [cancelModalVisible, setCancelModalVisible] = useState(false);
-  const [cancelComment, setCancelComment] = useState('');
+  const [cancelComment, setCancelComment] = useState("");
   const [cancelLoading, setCancelLoading] = useState(false);
   const [selectedCancelContract, setSelectedCancelContract] = useState(null);
 
@@ -178,44 +180,46 @@ const ClientCraInterface = () => {
     }
   };
 
-    // CRA status constants
+  // CRA status constants
   const CRA_STATUS = {
     A_SAISIR: "À saisir",
     EN_ATTENTE_PRESTATAIRE: "EVP",
     EN_ATTENTE_CLIENT: "En attente validation client",
     VALIDE: "Validé",
   };
-    // Function to handle CRA cancellation with comment
+  // Function to handle CRA cancellation with comment
   const handleCancelCRA = async () => {
     // Validate that a comment was entered
     if (!cancelComment.trim()) {
       message.error("Veuillez saisir un motif de refus");
       return;
     }
-    
+
     try {
       setCancelLoading(true);
       const token = localStorage.getItem("unifiedToken");
-      
+
       // Create JSON formatted comment with timestamp and client info
       const commentObject = {
-        timestamp: moment().format('DD/MM/YYYY à HH:mm'),
+        timestamp: moment().format("DD/MM/YYYY à HH:mm"),
         client: {
           id: userData.ID_collab,
           name: `${userData.Prenom} ${userData.Nom}`,
-          role: 'Client',
-          company: userData.company || 'Client'
+          role: "Client",
+          company: userData.company || "Client",
         },
-        action: 'Refus du CRA',
+        action: "Refus du CRA",
         motif: cancelComment,
         previousStatus: selectedCancelContract.statut,
-        consultant: selectedConsultant ? `${selectedConsultant.Prenom} ${selectedConsultant.Nom}` : 'Consultant',
-        periode: selectedMonth.format('MMMM YYYY')
+        consultant: selectedConsultant
+          ? `${selectedConsultant.Prenom} ${selectedConsultant.Nom}`
+          : "Consultant",
+        periode: selectedMonth.format("MMMM YYYY"),
       };
-      
+
       // Convert to JSON string
       const jsonComment = JSON.stringify(commentObject);
-      
+
       // Make API call
       await axios.put(
         `${Endpoint()}/api/cra_consultant/${selectedCancelContract.id_CRA}/`,
@@ -231,12 +235,12 @@ const ClientCraInterface = () => {
       );
 
       message.success("CRA refusé avec succès");
-      
+
       // Reset state
       setCancelModalVisible(false);
-      setCancelComment('');
+      setCancelComment("");
       setSelectedCancelContract(null);
-      
+
       // Refresh the CRA data
       await fetchConsultantCra(selectedConsultant, selectedMonth);
     } catch (error) {
@@ -332,7 +336,6 @@ const ClientCraInterface = () => {
     `;
     document.head.appendChild(style);
 
-
     // Cleanup
     return () => {
       document.head.removeChild(style);
@@ -388,53 +391,54 @@ const ClientCraInterface = () => {
     });
   };
 
-const fetchConsultants = async () => {
-  setConsultantsLoading(true);
-  setConsultantsError(null);
-  try {
-    const token = localStorage.getItem("unifiedToken");
-    const commercialId = localStorage.getItem("id");
+  const fetchConsultants = async () => {
+    setConsultantsLoading(true);
+    setConsultantsError(null);
+    try {
+      const token = localStorage.getItem("unifiedToken");
+      const commercialId = localStorage.getItem("id");
 
-    const response = await fetch(
-      `${Endpoint()}/api/consultants-by-client/?client_id=${commercialId}`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+      const response = await fetch(
+        `${Endpoint()}/api/consultants-by-client/?client_id=${commercialId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Erreur lors du chargement des consultants");
       }
-    );
 
-    if (!response.ok) {
-      throw new Error("Erreur lors du chargement des consultants");
+      const data = await response.json();
+
+      // Transform the API response to match the expected format
+      const transformedData = (data.data || []).map((consultant) => ({
+        ID_collab: consultant.id,
+        Nom: consultant.name.split(" ").slice(-1)[0] || consultant.name,
+        Prenom:
+          consultant.name.split(" ").slice(0, -1).join(" ") || consultant.name,
+        email: consultant.email,
+        Poste: consultant.position || "Consultant",
+        ID_ESN: consultant.esn_id,
+        esn: consultant.esn,
+        statistics: {
+          client_count: consultant.project_count || 0,
+        },
+        active_projects: consultant.active_projects || [],
+        profile_photo: consultant.profile_photo,
+      }));
+
+      setConsultants(transformedData);
+    } catch (error) {
+      console.error("Error fetching consultants:", error);
+      setConsultantsError(error.message);
+      message.error("Impossible de charger la liste des consultants");
+    } finally {
+      setConsultantsLoading(false);
     }
-
-    const data = await response.json();
-    
-    // Transform the API response to match the expected format
-    const transformedData = (data.data || []).map(consultant => ({
-      ID_collab: consultant.id,
-      Nom: consultant.name.split(' ').slice(-1)[0] || consultant.name,
-      Prenom: consultant.name.split(' ').slice(0, -1).join(' ') || consultant.name,
-      email: consultant.email,
-      Poste: consultant.position || 'Consultant',
-      ID_ESN: consultant.esn_id,
-      esn: consultant.esn,
-      statistics: {
-        client_count: consultant.project_count || 0
-      },
-      active_projects: consultant.active_projects || [],
-      profile_photo: consultant.profile_photo
-    }));
-    
-    setConsultants(transformedData);
-  } catch (error) {
-    console.error("Error fetching consultants:", error);
-    setConsultantsError(error.message);
-    message.error("Impossible de charger la liste des consultants");
-  } finally {
-    setConsultantsLoading(false);
-  }
-};
+  };
 
   // Replace the existing fetchConsultantCra function with this updated version
   const fetchConsultantCra = async (consultant, period = selectedMonth) => {
@@ -660,15 +664,18 @@ const fetchConsultants = async () => {
   const fetchProjectTitleById = async (projectId) => {
     try {
       const token = localStorage.getItem("unifiedToken");
-      const response = await axios.get(`${Endpoint()}/api/project-title-by-id/`, {
-        params: {
-          project_id: projectId
-        },
-        headers: {
-          Authorization: `Bearer ${token}`
+      const response = await axios.get(
+        `${Endpoint()}/api/project-title-by-id/`,
+        {
+          params: {
+            project_id: projectId,
+          },
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         }
-      });
-      
+      );
+
       if (response.data?.status) {
         return response.data.data.titre;
       }
@@ -775,14 +782,21 @@ const fetchConsultants = async () => {
             projects: {},
             totalDays: 0,
           };
-        }        if (!clientWork[clientId].projects[projectId]) {
+        }
+        if (!clientWork[clientId].projects[projectId]) {
           // Fetch project title directly from API
-          fetchProjectTitleById(projectId).then(projectTitle => {
-            clientWork[clientId].projects[projectId].projectName = projectTitle;
-          }).catch(error => {
-            console.error(`Error fetching project title for ID ${projectId}:`, error);
-          });
-          
+          fetchProjectTitleById(projectId)
+            .then((projectTitle) => {
+              clientWork[clientId].projects[projectId].projectName =
+                projectTitle;
+            })
+            .catch((error) => {
+              console.error(
+                `Error fetching project title for ID ${projectId}:`,
+                error
+              );
+            });
+
           clientWork[clientId].projects[projectId] = {
             projectId,
             projectName: `Projet ${projectId}`, // Default name until API response arrives
@@ -1072,104 +1086,104 @@ const fetchConsultants = async () => {
     );
   };
 
- const renderConsultants = () => {
-  const columns = [
-    {
-      title: "Nom",
-      key: "name",
-      render: (_, record) => `${record.Prenom} ${record.Nom}`,
-    },
-    {
-      title: "Email",
-      dataIndex: "email",
-      key: "email",
-    },
-    {
-      title: "Poste",
-      dataIndex: "Poste",
-      key: "poste",
-      render: (text) => text || "Consultant",
-    },
-    {
-      title: "ESN",
-      dataIndex: "esn",
-      key: "esn",
-    },
- 
-    {
-      title: "Actions",
-      key: "actions",
-      render: (_, record) => (
-        <Space size="small">
-          <Button
-            icon={<FileSearchOutlined />}
-            size="small"
-            onClick={() => fetchConsultantCra(record)}
-          >
-            CRA
-          </Button>
-        </Space>
-      ),
-    },
-  ];
+  const renderConsultants = () => {
+    const columns = [
+      {
+        title: "Nom",
+        key: "name",
+        render: (_, record) => `${record.Prenom} ${record.Nom}`,
+      },
+      {
+        title: "Email",
+        dataIndex: "email",
+        key: "email",
+      },
+      {
+        title: "Poste",
+        dataIndex: "Poste",
+        key: "poste",
+        render: (text) => text || "Consultant",
+      },
+      {
+        title: "ESN",
+        dataIndex: "esn",
+        key: "esn",
+      },
 
-  return (
-    <div className="consultants-content" style={{ animation: "fadeIn 0.5s" }}>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 16,
-        }}
-      >
-        <Button
-          type="primary"
-          icon={<ReloadOutlined />}
-          onClick={fetchConsultants}
-          loading={consultantsLoading}
-        >
-          Actualiser
-        </Button>
-      </div>
+      {
+        title: "Actions",
+        key: "actions",
+        render: (_, record) => (
+          <Space size="small">
+            <Button
+              icon={<FileSearchOutlined />}
+              size="small"
+              onClick={() => fetchConsultantCra(record)}
+            >
+              CRA
+            </Button>
+          </Space>
+        ),
+      },
+    ];
 
-      <Card>
-        {consultantsError && (
-          <Alert
-            message="Erreur"
-            description={consultantsError}
-            type="error"
-            showIcon
-            style={{ marginBottom: 16 }}
-            action={
-              <Button size="small" type="primary" onClick={fetchConsultants}>
-                Réessayer
-              </Button>
-            }
-          />
-        )}
-
-        <Table
-          dataSource={consultants}
-          columns={columns}
-          rowKey="ID_collab"
-          loading={consultantsLoading}
-          pagination={{ pageSize: 10 }}
-          locale={{
-            emptyText: consultantsLoading ? (
-              "Chargement..."
-            ) : (
-              <Empty
-                description="Aucun consultant trouvé" 
-                image={Empty.PRESENTED_IMAGE_SIMPLE}
-              />
-            ),
+    return (
+      <div className="consultants-content" style={{ animation: "fadeIn 0.5s" }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: 16,
           }}
-        />
-      </Card>
-    </div>
-  );
-};
+        >
+          <Button
+            type="primary"
+            icon={<ReloadOutlined />}
+            onClick={fetchConsultants}
+            loading={consultantsLoading}
+          >
+            Actualiser
+          </Button>
+        </div>
+
+        <Card>
+          {consultantsError && (
+            <Alert
+              message="Erreur"
+              description={consultantsError}
+              type="error"
+              showIcon
+              style={{ marginBottom: 16 }}
+              action={
+                <Button size="small" type="primary" onClick={fetchConsultants}>
+                  Réessayer
+                </Button>
+              }
+            />
+          )}
+
+          <Table
+            dataSource={consultants}
+            columns={columns}
+            rowKey="ID_collab"
+            loading={consultantsLoading}
+            pagination={{ pageSize: 10 }}
+            locale={{
+              emptyText: consultantsLoading ? (
+                "Chargement..."
+              ) : (
+                <Empty
+                  description="Aucun consultant trouvé"
+                  image={Empty.PRESENTED_IMAGE_SIMPLE}
+                />
+              ),
+            }}
+          />
+        </Card>
+      </div>
+    );
+  };
 
   // Update the renderCraTable function - modify the "Pas d'activité" row section
   const renderCraTable = () => {
@@ -1216,9 +1230,10 @@ const fetchConsultants = async () => {
           if (record.isClient) {
             // Remove all client-level validation logic
             return null;
-          }          if (record.isProject) {
+          }
+          if (record.isProject) {
             const projectId = record.key.split("-")[1];
-            const contractStatus = contractStatuses[projectId];            // Can validate only if status is "EVC"
+            const contractStatus = contractStatuses[projectId]; // Can validate only if status is "EVC"
             const canValidate = contractStatus?.statut === "EVC";
 
             const hasValidatableEntries = record.entries.some(
@@ -1228,7 +1243,8 @@ const fetchConsultants = async () => {
             return (
               <Space size="small" wrap>
                 {/* Display contract status */}
-                {contractStatus && (                  <Tag
+                {contractStatus && (
+                  <Tag
                     color={
                       contractStatus.statut === "saisi"
                         ? "blue"
@@ -1241,34 +1257,43 @@ const fetchConsultants = async () => {
                         : contractStatus.statut === "annule"
                         ? "red"
                         : "default"
-                    }                    title={contractStatus.statut === "annule" && contractStatus.commentaire ? 
-                      (() => {
-                        try {
-                          const commentObj = JSON.parse(contractStatus.commentaire);
-                          
-                          // Handle new format (client-focused)
-                          if (commentObj.client && commentObj.motif) {
-                            return `Refusé le ${commentObj.timestamp} par ${commentObj.client.name} (${commentObj.client.role})
+                    }
+                    title={
+                      contractStatus.statut === "annule" &&
+                      contractStatus.commentaire
+                        ? (() => {
+                            try {
+                              const commentObj = JSON.parse(
+                                contractStatus.commentaire
+                              );
+
+                              // Handle new format (client-focused)
+                              if (commentObj.client && commentObj.motif) {
+                                return `Refusé le ${commentObj.timestamp} par ${
+                                  commentObj.client.name
+                                } (${commentObj.client.role})
 Motif: ${commentObj.motif}
 Statut précédent: ${commentObj.previousStatus}
-Consultant: ${commentObj.consultant || 'N/A'}
-Période: ${commentObj.periode || 'N/A'}`;
-                          }
-                          
-                          // Handle old format (user-focused)
-                          if (commentObj.user && commentObj.reason) {
-                            return `Annulé le ${commentObj.timestamp} par ${commentObj.user.name} (${commentObj.user.role})
+Consultant: ${commentObj.consultant || "N/A"}
+Période: ${commentObj.periode || "N/A"}`;
+                              }
+
+                              // Handle old format (user-focused)
+                              if (commentObj.user && commentObj.reason) {
+                                return `Annulé le ${commentObj.timestamp} par ${commentObj.user.name} (${commentObj.user.role})
 Raison: ${commentObj.reason}
 Statut précédent: ${commentObj.previousStatus}`;
-                          }
-                          
-                          // Fallback to raw comment if neither format matches
-                          return contractStatus.commentaire;
-                        } catch (e) {
-                          return contractStatus.commentaire;
-                        }
-                      })() 
-                      : undefined}>
+                              }
+
+                              // Fallback to raw comment if neither format matches
+                              return contractStatus.commentaire;
+                            } catch (e) {
+                              return contractStatus.commentaire;
+                            }
+                          })()
+                        : undefined
+                    }
+                  >
                     {contractStatus.statut === "saisi"
                       ? "Saisi"
                       : contractStatus.statut === "EVP"
@@ -1281,8 +1306,9 @@ Statut précédent: ${commentObj.previousStatus}`;
                       ? "Refusé"
                       : contractStatus.statut}
                   </Tag>
-                )}                {/* Show validation and cancel buttons only when status is "EVC" */}
-                {contractStatus && (contractStatus.statut === "EVC") && (
+                )}{" "}
+                {/* Show validation and cancel buttons only when status is "EVC" */}
+                {contractStatus && contractStatus.statut === "EVC" && (
                   <>
                     {/* Validation button */}
                     <Button
@@ -1320,7 +1346,8 @@ Statut précédent: ${commentObj.previousStatus}`;
                       size="small"
                       type="default"
                       danger
-                      icon={<ArrowLeftOutlined />}                      onClick={() => {
+                      icon={<ArrowLeftOutlined />}
+                      onClick={() => {
                         // Open the cancel modal instead of Modal.confirm
                         setSelectedCancelContract(contractStatus);
                         setCancelModalVisible(true);
@@ -1331,7 +1358,6 @@ Statut précédent: ${commentObj.previousStatus}`;
                     </Button>
                   </>
                 )}
-
               </Space>
             );
           }
@@ -1598,7 +1624,8 @@ Statut précédent: ${commentObj.previousStatus}`;
           setSelectedContractId(null);
           setCraEntriesToSubmit([]);
         }}
-        confirmLoading={submitting}        okText="Envoyer"
+        confirmLoading={submitting}
+        okText="Envoyer"
         cancelText="Annuler l'envoi"
         width={700}
       >
@@ -1653,10 +1680,7 @@ Statut précédent: ${commentObj.previousStatus}`;
           </div>
         )}
       </Modal>
- 
       <Layout>
-   
-
         <Content
           style={{ padding: "24px", background: "#f5f5f5", minHeight: 280 }}
         >
@@ -1684,7 +1708,8 @@ Statut précédent: ${commentObj.previousStatus}`;
             <div>
               CRA - {selectedConsultant?.Prenom} {selectedConsultant?.Nom} -{" "}
               {selectedMonth.format("MMMM YYYY")}
-            </div>              <Space>
+            </div>{" "}
+            <Space>
               <Button
                 icon={<LeftOutlined />}
                 onClick={() => {
@@ -1795,7 +1820,8 @@ Statut précédent: ${commentObj.previousStatus}`;
           setValidationModalVisible(false);
           setSelectedEntries([]);
         }}
-        confirmLoading={validationLoading}        okText="Valider"
+        confirmLoading={validationLoading}
+        okText="Valider"
         cancelText="Annuler la validation"
       >
         <div style={{ marginBottom: 16 }}>
@@ -1806,7 +1832,6 @@ Statut précédent: ${commentObj.previousStatus}`;
             showIcon
           />
         </div>
-
         {selectedEntries.length > 0 && (
           <div>
             <Title level={5}>Entrées à valider:</Title>
@@ -1825,14 +1850,16 @@ Statut précédent: ${commentObj.previousStatus}`;
               )}
             />
           </div>
-        )}      </Modal>      {/* Cancel Modal */}
+        )}{" "}
+      </Modal>{" "}
+      {/* Cancel Modal */}
       <Modal
         title="Refuser le CRA"
         open={cancelModalVisible}
         onOk={handleCancelCRA}
         onCancel={() => {
           setCancelModalVisible(false);
-          setCancelComment('');
+          setCancelComment("");
           setSelectedCancelContract(null);
         }}
         confirmLoading={cancelLoading}
@@ -1843,16 +1870,18 @@ Statut précédent: ${commentObj.previousStatus}`;
         <div style={{ marginBottom: 16 }}>
           <Alert
             message="Refus de CRA"
-            description={`Vous allez refuser ce CRA en tant que client. Le statut passera de "${selectedCancelContract?.statut || ''}" à "annule".`}
+            description={`Vous allez refuser ce CRA en tant que client. Le statut passera de "${
+              selectedCancelContract?.statut || ""
+            }" à "annule".`}
             type="warning"
             showIcon
           />
         </div>
 
         <Form layout="vertical">
-          <Form.Item 
-            label="Motif de refus" 
-            required 
+          <Form.Item
+            label="Motif de refus"
+            required
             tooltip="Veuillez préciser la raison de votre refus pour information"
           >
             <Input.TextArea
@@ -1869,4 +1898,3 @@ Statut précédent: ${commentObj.previousStatus}`;
 };
 
 export default ClientCraInterface;
-

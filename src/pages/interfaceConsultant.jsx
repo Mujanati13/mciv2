@@ -32,6 +32,8 @@ import {
   // Comment,
   Form,
   Result,
+  Upload,
+  InputNumber,
 } from "antd";
 import {
   UserOutlined,
@@ -57,6 +59,8 @@ import {
   CommentOutlined,
   EnvironmentOutlined,
   FileTextOutlined,
+  DeleteOutlined,
+  UploadOutlined,
 } from "@ant-design/icons";
 import {
   useNavigate,
@@ -75,6 +79,7 @@ import {
   logoutConsultant,
 } from "../helper/db";
 import MonthlyActivityReport from "../components/consultant-interface/MonthlyActivityReport";
+import ExpenseReports from "../components/consultant-interface/ExpenseReports";
 
 const { Header, Sider, Content, Footer } = Layout;
 const { Title, Text, Paragraph } = Typography;
@@ -1313,7 +1318,6 @@ const InterfaceConsultant = () => {
   const [dashboardData, setDashboardData] = useState(null);
   const [currentPage, setCurrentPage] = useState("dashboard");
   const [notificationCount, setNotificationCount] = useState(0);
-
   useEffect(() => {
     // Add some CSS for animations
     const style = document.createElement("style");
@@ -1433,14 +1437,23 @@ const InterfaceConsultant = () => {
       } finally {
         setLoading(false);
       }
-    };
-
-    fetchData();
-
-    // Listen for route changes
+    };    fetchData();    // Listen for route changes
     const path = location.pathname;
+    console.log("Full pathname:", path); // Debug log
+    
+    // Special case for '2/interface-consultant/notes-de-frais'
+    if (path.includes("2/interface-consultant/notes-de-frais")) {
+      console.log("Detected special path with prefix '2'");
+      setCurrentPage("notes-de-frais");
+      return;
+    }
+    
     if (path.includes("/interface-consultant/")) {
-      const page = path.split("/interface-consultant/")[1] || "dashboard";
+      const pathPart = path.split("/interface-consultant/")[1] || "dashboard";
+      console.log("Path part after split:", pathPart); // Debug log
+      // Extract the main page from the path (handle any subroutes)
+      const page = pathPart.split("/")[0] || "dashboard";
+      console.log("Current page from path:", page); // Debug log
       setCurrentPage(page);
     }
 
@@ -1543,8 +1556,7 @@ const InterfaceConsultant = () => {
         Marquer tout comme lu
       </Menu.Item> */}
     </Menu>
-  );
-  // Define menu items
+  );  // Define menu items
   const menuItems = [
     {
       key: "dashboard",
@@ -1556,14 +1568,19 @@ const InterfaceConsultant = () => {
       icon: <CalendarOutlined />,
       label: "Rapport d'activité mensuel",
     },
-  ];
-
-  // Handle menu selection
+    {
+      key: "notes-de-frais",
+      icon: <FileTextOutlined />,
+      label: "Notes de frais",
+    },
+  ];  // Handle menu selection
   const handleMenuClick = (e) => {
+    console.log("Menu clicked:", e.key); // Debug log
     setCurrentPage(e.key);
-    navigate(`/interface-consultant/${e.key === "dashboard" ? "" : e.key}`);
+    const route = `/interface-consultant/${e.key === "dashboard" ? "" : e.key}`;
+    console.log("Navigating to:", route); // Debug log
+    navigate(route);
   };
-
   const renderContent = () => {
     if (loading) {
       return (
@@ -1576,11 +1593,19 @@ const InterfaceConsultant = () => {
       );
     }
 
+    // Debug log
+    console.log("Current location:", location.pathname);
+
+    // Handle the specific error case with '2/interface-consultant/notes-de-frais'
+    if (location.pathname.includes("2/interface-consultant/notes-de-frais")) {
+      console.log("Handling special case with prefix '2'");
+      return <ExpenseReports consultantData={consultantData} />;
+    }
+
     // Check if we're on a project detail page
     if (location.pathname.match(/\/interface-consultant\/cra-monthly\/\d+/)) {
       return <ProjectDetails />;
-    }
-    switch (currentPage) {
+    }switch (currentPage) {
       case "dashboard":
         return (
           <Dashboard
@@ -1592,6 +1617,8 @@ const InterfaceConsultant = () => {
         return <Projects dashboardData={dashboardData} />;
       case "cra-monthly":
         return <MonthlyActivityReport />;
+      case "notes-de-frais":
+        return <ExpenseReports consultantData={consultantData} />;
       case "profile":
         return (
           <Profile

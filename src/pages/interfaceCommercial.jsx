@@ -1,4 +1,690 @@
-import React, { useState, useEffect } from "react";
+// import React, { useState, useEffect } from "react";
+// import {
+//   Card,
+//   Form,
+//   Input,
+//   Select,
+//   Button,
+//   Table,
+//   Tag,
+//   Space,
+//   message,
+//   Modal,
+//   Row,
+//   Col,
+//   Typography,
+//   Spin,
+//   Badge,
+// } from "antd";
+// import {
+//   SearchOutlined,
+//   ClearOutlined,
+//   CalendarOutlined,
+//   CheckOutlined,
+//   CloseOutlined,
+// } from "@ant-design/icons";
+// import axios from "axios";
+// import { Endponit } from "../helper/enpoint";
+// import moment from "moment";
+
+// const { Option } = Select;
+// const { Text, Title } = Typography;
+
+// // CRA status constants
+// const CRA_STATUS = {
+//   A_SAISIR: "À saisir",
+//   EN_ATTENTE_PRESTATAIRE: "En attente validation prestataire",
+//   EN_ATTENTE_CLIENT: "En attente validation client",
+//   VALIDE: "Validé",
+//   ANNULE: "Annulé",
+// };
+
+// const InterfaceCommercial = () => {
+//   const [form] = Form.useForm();
+//   const [craData, setCraData] = useState([]);
+//   const [loading, setLoading] = useState(false);
+//   const [total, setTotal] = useState(0);
+//   const [commercialInfo, setCommercialInfo] = useState(null);
+
+//   // CRA tracking modal states
+//   const [craModalVisible, setCraModalVisible] = useState(false);
+//   const [selectedConsultant, setSelectedConsultant] = useState(null);
+//   const [selectedBdc, setSelectedBdc] = useState(null);
+//   const [selectedPeriod, setSelectedPeriod] = useState(null);
+//   const [craWorkDays, setCraWorkDays] = useState([]);
+//   const [craModalLoading, setCraModalLoading] = useState(false);
+
+//   // Store the selected CRA record and its status from API
+//   const [selectedCraRecord, setSelectedCraRecord] = useState(null);
+
+//   // Validation states
+//   const [validationNote, setValidationNote] = useState("");
+//   const [validationLoading, setValidationLoading] = useState(false);
+//   const [rejectModalVisible, setRejectModalVisible] = useState(false);
+
+//   const statusOptions = [
+//     { value: "Validé", color: "green" },
+//     { value: "saisi", color: "yellow" },
+//     { value: "EVC", color: "orange" },
+//     { value: "EVP", color: "blue" },
+//     { value: "Annulé", color: "magenta" },
+//   ];
+
+//   // Filtered status options for commercial
+//   const filterStatusOptions = [
+//     { value: "EVC", color: "orange" },
+//     { value: "EVP", color: "blue" },
+//     { value: "Validé", color: "green" },
+//     { value: "Annulé", color: "magenta" },
+//   ];
+
+//   const getDisplayStatus = (status) => {
+//     const statusMap = {
+//       annule: "Annulé",
+//       validé: "Validé",
+//       evc: "EVC",
+//       evp: "EVP",
+//       // Add other mappings as needed
+//     };
+
+//     return statusMap[status?.toLowerCase()] || status;
+//   };
+
+//   useEffect(() => {
+//     const currentPeriod = moment().format("MM_YYYY");
+//     fetchCraData({ period: currentPeriod });
+//   }, []);
+
+//   const fetchCraData = async (values) => {
+//     const commercialId = localStorage.getItem("userId") || localStorage.getItem("id");
+//     const token = localStorage.getItem("unifiedToken") || localStorage.getItem("token");
+
+//     if (!commercialId) {
+//       message.error("Commercial ID not found");
+//       return;
+//     }
+
+//     setLoading(true);
+
+//     try {
+//       const currentPeriod = moment().format("MM_YYYY");
+//       const params = {
+//         commercial_id: commercialId,
+//         period: values.period || currentPeriod,
+//         ...(values.status && { status: values.status }),
+//       };
+
+//       const response = await axios.get(
+//         `${Endponit()}/api/cra-consultants/commercial/`,
+//         {
+//           params: params,
+//           headers: { Authorization: `Bearer ${token}` },
+//         }
+//       );
+
+//       if (response.data?.status) {
+//         const rawData = response.data.data || [];
+//         setCommercialInfo(response.data.commercial || null);
+
+//         const groupedData = groupConsultantsByBdc(rawData);
+//         setCraData(groupedData);
+//         setTotal(response.data.total || groupedData.length);
+//       } else {
+//         message.error(response.data.message || "Failed to fetch CRA data");
+//         setCraData([]);
+//         setTotal(0);
+//       }
+//     } catch (error) {
+//       message.error(`Error: ${error.response?.data?.message || error.message}`);
+//       setCraData([]);
+//       setTotal(0);
+//     } finally {
+//       setLoading(false);
+//     }
+//   };
+
+//   // Handle bulk validation for all work days of the selected CRA
+//   const handleBulkValidation = async (approved) => {
+//     setValidationLoading(true);
+//     try {
+//       const commercialId = localStorage.getItem("userId") || localStorage.getItem("id");
+//       const token = localStorage.getItem("unifiedToken") || localStorage.getItem("token");
+
+//       if (!commercialId || !selectedCraRecord) {
+//         message.error("Information de connexion ou CRA non trouvée");
+//         return;
+//       }
+
+//       // Use the selected CRA record ID
+//       const craId = selectedCraRecord.id_CRA;
+
+//       if (!craId) {
+//         message.error("ID CRA non trouvé");
+//         return;
+//       }
+
+//       // Update the CRA status using the cra_consultant endpoint
+//       const response = await axios.put(
+//         `${Endponit()}/api/cra_consultant/${craId}/`,
+//         {
+//           statut: approved ? "EVC" : "annule",
+//           commentaire: approved
+//             ? `CRA validé par le commercial - ${formatPeriod(selectedPeriod)}`
+//             : validationNote || `CRA refusé par le commercial - ${formatPeriod(selectedPeriod)}`,
+//         },
+//         { headers: { Authorization: `Bearer ${token}` } }
+//       );
+
+//       if (response.data?.status) {
+//         message.success(
+//           approved
+//             ? "CRA validé avec succès"
+//             : "CRA refusé et renvoyé au client"
+//         );
+
+//         // Refresh data
+//         await fetchCraWorkDays(
+//           selectedConsultant.id,
+//           selectedBdc.id,
+//           selectedPeriod
+//         );
+//         fetchCraData({ period: selectedPeriod });
+
+//         setValidationNote("");
+//       } else {
+//         message.error("Failed to update CRA status");
+//       }
+//     } catch (error) {
+//       console.error("Error validating CRA:", error);
+//       message.error(
+//         "Impossible de valider le CRA: " + (error.response?.data?.message || error.message || "Erreur inconnue")
+//       );
+//     } finally {
+//       setValidationLoading(false);
+//     }
+//   };
+
+//   const groupConsultantsByBdc = (data) => {
+//     const groups = {};
+
+//     data.forEach((item) => {
+//       const key = `${item.id_consultan}_${item.id_bdc}`;
+
+//       if (!groups[key]) {
+//         groups[key] = {
+//           id: key,
+//           id_CRA: item.id_CRA,
+//           id_consultan: item.id_consultan,
+//           id_bdc: item.id_bdc,
+//           id_esn: item.id_esn,
+//           id_client: item.id_client,
+//           période: item.période,
+//           consultant_name: item.consultant_name,
+//           consultant_email: item.consultant_email,
+//           client_name: item.client_name,
+//           n_jour: item.n_jour,
+//           commentaire: item.commentaire,
+//           statut: item.statut,
+//           total_days: 0,
+//           work_days: [],
+//           statuses: new Set(),
+//         };
+//       }
+
+//       if (item.n_jour) {
+//         groups[key].total_days += parseFloat(item.n_jour || 0);
+//       }
+//       groups[key].work_days.push(item);
+//       groups[key].statuses.add(item.statut);
+//     });
+
+//     return Object.values(groups).map((group) => ({
+//       ...group,
+//       total_entries: group.work_days.length,
+//     }));
+//   };
+
+//   const fetchCraWorkDays = async (consultantId, bdcId, period) => {
+//     setCraModalLoading(true);
+//     try {
+//       const commercialId = localStorage.getItem("userId") || localStorage.getItem("id");
+//       const token = localStorage.getItem("unifiedToken") || localStorage.getItem("token");
+
+//       const response = await axios.get(
+//         `${Endponit()}/api/cra-by-commercial-period/`,
+//         {
+//           params: { commercial_id: commercialId, period: period },
+//           headers: { Authorization: `Bearer ${token}` },
+//         }
+//       );
+
+//       if (response.data?.status) {
+//         const filteredData = response.data.data.filter(
+//           (item) => item.id_consultan === consultantId && item.id_bdc === bdcId
+//         );
+//         setCraWorkDays(filteredData);
+//       } else {
+//         message.error("Failed to fetch CRA work days");
+//         setCraWorkDays([]);
+//       }
+//     } catch (error) {
+//       message.error(`Error fetching CRA work days: ${error.message}`);
+//       setCraWorkDays([]);
+//     } finally {
+//       setCraModalLoading(false);
+//     }
+//   };
+
+//   const handleCraClick = (record) => {
+//     const consultantId = record.id_consultan;
+//     const bdcId = record.id_bdc;
+//     const period = record.période;
+
+//     // Store the selected CRA record with its API status
+//     setSelectedCraRecord(record);
+
+//     setSelectedConsultant({
+//       id: consultantId,
+//       name: record.consultant_name,
+//       email: record.consultant_email,
+//       period: period,
+//     });
+//     setSelectedBdc({
+//       id: bdcId,
+//       project: `BDC ${bdcId}`,
+//       description: record.client_name,
+//     });
+//     setSelectedPeriod(period);
+//     setCraModalVisible(true);
+//     fetchCraWorkDays(consultantId, bdcId, period);
+//   };
+
+//   const handleSearch = (values) => {
+//     fetchCraData(values);
+//   };
+
+//   const handleReset = () => {
+//     form.resetFields();
+//     const currentPeriod = moment().format("MM_YYYY");
+//     form.setFieldsValue({ period: currentPeriod });
+//     fetchCraData({ period: currentPeriod });
+//   };
+
+//   const getStatusColor = (status) => {
+//     const statusOption = statusOptions.find((opt) => opt.value === status);
+//     return statusOption ? statusOption.color : "default";
+//   };
+
+//   const formatPeriod = (period) => {
+//     if (!period) return "";
+//     const [month, year] = period.split("_");
+//     if (!month || !year) return period;
+//     return moment(`${year}-${month}-01`).format("MMMM YYYY");
+//   };
+
+//   const craWorkDaysColumns = [
+//     {
+//       title: "Date",
+//       key: "date",
+//       render: (record) => {
+//         const periode = record.période || "";
+//         const jour = String(record.jour || "1");
+//         const [month, year] = periode.split("_");
+//         return jour && month && year
+//           ? `${jour.padStart(2, "0")}/${String(month).padStart(2, "0")}/${year}`
+//           : "-";
+//       },
+//       sorter: (a, b) => {
+//         const periodeA = a.période || "";
+//         const jourA = parseInt(a.jour || "1");
+//         const [monthA, yearA] = periodeA.split("_");
+
+//         const periodeB = b.période || "";
+//         const jourB = parseInt(b.jour || "1");
+//         const [monthB, yearB] = periodeB.split("_");
+
+//         return (
+//           new Date(yearA, monthA - 1, jourA) -
+//           new Date(yearB, monthB - 1, jourB)
+//         );
+//       },
+//     },
+//     {
+//       title: "Durée (j)",
+//       dataIndex: "Durée",
+//       key: "duration",
+//       render: (text) => <Tag color="blue">{text || "0"}</Tag>,
+//       sorter: (a, b) => (parseFloat(a.Durée) || 0) - (parseFloat(b.Durée) || 0),
+//     },
+//     {
+//       title: "Type",
+//       dataIndex: "type",
+//       key: "type",
+//       render: (text) => {
+//         const type = text || "travail";
+//         return type.charAt(0).toUpperCase() + type.slice(1);
+//       },
+//     },
+//     {
+//       title: "Project",
+//       key: "project",
+//       render: (record) => record.project?.titre || `BDC ${record.id_bdc}`,
+//     },
+//     {
+//       title: "TJM",
+//       key: "tjm",
+//       render: (record) => `${record.candidature?.tjm || 0}€`,
+//     },
+//   ];
+
+//   const columns = [
+//     {
+//       title: "Period",
+//       dataIndex: "période",
+//       key: "période",
+//       // width: 120,
+//       render: (text) => formatPeriod(text),
+//     },
+//     // {
+//     //   title: "Jours",
+//     //   dataIndex: "n_jour",
+//     //   key: "n_jour",
+//     //   render: (text) => <Tag color="blue">{text}</Tag>,
+//     //   sorter: (a, b) => a.n_jour - b.n_jour,
+//     // },
+//     {
+//       title: "CRA Status",
+//       dataIndex: "statut",
+//       key: "statut",
+//       // width: 120,
+//       render: (status) => {
+//         const displayStatus = getDisplayStatus(status);
+//         return <Tag color={getStatusColor(displayStatus)}>{displayStatus}</Tag>;
+//       },
+//       filters: statusOptions.map((option) => ({
+//         text: option.value,
+//         value: option.value,
+//       })),
+//       onFilter: (value, record) => {
+//         const displayStatus = getDisplayStatus(record.statut);
+//         return displayStatus === value;
+//       },
+//     },
+//     {
+//       title: "Actions",
+//       key: "actions",
+//       // width: 100,
+//       fixed: "right",
+//       render: (_, record) => (
+//         <Button
+//           type="primary"
+//           icon={<CalendarOutlined />}
+//           size="small"
+//           onClick={() => handleCraClick(record)}
+//         >
+//           CRA
+//         </Button>
+//       ),
+//     },
+//   ];
+
+//   const closeModal = () => {
+//     setCraModalVisible(false);
+//     setSelectedConsultant(null);
+//     setSelectedBdc(null);
+//     setSelectedPeriod(null);
+//     setCraWorkDays([]);
+//     setValidationNote("");
+//     setSelectedCraRecord(null);
+//     setRejectModalVisible(false);
+//   };
+
+//   // Check if the selected CRA status from API is EVP (for commercial validation)
+//   const hasEvpEntries =
+//     selectedCraRecord &&
+//     (selectedCraRecord.statut === "EVP" ||
+//       selectedCraRecord.statut === "En attente validation prestataire");
+
+//   return (
+//     <div
+//       style={{
+//         padding: "20px",
+//         backgroundColor: "#f0f2f5",
+//         minHeight: "100vh",
+//       }}
+//     >
+//       <Card style={{ marginBottom: "20px" }}>
+//         <Form
+//           form={form}
+//           layout="inline"
+//           onFinish={handleSearch}
+//           initialValues={{ period: moment().format("MM_YYYY") }}
+//         >
+//           <Form.Item
+//             label="Period"
+//             name="period"
+//             rules={[{ required: true, message: "Period is required" }]}
+//           >
+//             <Input
+//               placeholder="MM_YYYY (e.g., 05_2025)"
+//               style={{ width: 200 }}
+//             />
+//           </Form.Item>
+
+//           <Form.Item label="Status" name="status">
+//             <Select
+//               placeholder="Select status"
+//               style={{ width: 150 }}
+//               allowClear
+//             >
+//               {filterStatusOptions.map((option) => (
+//                 <Option key={option.value} value={option.value}>
+//                   <Tag color={option.color}>{option.value}</Tag>
+//                 </Option>
+//               ))}
+//             </Select>
+//           </Form.Item>
+
+//           <Form.Item>
+//             <Space>
+//               <Button
+//                 type="primary"
+//                 htmlType="submit"
+//                 icon={<SearchOutlined />}
+//                 loading={loading}
+//               >
+//                 Search
+//               </Button>
+//               <Button icon={<ClearOutlined />} onClick={handleReset}>
+//                 Reset
+//               </Button>
+//             </Space>
+//           </Form.Item>
+//         </Form>
+//       </Card>
+
+//       <Card>
+//         <Table
+//           columns={columns}
+//           dataSource={craData}
+//           rowKey="id_CRA"
+//           loading={loading}
+//           pagination={{
+//             pageSize: 10,
+//             showSizeChanger: true,
+//             showQuickJumper: true,
+//             showTotal: (total, range) =>
+//               `${range[0]}-${range[1]} of ${total} records`,
+//           }}
+//           scroll={{ x: 1400 }}
+//           size="small"
+//         />
+//       </Card>
+
+//       <Modal
+//         title={
+//           <div
+//             style={{
+//               display: "flex",
+//               justifyContent: "space-between",
+//               alignItems: "center",
+//               width: "100%",
+//               padding: "0 19px",
+//             }}
+//           >
+//             <div>
+//               <CalendarOutlined style={{ marginRight: 8 }} />
+//               {selectedConsultant && selectedBdc
+//                 ? `CRA Details - ${formatPeriod(selectedPeriod)}`
+//                 : "CRA Work Days"}
+//             </div>
+//             {hasEvpEntries && (
+//               <Space>
+//                 <Button
+//                   type="primary"
+//                   style={{ background: "#52c41a", borderColor: "#52c41a" }}
+//                   icon={<CheckOutlined />}
+//                   size="small"
+//                   loading={validationLoading}
+//                   onClick={() => {
+//                     Modal.confirm({
+//                       title: "Validation des CRA",
+//                       content: (
+//                         <div>
+                         
+//                         </div>
+//                       ),
+//                       okText: "Valider",
+//                       cancelText: "Annuler",
+//                       onOk: () => handleBulkValidation(true),
+//                     });
+//                   }}
+//                 >
+//                   Valider
+//                 </Button>
+//                 <Button
+//                   danger
+//                   icon={<CloseOutlined />}
+//                   size="small"
+//                   loading={validationLoading}
+//                   onClick={() => {
+//                     setValidationNote("");
+//                     setRejectModalVisible(true);
+//                   }}
+//                 >
+//                   Refuser
+//                 </Button>
+//               </Space>
+//             )}
+//           </div>
+//         }
+//         open={craModalVisible}
+//         onCancel={closeModal}
+//         width={1300}
+//         footer={[
+//           <Button key="close" onClick={closeModal}>
+//             Close
+//           </Button>,
+//         ]}
+//       >
+//         {craModalLoading ? (
+//           <div style={{ textAlign: "center", padding: "50px" }}>
+//             <Spin size="large" />
+//             <div style={{ marginTop: 16 }}>Loading work days...</div>
+//           </div>
+//         ) : (
+//           <Row gutter={[16, 16]}>
+            
+//             <Col span={24}>
+//               <Card  size="small">
+//                 <Table
+//                   columns={craWorkDaysColumns}
+//                   dataSource={craWorkDays}
+//                   rowKey="id_imputation"
+//                   size="small"
+//                   pagination={{ pageSize: 10 }}
+//                   locale={{
+//                     emptyText:
+//                       "No work days found for this consultant-project combination",
+//                   }}
+//                   summary={() => {
+//                     const totalDays = craWorkDays.reduce(
+//                       (sum, item) => sum + parseFloat(item.Durée || 0),
+//                       0
+//                     );
+//                     const totalAmount = craWorkDays.reduce(
+//                       (sum, item) =>
+//                         sum +
+//                         parseFloat(item.Durée || 0) *
+//                           parseFloat(item.candidature?.tjm || 0),
+//                       0
+//                     );
+
+//                     return (
+//                       <Table.Summary.Row style={{ backgroundColor: "#fafafa" }}>
+//                         <Table.Summary.Cell index={0}>
+//                           <strong>Total</strong>
+//                         </Table.Summary.Cell>
+//                         <Table.Summary.Cell index={1}>
+//                           <Tag color="green">
+//                             <strong>{totalDays} days</strong>
+//                           </Tag>
+//                         </Table.Summary.Cell>
+//                         <Table.Summary.Cell index={2}>-</Table.Summary.Cell>
+//                         <Table.Summary.Cell index={3}>-</Table.Summary.Cell>
+//                         <Table.Summary.Cell index={4}>
+//                           <Tag color="orange">
+//                             <strong>{totalAmount.toFixed(2)}€</strong>
+//                           </Tag>
+//                         </Table.Summary.Cell>
+//                       </Table.Summary.Row>
+//                     );
+//                   }}
+//                 />
+//               </Card>
+//             </Col>
+//           </Row>
+//         )}
+//       </Modal>
+
+//       {/* Reject Modal */}
+//       <Modal
+//         title="Refuser les CRA"
+//         open={rejectModalVisible}
+//         onCancel={() => {
+//           setRejectModalVisible(false);
+//           setValidationNote("");
+//         }}
+//         onOk={() => {
+//           if (!validationNote.trim()) {
+//             message.error("Veuillez indiquer la raison du refus");
+//             return;
+//           }
+//           setRejectModalVisible(false);
+//           handleBulkValidation(false);
+//         }}
+//         okText="Refuser"
+//         cancelText="Annuler"
+//         okButtonProps={{ danger: true }}
+//       >
+//         <div>
+        
+//           <Input.TextArea
+//             placeholder="Veuillez indiquer la raison du refus"
+//             rows={4}
+//             value={validationNote}
+//             onChange={(e) => setValidationNote(e.target.value)}
+//             style={{ marginTop: 16 }}
+//           />
+//         </div>
+//       </Modal>
+//     </div>
+//   );
+// };
+
+// export default InterfaceCommercial;
+
+import React, { useState, useEffect, lazy, Suspense } from "react";
 import {
   Layout,
   Menu,
@@ -1659,8 +2345,7 @@ Statut précédent: ${commentObj.previousStatus}`;
         />
       </div>
     );
-  };
-  // Main content based on current page
+  };  // Main content based on current page
   const renderContent = () => {
     if (loading) {
       return (
@@ -1673,16 +2358,31 @@ Statut précédent: ${commentObj.previousStatus}`;
       );
     }
 
+    // Lazy load the ExpenseReportsValidation component
+    const ExpenseReportsValidation = lazy(() => import("../components/commercial-interface/ExpenseReportsValidation"));
+
     switch (currentPage) {
       case "dashboard":
         return renderDashboard();
       case "consultants":
         return renderConsultants();
+      case "expense-reports":
+        return (
+          <Suspense fallback={
+            <div style={{ textAlign: "center", padding: "100px 0" }}>
+              <Spin size="large" />
+              <div style={{ marginTop: 16 }}>
+                Chargement des notes de frais...
+              </div>
+            </div>
+          }>
+            <ExpenseReportsValidation />
+          </Suspense>
+        );
       default:
         return renderDashboard();
     }
   };
-
   // Define menu items
   const menuItems = [
     {
@@ -1694,6 +2394,11 @@ Statut précédent: ${commentObj.previousStatus}`;
       key: "consultants",
       icon: <UserOutlined />,
       label: "Consultants",
+    },
+    {
+      key: "expense-reports",
+      icon: <FileTextOutlined />,
+      label: "Notes de frais",
     },
   ];
 

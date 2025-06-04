@@ -132,9 +132,9 @@ const App = () => {
         </Route>
 
         {/* Consultant Interface Routes */}
-        <Route path="/interface-consultant" element={<InterfaceConsultant onLogin={handleLogin} />} />
-        <Route path="/interface-consultant/projects" element={<ConsultantProjects />} />
-        <Route path="/interface-consultant/cra-monthly" element={<MonthlyActivityReport />} />
+        <Route path="/interface-consultant/*" element={<InterfaceConsultant onLogin={handleLogin} />} />
+        <Route path="/interface-consultant/notes-de-frais" element={<InterfaceConsultant onLogin={handleLogin} />} />
+        <Route path="/2/interface-consultant/notes-de-frais" element={<InterfaceConsultant onLogin={handleLogin} />} />
 
         {/* Commercial Interface Routes */}
         <Route path="/interface-commercial" element={<InterfaceCommercial onLogin={handleLogin} />} />

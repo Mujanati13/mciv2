@@ -2007,14 +2007,14 @@ Statut précédent: ${commentObj.previousStatus}`;
             {/* Header info */}
             <Row gutter={[24, 16]} style={{ marginBottom: 24 }}>
               <Col span={8}>
-                <div className="info-block">
+                {/* <div className="info-block">
                   <Text strong>Consultant : </Text>
                   <Text>
                     {consultantProfile
                       ? `${consultantProfile.Nom} ${consultantProfile.Prenom}`
                       : consultantName || ""}
                   </Text>
-                </div>
+                </div> */}
                 {consultantProfile?.Role && (
                   <div className="info-block">
                     <Text strong>Rôle : </Text>
