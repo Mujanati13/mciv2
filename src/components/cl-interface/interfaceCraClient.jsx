@@ -40,7 +40,7 @@ const CustomCalendar = ({ selectedPeriod, craWorkDays, onDateClick }) => {
 
   // Set moment locale to French
   useEffect(() => {
-    moment.locale('fr');
+    moment.locale("fr");
     if (selectedPeriod) {
       const [month, year] = selectedPeriod.split("_");
       setCurrentDate(moment(`${year}-${month}-01`));
@@ -48,19 +48,19 @@ const CustomCalendar = ({ selectedPeriod, craWorkDays, onDateClick }) => {
   }, [selectedPeriod]);
 
   const getDaysInMonth = () => {
-    const startOfMonth = currentDate.clone().startOf('month');
-    const endOfMonth = currentDate.clone().endOf('month');
-    const startDate = startOfMonth.clone().startOf('week');
-    const endDate = endOfMonth.clone().endOf('week');
-    
+    const startOfMonth = currentDate.clone().startOf("month");
+    const endOfMonth = currentDate.clone().endOf("month");
+    const startDate = startOfMonth.clone().startOf("week");
+    const endDate = endOfMonth.clone().endOf("week");
+
     const days = [];
     const day = startDate.clone();
-    
+
     while (day.isSameOrBefore(endDate)) {
       days.push(day.clone());
-      day.add(1, 'day');
+      day.add(1, "day");
     }
-    
+
     return days;
   };
 
@@ -68,14 +68,17 @@ const CustomCalendar = ({ selectedPeriod, craWorkDays, onDateClick }) => {
     const dayNum = day.date();
     const monthNum = day.month() + 1;
     const yearNum = day.year();
-    
+
     if (selectedPeriod) {
       const [periodMonth, periodYear] = selectedPeriod.split("_");
-      if (parseInt(periodMonth) !== monthNum || parseInt(periodYear) !== yearNum) {
+      if (
+        parseInt(periodMonth) !== monthNum ||
+        parseInt(periodYear) !== yearNum
+      ) {
         return [];
       }
     }
-    
+
     return craWorkDays.filter((item) => {
       const itemDay = parseInt(item.jour);
       return itemDay === dayNum;
@@ -86,16 +89,17 @@ const CustomCalendar = ({ selectedPeriod, craWorkDays, onDateClick }) => {
     const isCurrentMonth = day.month() === currentDate.month();
     const dayData = getWorkDataForDay(day);
     const hasWork = dayData.length > 0;
-    const isToday = day.isSame(moment(), 'day');
-    
+    const isToday = day.isSame(moment(), "day");
+
     const totalHours = dayData.reduce(
       (sum, item) => sum + parseFloat(item.Durée || 0),
       0
     );
-    
+
     const totalAmount = dayData.reduce(
       (sum, item) =>
-        sum + parseFloat(item.Durée || 0) * parseFloat(item.candidature?.tjm || 0),
+        sum +
+        parseFloat(item.Durée || 0) * parseFloat(item.candidature?.tjm || 0),
       0
     );
 
@@ -105,63 +109,65 @@ const CustomCalendar = ({ selectedPeriod, craWorkDays, onDateClick }) => {
 
     return (
       <div
-        key={day.format('YYYY-MM-DD')}
-        className={`calendar-day ${!isCurrentMonth ? 'other-month' : ''} ${hasWork ? 'has-work' : ''} ${isToday ? 'today' : ''}`}
+        key={day.format("YYYY-MM-DD")}
+        className={`calendar-day ${!isCurrentMonth ? "other-month" : ""} ${
+          hasWork ? "has-work" : ""
+        } ${isToday ? "today" : ""}`}
         onClick={() => onDateClick && onDateClick(day, dayData)}
         style={{
-          border: '1px solid #f0f0f0',
-          minHeight: '80px',
-          padding: '4px',
-          cursor: hasWork ? 'pointer' : 'default',
-          backgroundColor: !isCurrentMonth 
-            ? '#fafafa' 
-            : isToday 
-              ? '#e6f7ff' 
-              : hasWork 
-                ? '#f6ffed' 
-                : 'white',
-          position: 'relative',
-          transition: 'all 0.2s ease',
+          border: "1px solid #f0f0f0",
+          minHeight: "80px",
+          padding: "4px",
+          cursor: hasWork ? "pointer" : "default",
+          backgroundColor: !isCurrentMonth
+            ? "#fafafa"
+            : isToday
+            ? "#e6f7ff"
+            : hasWork
+            ? "#f6ffed"
+            : "white",
+          position: "relative",
+          transition: "all 0.2s ease",
         }}
         onMouseEnter={(e) => {
           if (hasWork) {
-            e.target.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
+            e.target.style.boxShadow = "0 2px 8px rgba(0,0,0,0.1)";
           }
         }}
         onMouseLeave={(e) => {
-          e.target.style.boxShadow = 'none';
+          e.target.style.boxShadow = "none";
         }}
       >
         {/* Day number */}
         <div
           style={{
-            fontWeight: isToday ? 'bold' : 'normal',
-            color: !isCurrentMonth ? '#ccc' : isToday ? '#1890ff' : '#333',
-            marginBottom: '2px',
-            fontSize: '12px',
+            fontWeight: isToday ? "bold" : "normal",
+            color: !isCurrentMonth ? "#ccc" : isToday ? "#1890ff" : "#333",
+            marginBottom: "2px",
+            fontSize: "12px",
           }}
         >
-          {day.format('D')}
+          {day.format("D")}
         </div>
 
         {/* Work indicator */}
         {hasWork && hasWorkType && (
           <div
             style={{
-              position: 'absolute',
-              top: '2px',
-              right: '2px',
-              background: '#52c41a',
-              color: 'white',
-              borderRadius: '50%',
-              width: '16px',
-              height: '16px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '10px',
-              fontWeight: 'bold',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+              position: "absolute",
+              top: "2px",
+              right: "2px",
+              background: "#52c41a",
+              color: "white",
+              borderRadius: "50%",
+              width: "16px",
+              height: "16px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: "10px",
+              fontWeight: "bold",
+              boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
             }}
           >
             ✓
@@ -170,59 +176,59 @@ const CustomCalendar = ({ selectedPeriod, craWorkDays, onDateClick }) => {
 
         {/* Work details */}
         {hasWork && (
-          <div style={{ fontSize: '10px' }}>
+          <div style={{ fontSize: "10px" }}>
             <div
               style={{
-                background: '#1890ff',
-                color: 'white',
-                padding: '1px 3px',
-                borderRadius: '2px',
-                marginBottom: '1px',
-                textAlign: 'center',
-                fontSize: '9px',
+                background: "#1890ff",
+                color: "white",
+                padding: "1px 3px",
+                borderRadius: "2px",
+                marginBottom: "1px",
+                textAlign: "center",
+                fontSize: "9px",
               }}
             >
               {totalHours}j
             </div>
-            
+
             {dayData.slice(0, 2).map((item, index) => (
               <div
                 key={index}
                 style={{
-                  background: item.type === 'congé' ? '#ffccc7' : '#e6f7ff',
-                  padding: '1px 2px',
-                  borderRadius: '2px',
-                  marginBottom: '1px',
-                  fontSize: '8px',
-                  textAlign: 'center',
+                  background: item.type === "congé" ? "#ffccc7" : "#e6f7ff",
+                  padding: "1px 2px",
+                  borderRadius: "2px",
+                  marginBottom: "1px",
+                  fontSize: "8px",
+                  textAlign: "center",
                 }}
               >
-                {item.type === 'congé' ? 'Congé' : 'Travail'}
+                {item.type === "congé" ? "Congé" : "Travail"}
               </div>
             ))}
-            
+
             {dayData.length > 2 && (
               <div
                 style={{
-                  fontSize: '7px',
-                  color: '#666',
-                  textAlign: 'center',
-                  fontStyle: 'italic',
+                  fontSize: "7px",
+                  color: "#666",
+                  textAlign: "center",
+                  fontStyle: "italic",
                 }}
               >
                 +{dayData.length - 2} autres
               </div>
             )}
-            
+
             <div
               style={{
-                background: '#f6ffed',
-                color: '#52c41a',
-                padding: '1px 2px',
-                borderRadius: '2px',
-                fontSize: '8px',
-                textAlign: 'center',
-                fontWeight: 'bold',
+                background: "#f6ffed",
+                color: "#52c41a",
+                padding: "1px 2px",
+                borderRadius: "2px",
+                fontSize: "8px",
+                textAlign: "center",
+                fontWeight: "bold",
               }}
             >
               {totalAmount.toFixed(0)}€
@@ -238,61 +244,88 @@ const CustomCalendar = ({ selectedPeriod, craWorkDays, onDateClick }) => {
   // French month names
   const getMonthYearText = () => {
     const monthNames = [
-      'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
-      'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'
+      "Janvier",
+      "Février",
+      "Mars",
+      "Avril",
+      "Mai",
+      "Juin",
+      "Juillet",
+      "Août",
+      "Septembre",
+      "Octobre",
+      "Novembre",
+      "Décembre",
     ];
-    
+
     const month = currentDate.month();
     const year = currentDate.year();
-    
+
     return `${monthNames[month]} ${year}`;
   };
 
   return (
-    <div style={{ background: 'white', borderRadius: '6px', overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
+    <div
+      style={{
+        background: "white",
+        borderRadius: "6px",
+        overflow: "hidden",
+        boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
+      }}
+    >
       {/* Calendar Header */}
       <div
         style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          padding: '16px',
-          background: '#fafafa',
-          borderBottom: '1px solid #f0f0f0',
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          padding: "16px",
+          background: "#fafafa",
+          borderBottom: "1px solid #f0f0f0",
         }}
       >
         <Button
           icon={<LeftOutlined />}
-          onClick={() => setCurrentDate(currentDate.clone().subtract(1, 'month'))}
+          onClick={() =>
+            setCurrentDate(currentDate.clone().subtract(1, "month"))
+          }
           size="small"
-          style={{ borderRadius: '4px' }}
+          style={{ borderRadius: "4px" }}
           title="Mois précédent"
         />
-        <Title level={4} style={{ margin: 0, color: '#1890ff' }}>
+        <Title level={4} style={{ margin: 0, color: "#1890ff" }}>
           {getMonthYearText()}
         </Title>
         <Button
           icon={<RightOutlined />}
-          onClick={() => setCurrentDate(currentDate.clone().add(1, 'month'))}
+          onClick={() => setCurrentDate(currentDate.clone().add(1, "month"))}
           size="small"
-          style={{ borderRadius: '4px' }}
+          style={{ borderRadius: "4px" }}
           title="Mois suivant"
         />
       </div>
 
       {/* Days of week header - French */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)' }}>
-        {['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'].map((day) => (
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)" }}>
+        {[
+          "Dimanche",
+          "Lundi",
+          "Mardi",
+          "Mercredi",
+          "Jeudi",
+          "Vendredi",
+          "Samedi",
+        ].map((day) => (
           <div
             key={day}
             style={{
-              padding: '8px 4px',
-              textAlign: 'center',
-              fontWeight: 'bold',
-              background: '#f5f5f5',
-              borderBottom: '1px solid #f0f0f0',
-              fontSize: '12px',
-              color: '#666',
+              padding: "8px 4px",
+              textAlign: "center",
+              fontWeight: "bold",
+              background: "#f5f5f5",
+              borderBottom: "1px solid #f0f0f0",
+              fontSize: "12px",
+              color: "#666",
             }}
           >
             {day}
@@ -301,23 +334,22 @@ const CustomCalendar = ({ selectedPeriod, craWorkDays, onDateClick }) => {
       </div>
 
       {/* Calendar grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)' }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)" }}>
         {days.map(renderDay)}
       </div>
 
       {/* Legend */}
       <div
         style={{
-          padding: '12px 16px',
-          background: '#fafafa',
-          borderTop: '1px solid #f0f0f0',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '16px',
-          fontSize: '11px',
+          padding: "12px 16px",
+          background: "#fafafa",
+          borderTop: "1px solid #f0f0f0",
+          display: "flex",
+          alignItems: "center",
+          gap: "16px",
+          fontSize: "11px",
         }}
-      >
-      </div>
+      ></div>
     </div>
   );
 };
@@ -358,15 +390,17 @@ const InterfaceCraClient = () => {
   const getDisplayStatus = (status) => {
     const statusMap = {
       evc: "En attente validation client",
-      evp: "En attente validation prestataire", 
+      evp: "En attente validation prestataire",
       annulé: "Annulé",
       annule: "Annulé",
       validé: "Validé",
       saisi: "Saisi",
     };
     return statusMap[status?.toLowerCase()] || status;
-  };useEffect(() => {
+  };
+  useEffect(() => {
     const currentPeriod = moment().format("MM_YYYY");
+    console.log("Initial load - current period:", currentPeriod); // Debug log
     fetchCraData({ period: currentPeriod });
   }, []);
 
@@ -375,8 +409,10 @@ const InterfaceCraClient = () => {
     if (!consultantSearch.trim()) {
       setFilteredCraData(craData);
     } else {
-      const filtered = craData.filter(item =>
-        item.consultant_name?.toLowerCase().includes(consultantSearch.toLowerCase())
+      const filtered = craData.filter((item) =>
+        item.consultant_name
+          ?.toLowerCase()
+          .includes(consultantSearch.toLowerCase())
       );
       setFilteredCraData(filtered);
     }
@@ -397,14 +433,16 @@ const InterfaceCraClient = () => {
       const params = {
         client_id: clientId,
         period: values.period || currentPeriod,
-      };
-
-      // Add status filter if provided
+      }; // Add status filter if provided
       if (values.status) {
         params.status = values.status;
       }
 
       console.log("Fetching CRA data with params:", params); // Debug log
+      console.log(
+        "Using endpoint:",
+        `${Endponit()}/api/cra-consultants/client/`
+      ); // Debug log
 
       const response = await axios.get(
         `${Endponit()}/api/cra-consultants/client/`,
@@ -413,24 +451,35 @@ const InterfaceCraClient = () => {
           headers: { Authorization: `Bearer ${token}` },
         }
       );
-
       if (response.data?.status) {
         const rawData = response.data.data || [];
+        console.log("Raw API data received:", rawData); // Debug log
         setClientInfo(response.data.client || null);
-
         const groupedData = groupConsultantsByBdc(rawData);
+        console.log("Grouped data after processing:", groupedData); // Debug log
         setCraData(groupedData);
         setFilteredCraData(groupedData);
         setTotal(groupedData.length);
+
+        // Show success message with count
+        if (groupedData.length > 0) {
+          message.success(`${groupedData.length} CRA trouvé(s)`);
+        } else {
+          message.info("Aucun CRA trouvé pour cette période");
+        }
       } else {
-        message.error(response.data.message || "Échec de récupération des données CRA");
+        message.error(
+          response.data.message || "Échec de récupération des données CRA"
+        );
         setCraData([]);
         setFilteredCraData([]);
         setTotal(0);
       }
     } catch (error) {
       console.error("Error fetching CRA data:", error); // Debug log
-      message.error(`Erreur: ${error.response?.data?.message || error.message}`);
+      message.error(
+        `Erreur: ${error.response?.data?.message || error.message}`
+      );
       setCraData([]);
       setFilteredCraData([]);
       setTotal(0);
@@ -497,54 +546,50 @@ const InterfaceCraClient = () => {
       setValidationLoading(false);
     }
   };
-
   const groupConsultantsByBdc = (data) => {
     const groups = {};
 
     data.forEach((item) => {
-      const key = `${item.id_consultan || item.consultant_id}_${
-        item.id_bdc || item.bdc_id
-      }`;
+      const key = `${item.id_consultan}_${item.id_bdc}`;
 
       if (!groups[key]) {
         groups[key] = {
           id: key,
           id_CRA: item.id_CRA,
-          id_consultan: item.id_consultan || item.consultant_id,
-          id_bdc: item.id_bdc || item.bdc_id,
-          id_esn: item.id_esn || item.esn_id,
-          id_client: item.id_client || item.client_id,
-          période: item.période || item.period,
-          consultant: item.consultant,
-          project: item.project,
-          candidature: item.candidature,
+          id_consultan: item.id_consultan,
+          id_bdc: item.id_bdc,
+          id_esn: item.id_esn,
+          id_client: item.id_client,
+          période: item.période,
           consultant_name: item.consultant_name,
-          project_title: item.project_title,
+          consultant_email: item.consultant_email,
+          consultant_position: item.consultant_position,
+          esn_name: item.esn_name,
+          esn_contact: item.esn_contact,
+          project_title: item.appel_offre_titre, // Use appel_offre_titre from API
+          appel_offre_description: item.appel_offre_description,
+          appel_offre_profil: item.appel_offre_profil,
+          appel_offre_date_debut: item.appel_offre_date_debut,
+          appel_offre_jours: item.appel_offre_jours,
           n_jour: item.n_jour,
           commentaire: item.commentaire,
           statut: item.statut,
-          total_days: 0,
-          work_days: [],
-          statuses: new Set(),
-          status: item.status || item.statut,
-          cra_status: item.cra_status || item.status || item.statut,
+          total_days: item.n_jour || 0, // Use n_jour as total_days
+          work_days: [], // Initialize empty, will be populated by detailed API call if needed
+          statuses: new Set([item.statut]),
+          status: item.statut,
+          cra_status: item.statut,
         };
-      }
-
-      if (item.Durée || item.duration) {
-        groups[key].total_days += parseFloat(item.Durée || item.duration || 0);
-      }
-      groups[key].work_days.push(item);
-      groups[key].statuses.add(item.statut || item.status);
-
-      if (item.cra_status) {
-        groups[key].cra_status = item.cra_status;
+      } else {
+        // If the key already exists, update the total days
+        groups[key].total_days += parseInt(item.n_jour || 0);
+        groups[key].statuses.add(item.statut);
       }
     });
 
     return Object.values(groups).map((group) => ({
       ...group,
-      total_entries: group.work_days.length,
+      total_entries: 1, // Each record represents one CRA summary
     }));
   };
 
@@ -572,13 +617,14 @@ const InterfaceCraClient = () => {
         setCraWorkDays([]);
       }
     } catch (error) {
-      message.error(`Erreur lors de la récupération des jours de travail CRA: ${error.message}`);
+      message.error(
+        `Erreur lors de la récupération des jours de travail CRA: ${error.message}`
+      );
       setCraWorkDays([]);
     } finally {
       setCraModalLoading(false);
     }
   };
-
   const handleCraClick = (record) => {
     const consultantId = record.id_consultan;
     const bdcId = record.id_bdc;
@@ -589,33 +635,34 @@ const InterfaceCraClient = () => {
     setSelectedConsultant({
       id: consultantId,
       name: record.consultant_name,
-      email: record.consultant?.email,
+      email: record.consultant_email, // Use consultant_email from the new API
       period: period,
-    });
-    setSelectedBdc({
+    });    setSelectedBdc({
       id: bdcId,
       project: record.project_title || `BDC ${bdcId}`,
-      description: record.project?.description,
+      description: record.appel_offre_description, // Use appel_offre_description from the new API
+      tjm: record.tjm || record.candidature?.tjm || '0' // Store TJM for display
     });
     setSelectedPeriod(period);
     setCraModalVisible(true);
     fetchCraWorkDays(consultantId, bdcId, period);
-  };  const handleSearch = (values) => {
+  };
+  const handleSearch = (values) => {
     fetchCraData(values);
   };
   // Handle period change with auto-refresh
   const handlePeriodChange = (event) => {
     const value = event.target.value;
     if (value) {
-      const [year, month] = value.split('-');
+      const [year, month] = value.split("-");
       const periodValue = `${month}_${year}`;
-      
+
       // Update form field
       form.setFieldsValue({ period: periodValue });
-      
+
       // Get current form values for other fields
       const currentValues = form.getFieldsValue();
-      
+
       // Automatically fetch data with new period
       fetchCraData({
         period: periodValue,
@@ -628,7 +675,7 @@ const InterfaceCraClient = () => {
   const handleStatusChange = (statusValue) => {
     // Get current form values
     const currentValues = form.getFieldsValue();
-    
+
     // Automatically fetch data with new status
     fetchCraData({
       period: currentValues.period,
@@ -639,21 +686,28 @@ const InterfaceCraClient = () => {
   const handleReset = () => {
     form.resetFields();
     setConsultantSearch("");
-    
+
     const currentPeriod = moment().format("MM_YYYY");
-    
+
     // Reset form fields to current month
-    form.setFieldsValue({ 
+    form.setFieldsValue({
       period: currentPeriod,
       status: null,
-      consultantSearch: ""
+      consultantSearch: "",
     });
-    
+
     fetchCraData({ period: currentPeriod });
   };
-
   const getStatusColor = (status) => {
-    const statusOption = statusOptions.find((opt) => opt.value === status);
+    // First check for exact match with status options
+    let statusOption = statusOptions.find((opt) => opt.value === status);
+
+    // If no exact match, try to find by display status
+    if (!statusOption) {
+      const displayStatus = getDisplayStatus(status);
+      statusOption = statusOptions.find((opt) => opt.label === displayStatus);
+    }
+
     return statusOption ? statusOption.color : "default";
   };
 
@@ -667,62 +721,86 @@ const InterfaceCraClient = () => {
   const handleCalendarDateClick = (day, dayData) => {
     if (dayData.length > 0) {
       Modal.info({
-        title: `Détails du ${day.format('DD/MM/YYYY')}`,
+        title: `Détails du ${day.format("DD/MM/YYYY")}`,
         content: (
           <div>
             {dayData.map((item, index) => (
-              <div key={index} style={{ 
-                marginBottom: '12px', 
-                padding: '12px', 
-                background: '#f5f5f5', 
-                borderRadius: '6px',
-                border: '1px solid #e8e8e8'
-              }}>
+              <div
+                key={index}
+                style={{
+                  marginBottom: "12px",
+                  padding: "12px",
+                  background: "#f5f5f5",
+                  borderRadius: "6px",
+                  border: "1px solid #e8e8e8",
+                }}
+              >
                 <Row gutter={[16, 8]}>
                   <Col span={12}>
-                    <Text strong>Projet:</Text><br />
+                    <Text strong>Projet:</Text>
+                    <br />
                     <Text>{item.project?.titre || `BDC ${item.id_bdc}`}</Text>
                   </Col>
                   <Col span={12}>
-                    <Text strong>Type:</Text><br />
-                    <Tag color={item.type === 'congé' ? 'orange' : 'green'}>
-                      {item.type === 'congé' ? 'Congé' : 'Travail'}
+                    <Text strong>Type:</Text>
+                    <br />
+                    <Tag color={item.type === "congé" ? "orange" : "green"}>
+                      {item.type === "congé" ? "Congé" : "Travail"}
                     </Tag>
                   </Col>
                   <Col span={8}>
-                    <Text strong>Durée:</Text><br />
+                    <Text strong>Durée:</Text>
+                    <br />
                     <Tag color="blue">{item.Durée}j</Tag>
                   </Col>
                   <Col span={8}>
-                    <Text strong>TJM:</Text><br />
+                    <Text strong>TJM:</Text>
+                    <br />
                     <Tag color="purple">{item.candidature?.tjm}€</Tag>
                   </Col>
                   <Col span={8}>
-                    <Text strong>Montant:</Text><br />
+                    <Text strong>Montant:</Text>
+                    <br />
                     <Tag color="orange">
-                      {(parseFloat(item.Durée) * parseFloat(item.candidature?.tjm)).toFixed(2)}€
+                      {(
+                        parseFloat(item.Durée) *
+                        parseFloat(item.candidature?.tjm)
+                      ).toFixed(2)}
+                      €
                     </Tag>
                   </Col>
                 </Row>
               </div>
             ))}
-            <div style={{ 
-              marginTop: '16px', 
-              padding: '12px', 
-              background: '#e6f7ff', 
-              borderRadius: '6px',
-              textAlign: 'center'
-            }}>
+            <div
+              style={{
+                marginTop: "16px",
+                padding: "12px",
+                background: "#e6f7ff",
+                borderRadius: "6px",
+                textAlign: "center",
+              }}
+            >
               <Text strong>Total du jour: </Text>
               <Tag color="green">
-                {dayData.reduce((sum, item) => sum + parseFloat(item.Durée || 0), 0)}j
+                {dayData.reduce(
+                  (sum, item) => sum + parseFloat(item.Durée || 0),
+                  0
+                )}
+                j
               </Tag>
               <Text strong> - Montant: </Text>
               <Tag color="orange">
-                {dayData.reduce(
-                  (sum, item) => sum + (parseFloat(item.Durée || 0) * parseFloat(item.candidature?.tjm || 0)),
-                  0
-                ).toFixed(2)}€
+                {dayData
+                  .reduce(
+                    (sum, item) =>
+                      sum +
+                      parseFloat(item.Durée || 0) *
+                        parseFloat(item.candidature?.tjm || 0),
+                    0
+                  )
+                  .toFixed(2)}
+                €
               </Tag>
             </div>
           </div>
@@ -761,8 +839,7 @@ const InterfaceCraClient = () => {
       dataIndex: "Durée",
       key: "duration",
       render: (text) => <Tag color="blue">{text || "0"}</Tag>,
-      sorter: (a, b) => (parseFloat(a.Durée) || 0) - (parseFloat(b.Durée) || 0),
-    },
+      sorter: (a, b) => (parseFloat(a.Durée) || 0) - (parseFloat(b.Durée) || 0),    },
     {
       title: "Type",
       dataIndex: "type",
@@ -776,21 +853,9 @@ const InterfaceCraClient = () => {
             ? "orange"
             : "default";
         return (
-          <Tag color={typeColor}>
-            {type === 'congé' ? 'Congé' : 'Travail'}
-          </Tag>
+          <Tag color={typeColor}>{type === "congé" ? "Congé" : "Travail"}</Tag>
         );
       },
-    },
-    {
-      title: "Projet",
-      key: "project",
-      render: (record) => record.project?.titre || `BDC ${record.id_bdc}`,
-    },
-    {
-      title: "TJM",
-      key: "tjm",
-      render: (record) => `${record.candidature?.tjm || 0}€`,
     },
     {
       title: "Montant",
@@ -803,7 +868,6 @@ const InterfaceCraClient = () => {
       },
     },
   ];
-
   const columns = [
     {
       title: "Consultants",
@@ -814,7 +878,7 @@ const InterfaceCraClient = () => {
             <strong>{record.consultant_name}</strong>
           </div>
           <div style={{ fontSize: "12px", color: "#666" }}>
-            ID: {record.id_consultan}
+            {record.consultant_email}
           </div>
         </div>
       ),
@@ -822,12 +886,34 @@ const InterfaceCraClient = () => {
         (a.consultant_name || "").localeCompare(b.consultant_name || ""),
     },
     {
-      title: "Périodes",
-      dataIndex: "période",
-      key: "période",
-      render: (text) => formatPeriod(text),
+      title: "Contrat",
+      key: "project",
+      render: (record) => (
+        <div>
+          <div>
+            <strong>{record.project_title}</strong>
+          </div>
+          <div style={{ fontSize: "12px", color: "#666" }}>
+            ESN: {record.esn_name}
+          </div>
+        </div>
+      ),
     },
-     {
+    // {
+    //   title: "Périodes",
+    //   dataIndex: "période",
+    //   key: "période",
+    //   render: (text) => formatPeriod(text),
+    // },
+    // {
+    //   title: "Jours travaillés",
+    //   key: "total_days",
+    //   render: (record) => (
+    //     <Tag color="blue">{record.n_jour || record.total_days} jours</Tag>
+    //   ),
+    //   sorter: (a, b) => (parseInt(a.n_jour) || 0) - (parseInt(b.n_jour) || 0),
+    // },
+    {
       title: "Statut CRA",
       dataIndex: "statut",
       key: "statut",
@@ -883,73 +969,80 @@ const InterfaceCraClient = () => {
         minHeight: "100vh",
       }}
     >
-      <Card style={{ marginBottom: "20px" }}>        <Form
+      <Card style={{ marginBottom: "20px" }}>
+        {" "}
+        <Form
           form={form}
           layout="inline"
           onFinish={handleSearch}
-          initialValues={{ 
+          initialValues={{
             period: moment().format("MM_YYYY"),
             status: undefined,
-            consultantSearch: ""
+            consultantSearch: "",
           }}
-        >          <Form.Item
+        >
+          {" "}
+          <Form.Item
             label="Période"
             name="period"
             rules={[{ required: true, message: "La période est requise" }]}
             getValueFromEvent={(e) => {
               const value = e.target.value;
               if (value) {
-                const [year, month] = value.split('-');
+                const [year, month] = value.split("-");
                 return `${month}_${year}`;
               }
               return value;
             }}
             getValueProps={(value) => {
               if (value) {
-                const [month, year] = value.split('_');
+                const [month, year] = value.split("_");
                 if (month && year) {
-                  return { value: `${year}-${month.padStart(2, '0')}` };
+                  return { value: `${year}-${month.padStart(2, "0")}` };
                 }
               }
               return { value: moment().format("YYYY-MM") };
             }}
-          >            <input
+          >
+            {" "}
+            <input
               type="month"
               style={{
-                width: '180px',
-                height: '32px',
-                padding: '4px 11px',
-                border: '1px solid #d9d9d9',
-                borderRadius: '6px',
-                fontSize: '14px',
-                lineHeight: '1.5715',
-                outline: 'none',
-                transition: 'all 0.2s',
-                backgroundColor: '#fff',
-                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+                width: "180px",
+                height: "32px",
+                padding: "4px 11px",
+                border: "1px solid #d9d9d9",
+                borderRadius: "6px",
+                fontSize: "14px",
+                lineHeight: "1.5715",
+                outline: "none",
+                transition: "all 0.2s",
+                backgroundColor: "#fff",
+                fontFamily:
+                  '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
               }}
               onChange={handlePeriodChange}
               onFocus={(e) => {
-                e.target.style.borderColor = '#40a9ff';
-                e.target.style.boxShadow = '0 0 0 2px rgba(24, 144, 255, 0.2)';
+                e.target.style.borderColor = "#40a9ff";
+                e.target.style.boxShadow = "0 0 0 2px rgba(24, 144, 255, 0.2)";
               }}
               onBlur={(e) => {
-                e.target.style.borderColor = '#d9d9d9';
-                e.target.style.boxShadow = 'none';
+                e.target.style.borderColor = "#d9d9d9";
+                e.target.style.boxShadow = "none";
               }}
             />
           </Form.Item>
-
           <Form.Item label="Consultant" name="consultantSearch">
             <Input
               placeholder="Rechercher un consultant..."
-              prefix={<UserOutlined style={{ color: '#bfbfbf' }} />}
+              prefix={<UserOutlined style={{ color: "#bfbfbf" }} />}
               value={consultantSearch}
               onChange={(e) => setConsultantSearch(e.target.value)}
               style={{ width: 220 }}
               allowClear
             />
-          </Form.Item>          <Form.Item label="Statut" name="status">
+          </Form.Item>{" "}
+          <Form.Item label="Statut" name="status">
             <Select
               placeholder="Sélectionner un statut"
               style={{ width: 200 }}
@@ -963,7 +1056,6 @@ const InterfaceCraClient = () => {
               ))}
             </Select>
           </Form.Item>
-
           <Form.Item>
             <Space>
               <Button
@@ -997,9 +1089,7 @@ const InterfaceCraClient = () => {
             </Col> */}
             <Col>
               {clientInfo && (
-                <Text style={{ color: '#666' }}>
-                  Client: {clientInfo.name}
-                </Text>
+                <Text style={{ color: "#666" }}>Client: {clientInfo.name}</Text>
               )}
             </Col>
           </Row>
@@ -1016,7 +1106,7 @@ const InterfaceCraClient = () => {
             showTotal: (total, range) =>
               `${range[0]}-${range[1]} sur ${total} combinaisons`,
           }}
-          scroll={{ x: 1400 }}
+          scroll={{ x: 1600 }}
           size="middle"
         />
       </Card>
@@ -1029,8 +1119,7 @@ const InterfaceCraClient = () => {
               justifyContent: "space-between",
               alignItems: "center",
               width: "100%",
-            }}
-          >
+            }}          >
             <div>
               <CalendarOutlined style={{ marginRight: 8 }} />
               {selectedConsultant && selectedBdc
@@ -1126,14 +1215,63 @@ const InterfaceCraClient = () => {
         {craModalLoading ? (
           <div style={{ textAlign: "center", padding: "50px" }}>
             <Spin size="large" />
-            <div style={{ marginTop: 16 }}>Chargement des jours de travail...</div>
-          </div>
-        ) : (
+            <div style={{ marginTop: 16 }}>
+              Chargement des jours de travail...
+            </div>
+          </div>        ) : (
           <Row gutter={[16, 16]}>
             <Col span={24}>
+              {selectedBdc && (
+                <Card 
+                  size="small" 
+                  style={{ 
+                    marginBottom: 16,
+                    background: "#f6ffed",
+                    borderColor: "#b7eb8f"
+                  }}
+                >
+                  <Row gutter={[16, 0]}>
+                    <Col xs={24} sm={12} md={6}>
+                      <div style={{ marginBottom: 8 }}>
+                        <Text strong style={{ fontSize: '12px', color: '#666' }}>Projet:</Text>
+                        <br />
+                        <Text strong style={{ fontSize: '14px' }}>
+                          {selectedBdc.project}
+                        </Text>
+                      </div>
+                    </Col>
+                    <Col xs={24} sm={12} md={6}>
+                      <div style={{ marginBottom: 8 }}>
+                        <Text strong style={{ fontSize: '12px', color: '#666' }}>TJM:</Text>
+                        <br />
+                        <Tag color="purple" style={{ fontSize: '14px' }}>
+                          {craWorkDays.length > 0 ? `${craWorkDays[0].candidature?.tjm || 0}€` : '0€'}
+                        </Tag>
+                      </div>
+                    </Col>
+                    <Col xs={24} sm={12} md={6}>
+                      <div style={{ marginBottom: 8 }}>
+                        <Text strong style={{ fontSize: '12px', color: '#666' }}>Consultant:</Text>
+                        <br />
+                        <Text style={{ fontSize: '14px' }}>
+                          {selectedConsultant?.name}
+                        </Text>
+                      </div>
+                    </Col>
+                    <Col xs={24} sm={12} md={6}>
+                      <div style={{ marginBottom: 8 }}>
+                        <Text strong style={{ fontSize: '12px', color: '#666' }}>Période:</Text>
+                        <br />
+                        <Text style={{ fontSize: '14px' }}>
+                          {formatPeriod(selectedPeriod)}
+                        </Text>
+                      </div>
+                    </Col>
+                  </Row>
+                </Card>
+              )}
               <Card size="small">
                 {/* Summary Information */}
-
 
                 {/* Conditional View Based on Mode */}
                 {viewMode === "table" ? (
@@ -1166,16 +1304,13 @@ const InterfaceCraClient = () => {
                         >
                           <Table.Summary.Cell index={0}>
                             <strong>Total</strong>
-                          </Table.Summary.Cell>
-                          <Table.Summary.Cell index={1}>
+                          </Table.Summary.Cell>                          <Table.Summary.Cell index={1}>
                             <Tag color="green">
                               <strong>{totalDays} jours</strong>
                             </Tag>
                           </Table.Summary.Cell>
                           <Table.Summary.Cell index={2}>-</Table.Summary.Cell>
-                          <Table.Summary.Cell index={3}>-</Table.Summary.Cell>
-                          <Table.Summary.Cell index={4}>-</Table.Summary.Cell>
-                          <Table.Summary.Cell index={5}>
+                          <Table.Summary.Cell index={3}>
                             <Tag color="orange">
                               <strong>{totalAmount.toFixed(2)}€</strong>
                             </Tag>

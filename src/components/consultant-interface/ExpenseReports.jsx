@@ -30,23 +30,23 @@ import {
   UploadOutlined,
   FilterOutlined,
   SendOutlined,
+  CalendarOutlined,
 } from "@ant-design/icons";
 import { Endponit as Endpoint } from "../../helper/enpoint";
 
 const { Title, Text } = Typography;
 const { Search } = Input;
 const { Option } = Select;
+const { RangePicker } = DatePicker;
 
 const ExpenseReports = ({ consultantData }) => {
   const [loading, setLoading] = useState(false);
   const [fetchLoading, setFetchLoading] = useState(true);
   const [expenses, setExpenses] = useState([]);
-  const [isModalVisible, setIsModalVisible] = useState(false);
-  const [isDetailModalVisible, setIsDetailModalVisible] = useState(false);
+  const [isModalVisible, setIsModalVisible] = useState(false);  const [isDetailModalVisible, setIsDetailModalVisible] = useState(false);
   const [selectedExpense, setSelectedExpense] = useState(null);
   const [form] = Form.useForm();
-  const [editingExpense, setEditingExpense] = useState(null);
-  const [searchText, setSearchText] = useState("");
+  const [editingExpense, setEditingExpense] = useState(null);  const [searchText, setSearchText] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [dateRange, setDateRange] = useState(null);
   const [pagination, setPagination] = useState({
@@ -69,9 +69,8 @@ const ExpenseReports = ({ consultantData }) => {
   const [bdcList, setBdcList] = useState([]);
   const [esnLoading, setEsnLoading] = useState(false);
   const [clientLoading, setClientLoading] = useState(false);
-  const [bdcLoading, setBdcLoading] = useState(false);
-  const [autoFilledFields, setAutoFilledFields] = useState({
-    esn_id: false,
+  const [bdcLoading, setBdcLoading] = useState(false);  const [autoFilledFields, setAutoFilledFields] = useState({
+    esn_id: true, // Hide ESN field by default
     client_id: false,
   });
 
@@ -184,14 +183,22 @@ const ExpenseReports = ({ consultantData }) => {
       setClientLoading(false);
     }
   };
-
   // Function to fetch BDCs from API
   const fetchBdcs = async () => {
     setBdcLoading(true);
     try {
-      const { consultantId, token } = getAuthInfo();
+      const { consultantId, token } = getAuthInfo();      // Build query parameters for the new endpoint
+      const queryParams = new URLSearchParams();
+      queryParams.append("consultant_id", consultantId);
+      
+      // Add period filter - use filterParams.period if available, otherwise current period
+      const period = filterParams.period || (() => {
+        const currentDate = new Date();
+        return `${(currentDate.getMonth() + 1).toString().padStart(2, '0')}_${currentDate.getFullYear()}`;
+      })();
+      queryParams.append("period", period);
 
-      const response = await fetch(`${Endpoint()}/api/bdc-list/`, {
+      const response = await fetch(`${Endpoint()}/api/bdc-list/?${queryParams.toString()}`, {
         method: "GET",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -203,18 +210,17 @@ const ExpenseReports = ({ consultantData }) => {
         throw new Error(`Error fetching BDCs: ${response.statusText}`);
       }
 
-      const data = await response.json();
-
-      if (!data.status) {
+      const data = await response.json();      if (!data.status) {
         throw new Error(data.message || "Failed to fetch BDCs");
       }
-
+      
       // Transform API data to match our component's select needs
       const transformedData = data.data.map((item) => ({
-        id: item.bdc_id,
-        number: item.bdc_number,
-        esn_id: item.esn_id,
-        client_id: item.client_id,
+        id: item.id_bdc,
+        number: `BDC-${item.id_bdc}`, // Create a display number since bdc_number doesn't exist
+        esn_id: item.id_esn,
+        client_id: item.id_client,
+        appel_offre_titre: item.titre,
       }));
 
       setBdcList(transformedData);
@@ -229,11 +235,10 @@ const ExpenseReports = ({ consultantData }) => {
   };
 
   // Function to handle BDC selection
-  const handleBdcChange = (bdcId) => {
-    if (!bdcId) {
-      // Clear auto-filled fields when BDC is cleared
+  const handleBdcChange = (bdcId) => {    if (!bdcId) {
+      // Clear auto-filled fields when BDC is cleared, but keep ESN hidden
       setAutoFilledFields({
-        esn_id: false,
+        esn_id: true, // Keep ESN field hidden by default
         client_id: false,
       });
       form.setFieldsValue({
@@ -381,9 +386,7 @@ const ExpenseReports = ({ consultantData }) => {
   const createExpenseReport = async (values) => {
     setLoading(true);
     try {
-      const { consultantId, token } = getAuthInfo();
-
-      // Upload files first using saveDoc API
+      const { consultantId, token } = getAuthInfo();      // Upload files first using saveDoc API
       const uploadedFiles = [];
       if (fileList.length > 0) {
         for (const file of fileList) {
@@ -431,13 +434,10 @@ const ExpenseReports = ({ consultantData }) => {
       const year = dateObj.getFullYear().toString();
       const period = `${month}_${year}`;
 
-      // Calculate montant_ttc (assuming 20% VAT if not transport)
-      const montant_ht = parseFloat(values.amount);
+      // Use exact values provided by the form without calculation
+      const montant_ht = values.amount ? parseFloat(values.amount) : 0;
+      const montant_ttc = values.amount_ttc ? parseFloat(values.amount_ttc) : 0;
       const categories = Array.isArray(values.category) ? values.category : [values.category];
-      const hasTransport = categories.some(cat => cat.toLowerCase() === "transport");
-      const montant_ttc = hasTransport
-        ? montant_ht
-        : parseFloat((montant_ht * 1.2).toFixed(2));
 
       // Prepare JSON payload according to API structure
       const payload = {
@@ -568,15 +568,10 @@ const ExpenseReports = ({ consultantData }) => {
       const day = dateObj.getDate();
       const month = (dateObj.getMonth() + 1).toString().padStart(2, "0");
       const year = dateObj.getFullYear().toString();
-      const period = `${month}_${year}`;
-
-      // Calculate montant_ttc (assuming 20% VAT if not transport)
-      const montant_ht = parseFloat(values.amount);
+      const period = `${month}_${year}`;      // Use exact values from form without automatic VAT calculation
+      const montant_ht = values.amount ? parseFloat(values.amount) : 0;
+      const montant_ttc = values.amount_ttc ? parseFloat(values.amount_ttc) : 0;
       const categories = Array.isArray(values.category) ? values.category : [values.category];
-      const hasTransport = categories.some(cat => cat.toLowerCase() === "transport");
-      const montant_ttc = hasTransport
-        ? montant_ht
-        : parseFloat((montant_ht * 1.2).toFixed(2));
 
       // Prepare JSON payload according to API structure
       const payload = {
@@ -765,7 +760,6 @@ const ExpenseReports = ({ consultantData }) => {
       },
     });
   };
-
   // Initial fetch on component mount
   useEffect(() => {
     const initialParams = {
@@ -784,6 +778,23 @@ const ExpenseReports = ({ consultantData }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Refresh data when period changes
+  useEffect(() => {
+    if (filterParams.period) {
+      // Refresh expense reports with new period
+      const params = {
+        limit: pagination.pageSize,
+        offset: (pagination.current - 1) * pagination.pageSize,
+        ...filterParams,
+      };
+      fetchExpenseReports(params);
+      
+      // Refresh BDC list as it depends on period
+      fetchBdcs();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterParams.period]);
+
   // Handle table pagination change
   const handleTableChange = (newPagination, filters, sorter) => {
     const params = {
@@ -795,18 +806,28 @@ const ExpenseReports = ({ consultantData }) => {
     setPagination(newPagination);
     fetchExpenseReports(params);
   };
-
   // Apply filters
   const applyFilters = () => {
     const params = {
       limit: pagination.pageSize,
       offset: 0, // Reset to first page when filtering
       ...filterParams,
-    };
-
-    // Convert date range to period format if present
+    };    // Handle date range filtering - convert to period format or use start/end dates
     if (dateRange && dateRange[0]) {
-      params.period = dateRange[0].format("MM_YYYY");
+      // For API compatibility, we can send the month in the required format
+      const selectedMonth = dateRange[0];
+      
+      // Format as MM_YYYY for the API
+      params.period = selectedMonth.format("MM_YYYY");
+      
+      // Store the actual date range for potential client-side filtering
+      params.startDate = selectedMonth.startOf('month').format("YYYY-MM-DD");
+      params.endDate = selectedMonth.endOf('month').format("YYYY-MM-DD");
+    } else {
+      // Remove period filter if no date range is selected
+      delete params.period;
+      delete params.startDate;
+      delete params.endDate;
     }
 
     // Update status filter if set
@@ -816,6 +837,9 @@ const ExpenseReports = ({ consultantData }) => {
       delete params.status;
     }
 
+    // Update filterParams state for consistency
+    setFilterParams(params);
+
     setPagination({
       ...pagination,
       current: 1, // Reset to first page
@@ -823,29 +847,43 @@ const ExpenseReports = ({ consultantData }) => {
 
     fetchExpenseReports(params);
   };
-
   // Handle text search
   const handleSearch = (value) => {
     setSearchText(value);
-    // Note: If the API doesn't support text search, we'll filter client-side
+    // The filtering is now handled by the filteredExpenses computed value
+    // No need to call API for text search as it's done client-side
   };
-
-  // Client-side filtering for text search (if API doesn't support it)
+  // Client-side filtering for text search and date range (if API doesn't support it)
   const filteredExpenses = expenses.filter((expense) => {
-    if (!searchText) return true;
+    // Text search filter
+    let textMatch = true;
+    if (searchText) {
+      textMatch = (
+        expense.description.toLowerCase().includes(searchText.toLowerCase()) ||
+        (Array.isArray(expense.category) 
+          ? expense.category.some(cat => cat.toLowerCase().includes(searchText.toLowerCase()))
+          : expense.category.toLowerCase().includes(searchText.toLowerCase())
+        ) ||
+        (expense.esn &&
+          expense.esn.toLowerCase().includes(searchText.toLowerCase())) ||
+        (expense.client &&
+          expense.client.toLowerCase().includes(searchText.toLowerCase())) ||
+        (expense.consultant_name &&
+          expense.consultant_name
+            .toLowerCase()
+            .includes(searchText.toLowerCase()))
+      );
+    }    // Date range filter (client-side backup)
+    let dateMatch = true;
+    if (dateRange && dateRange[0]) {
+      const expenseDate = dayjs(expense.date);
+      const selectedMonth = dateRange[0];
+      
+      // Check if the expense date is in the same month and year
+      dateMatch = expenseDate.format('MM_YYYY') === selectedMonth.format('MM_YYYY');
+    }
 
-    return (
-      expense.description.toLowerCase().includes(searchText.toLowerCase()) ||
-      expense.category.toLowerCase().includes(searchText.toLowerCase()) ||
-      (expense.esn &&
-        expense.esn.toLowerCase().includes(searchText.toLowerCase())) ||
-      (expense.client &&
-        expense.client.toLowerCase().includes(searchText.toLowerCase())) ||
-      (expense.consultant_name &&
-        expense.consultant_name
-          .toLowerCase()
-          .includes(searchText.toLowerCase()))
-    );
+    return textMatch && dateMatch;
   });
 
   // Handle file upload
@@ -1066,12 +1104,10 @@ const ExpenseReports = ({ consultantData }) => {
   };
 
   const showModal = (record = null) => {
-    setEditingExpense(record);
-
-    // Reset file list and auto-filled state
+    setEditingExpense(record);    // Reset file list and auto-filled state
     setFileList([]);
     setAutoFilledFields({
-      esn_id: false,
+      esn_id: true, // Keep ESN field hidden by default
       client_id: false,
     });
 
@@ -1081,8 +1117,8 @@ const ExpenseReports = ({ consultantData }) => {
         date: dateValue,
         description: record.description,
         category: record.category,
-        amount: record.amount,
-        amount_ttc: record.amount_ttc,
+        amount: record.amount || 0,
+        amount_ttc: record.amount_ttc || 0,
         esn_id: record.esn_id,
         client_id: record.client_id,
         bdc_id: record.bdc_id,
@@ -1097,9 +1133,13 @@ const ExpenseReports = ({ consultantData }) => {
           url: `${Endpoint()}/media/attachments/${file}`, // Adjust the URL according to your API
         }));
         setFileList(existingFiles);
-      }
-    } else {
+      }    } else {
       form.resetFields();
+      // Set default values for amount fields
+      form.setFieldsValue({
+        amount: 0,
+        amount_ttc: 0
+      });
     }
 
     setIsModalVisible(true);
@@ -1132,29 +1172,42 @@ const ExpenseReports = ({ consultantData }) => {
         }
       },
     });
-  };
-
-  const handleCancel = () => {
+  };  const handleCancel = () => {
     setIsModalVisible(false);
     form.resetFields();
     setFileList([]);
     setAutoFilledFields({
-      esn_id: false,
+      esn_id: true, // Keep ESN field hidden by default
       client_id: false,
     });
   };
-
+  
   const handleSubmit = () => {
     form
       .validateFields()
-      .then((values) => {        // Format date to string if it's a dayjs object
+      .then((values) => {
+        // Format date to string if it's a dayjs object
         const formattedValues = {
           ...values,
           date: values.date ? values.date.format("YYYY-MM-DD") : "",
-          // Ensure both HT and TTC amounts are included
-          amount: values.amount,
-          amount_ttc: values.amount_ttc,
-        };
+        };        // Ensure TTC amount is valid (greater than 0), HT can be 0 or greater
+        const amount = parseFloat(values.amount) || 0;
+        const amount_ttc = parseFloat(values.amount_ttc) || 0;
+
+        // Validate amounts before submission - only TTC is required to be > 0
+        if (amount_ttc <= 0) {
+          form.setFields([{
+            name: "amount_ttc",
+            errors: ["Le montant TTC doit être supérieur à 0"]
+          }]);
+          return;
+        }
+
+        // HT can be 0 or greater, no validation needed for HT minimum value
+
+        // Update values with validated amounts
+        formattedValues.amount = amount;
+        formattedValues.amount_ttc = amount_ttc;
 
         if (editingExpense) {
           // Update existing expense report
@@ -1163,8 +1216,7 @@ const ExpenseReports = ({ consultantData }) => {
           // Create new expense report
           createExpenseReport(formattedValues);
         }
-      })
-      .catch((errorInfo) => {
+      })      .catch((errorInfo) => {
         console.log("Failed:", errorInfo);
       });
   };
@@ -1327,8 +1379,7 @@ const ExpenseReports = ({ consultantData }) => {
         </Button>
       </div>
 
-      <Card style={{ marginBottom: 24 }}>
-        <div
+      <Card style={{ marginBottom: 24 }}>        <div
           style={{
             display: "flex",
             flexWrap: "wrap",
@@ -1356,8 +1407,25 @@ const ExpenseReports = ({ consultantData }) => {
             <Option value="approuvé">Approuvé</Option>
             <Option value="remboursé">Remboursé</Option>
             <Option value="refusé">Refusé</Option>
-          </Select>
-          <Button
+          </Select>          <Input
+            type="month"
+            style={{ width: 250 }}
+            placeholder="Période (MM/YYYY)"
+            value={dateRange ? dateRange[0].format("YYYY-MM") : ""}
+            onChange={(e) => {
+              const monthValue = e.target.value;
+              if (monthValue) {
+                // Create a dayjs object from the month input value
+                const selectedMonth = dayjs(monthValue);
+                // Set the date range to cover the entire month
+                const startDate = selectedMonth.startOf('month');
+                const endDate = selectedMonth.endOf('month');
+                setDateRange([startDate, endDate]);
+              } else {
+                setDateRange(null);
+              }
+            }}
+          /><Button
             type="primary"
             icon={<FilterOutlined />}
             onClick={applyFilters}
@@ -1366,8 +1434,7 @@ const ExpenseReports = ({ consultantData }) => {
           </Button>
         </div>
 
-        <Divider style={{ margin: "16px 0" }} />
-
+  
         <Table
           dataSource={filteredExpenses}
           columns={columns}
@@ -1539,16 +1606,53 @@ const ExpenseReports = ({ consultantData }) => {
             {editingExpense ? "Mettre à jour" : "Ajouter"}
           </Button>,
         ]}
-      >
-        <Form form={form} layout="vertical">
-          <Form.Item
+      >        <Form form={form} layout="vertical">          <Form.Item
             name="date"
             label="Date"
             rules={[
               { required: true, message: "Veuillez sélectionner une date" },
             ]}
-          >
-            <DatePicker style={{ width: "100%" }} format="YYYY-MM-DD" />
+          >            <DatePicker 
+              style={{ width: "100%" }} 
+              format="YYYY-MM-DD"
+              placeholder="Sélectionner une date"              disabledDate={(current) => {
+                if (!current) return false;
+                
+                const today = dayjs();
+                const currentMonth = today.month();
+                const currentYear = today.year();
+                const currentMonthOfDate = current.month();
+                const currentYearOfDate = current.year();
+                
+                // Allow all dates in the current month and past dates
+                // Disable only future dates that are beyond the current month
+                if (currentYearOfDate > currentYear) {
+                  return true; // Disable future years
+                }
+                
+                if (currentYearOfDate === currentYear && currentMonthOfDate > currentMonth) {
+                  return true; // Disable future months in current year
+                }
+                
+                // Allow all dates in current month and past
+                return false;
+              }}
+            />
+          </Form.Item>
+
+          <Form.Item name="bdc_id" label="Bon de Commande (BDC)">
+            <Select
+              placeholder="Sélectionner un BDC"
+              allowClear
+              loading={bdcLoading}
+              onChange={handleBdcChange}
+            >
+              {bdcList.map((bdc) => (
+                <Option key={bdc.id} value={bdc.id}>
+                  {bdc.number} - {bdc.appel_offre_titre || 'Titre non disponible'}
+                </Option>
+              ))}
+            </Select>
           </Form.Item>
          
           <Form.Item
@@ -1580,64 +1684,73 @@ const ExpenseReports = ({ consultantData }) => {
           </Form.Item>          <Form.Item
             name="amount_ttc"
             label="Montant TTC (€)"
+            initialValue={0}
             rules={[
               { required: true, message: "Veuillez entrer un montant TTC" },
               {
-                type: "number",
-                min: 0.01,
-                message: "Le montant doit être positif",
+                validator: (_, value) => {
+                  // Skip validation during user input if field is empty or null
+                  if (value === null || value === undefined || value === '') {
+                    return Promise.resolve();
+                  }
+                  
+                  // Require TTC to be greater than 0
+                  const numericValue = parseFloat(value);
+                  if (!isNaN(numericValue) && numericValue <= 0) {
+                    return Promise.reject(new Error("Le montant TTC doit être supérieur à 0"));
+                  }
+                  return Promise.resolve();
+                },
               },
             ]}
-            extra="Le montant HT sera calculé automatiquement (TVA 20%)"
           >
             <InputNumber
               style={{ width: "100%" }}
               step={0.01}
               precision={2}
-              formatter={(value) => `${value} €`}
-              parser={(value) => value.replace(" €", "")}
-              onChange={(value) => {
-                if (value && value > 0) {
-                  // Calculate HT from TTC (TTC / 1.20)
-                  const htAmount = value / 1.20;
-                  form.setFieldValue("amount", parseFloat(htAmount.toFixed(2)));
-                } else {
-                  form.setFieldValue("amount", undefined);
-                }
+              min={0.01}
+              formatter={(value) => {
+                // Handle null/undefined values gracefully
+                return value !== null && value !== undefined ? `${value} €` : '';
               }}
+              parser={(value) => value.replace(" €", "")}
+              placeholder="Montant TTC"
             />
-          </Form.Item>
-          
-          <Form.Item
+          </Form.Item>          <Form.Item
             name="amount"
-            label="Montant HT (€)"
-            extra="Calculé automatiquement à partir du montant TTC"
+            label="Montant HT (€) - Optionnel"
+            initialValue={0}
+            rules={[
+              {
+                validator: (_, value) => {
+                  // Skip validation during user input if field is empty or null
+                  if (value === null || value === undefined || value === '') {
+                    return Promise.resolve();
+                  }
+                  
+                  // Allow values >= 0 (including 0)
+                  const numericValue = parseFloat(value);
+                  if (!isNaN(numericValue) && numericValue < 0) {
+                    return Promise.reject(new Error("Le montant HT doit être supérieur ou égal à 0"));
+                  }
+                  return Promise.resolve();
+                },
+              },
+            ]}
           >
             <InputNumber
               style={{ width: "100%" }}
               step={0.01}
               precision={2}
-              formatter={(value) => `${value} €`}
+              min={0}
+              formatter={(value) => {
+                // Handle null/undefined values gracefully
+                return value !== null && value !== undefined ? `${value} €` : '';
+              }}
               parser={(value) => value.replace(" €", "")}
-              disabled
-              placeholder="Sera calculé automatiquement"
+              placeholder="Montant HT (optionnel)"
             />
-          </Form.Item>
-          <Form.Item name="bdc_id" label="Bon de Commande (BDC)">
-            <Select
-              placeholder="Sélectionner un BDC"
-              allowClear
-              loading={bdcLoading}
-              onChange={handleBdcChange}
-            >
-              {bdcList.map((bdc) => (
-                <Option key={bdc.id} value={bdc.id}>
-                  {bdc.number}
-                </Option>
-              ))}
-            </Select>
-          </Form.Item>
-          {/* Show ESN field only if not auto-filled from BDC */}
+          </Form.Item>{/* Show ESN field only if not auto-filled from BDC */}
           {!autoFilledFields.esn_id && (
             <Form.Item name="esn_id" label="ESN">
               <Select
@@ -1654,35 +1767,6 @@ const ExpenseReports = ({ consultantData }) => {
                   </Option>
                 ))}
               </Select>
-            </Form.Item>
-          )}
-
-          {/* Show selected ESN as read-only if auto-filled */}
-          {autoFilledFields.esn_id && (
-            <Form.Item label="ESN (Auto-rempli depuis BDC)">
-              <Input
-                value={
-                  esnList.find((esn) => esn.id === form.getFieldValue("esn_id"))
-                    ?.name || "ESN sélectionnée"
-                }
-                disabled
-                style={{ backgroundColor: "#f5f5f5", color: "#666" }}
-                suffix={
-                  <Button
-                    type="text"
-                    size="small"
-                    onClick={() => {
-                      form.setFieldValue("esn_id", undefined);
-                      setAutoFilledFields((prev) => ({
-                        ...prev,
-                        esn_id: false,
-                      }));
-                    }}
-                  >
-                    ✕
-                  </Button>
-                }
-              />
             </Form.Item>
           )}
 
