@@ -43,10 +43,12 @@ const ExpenseReports = ({ consultantData }) => {
   const [loading, setLoading] = useState(false);
   const [fetchLoading, setFetchLoading] = useState(true);
   const [expenses, setExpenses] = useState([]);
-  const [isModalVisible, setIsModalVisible] = useState(false);  const [isDetailModalVisible, setIsDetailModalVisible] = useState(false);
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [isDetailModalVisible, setIsDetailModalVisible] = useState(false);
   const [selectedExpense, setSelectedExpense] = useState(null);
   const [form] = Form.useForm();
-  const [editingExpense, setEditingExpense] = useState(null);  const [searchText, setSearchText] = useState("");
+  const [editingExpense, setEditingExpense] = useState(null);
+  const [searchText, setSearchText] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [dateRange, setDateRange] = useState(null);
   const [pagination, setPagination] = useState({
@@ -69,7 +71,8 @@ const ExpenseReports = ({ consultantData }) => {
   const [bdcList, setBdcList] = useState([]);
   const [esnLoading, setEsnLoading] = useState(false);
   const [clientLoading, setClientLoading] = useState(false);
-  const [bdcLoading, setBdcLoading] = useState(false);  const [autoFilledFields, setAutoFilledFields] = useState({
+  const [bdcLoading, setBdcLoading] = useState(false);
+  const [autoFilledFields, setAutoFilledFields] = useState({
     esn_id: true, // Hide ESN field by default
     client_id: false,
   });
@@ -78,7 +81,9 @@ const ExpenseReports = ({ consultantData }) => {
   const truncateText = (text, maxLength = 50) => {
     if (!text) return text;
     const textStr = Array.isArray(text) ? text.join(", ") : text.toString();
-    return textStr.length > maxLength ? `${textStr.substring(0, maxLength)}...` : textStr;
+    return textStr.length > maxLength
+      ? `${textStr.substring(0, maxLength)}...`
+      : textStr;
   };
 
   // Function to show expense details modal
@@ -187,33 +192,41 @@ const ExpenseReports = ({ consultantData }) => {
   const fetchBdcs = async () => {
     setBdcLoading(true);
     try {
-      const { consultantId, token } = getAuthInfo();      // Build query parameters for the new endpoint
+      const { consultantId, token } = getAuthInfo(); // Build query parameters for the new endpoint
       const queryParams = new URLSearchParams();
       queryParams.append("consultant_id", consultantId);
-      
+
       // Add period filter - use filterParams.period if available, otherwise current period
-      const period = filterParams.period || (() => {
-        const currentDate = new Date();
-        return `${(currentDate.getMonth() + 1).toString().padStart(2, '0')}_${currentDate.getFullYear()}`;
-      })();
+      const period =
+        filterParams.period ||
+        (() => {
+          const currentDate = new Date();
+          return `${(currentDate.getMonth() + 1)
+            .toString()
+            .padStart(2, "0")}_${currentDate.getFullYear()}`;
+        })();
       queryParams.append("period", period);
 
-      const response = await fetch(`${Endpoint()}/api/bdc-list/?${queryParams.toString()}`, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      });
+      const response = await fetch(
+        `${Endpoint()}/api/bdc-list/?${queryParams.toString()}`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
 
       if (!response.ok) {
         throw new Error(`Error fetching BDCs: ${response.statusText}`);
       }
 
-      const data = await response.json();      if (!data.status) {
+      const data = await response.json();
+      if (!data.status) {
         throw new Error(data.message || "Failed to fetch BDCs");
       }
-      
+
       // Transform API data to match our component's select needs
       const transformedData = data.data.map((item) => ({
         id: item.id_bdc,
@@ -235,7 +248,8 @@ const ExpenseReports = ({ consultantData }) => {
   };
 
   // Function to handle BDC selection
-  const handleBdcChange = (bdcId) => {    if (!bdcId) {
+  const handleBdcChange = (bdcId) => {
+    if (!bdcId) {
       // Clear auto-filled fields when BDC is cleared, but keep ESN hidden
       setAutoFilledFields({
         esn_id: true, // Keep ESN field hidden by default
@@ -318,11 +332,11 @@ const ExpenseReports = ({ consultantData }) => {
           item.période.split("_")[0]
         }-${item.jour.toString().padStart(2, "0")}`, // Convert back to YYYY-MM-DD format
         description: item.description || "Sans description",
-        category: item.type_frais ? 
-          (item.type_frais.includes(",") ? 
-            item.type_frais.split(",").map(cat => cat.trim()) : 
-            item.type_frais
-          ) : "Autre", // Handle both single and multiple categories
+        category: item.type_frais
+          ? item.type_frais.includes(",")
+            ? item.type_frais.split(",").map((cat) => cat.trim())
+            : item.type_frais
+          : "Autre", // Handle both single and multiple categories
         amount: parseFloat(item.montant_ht) || 0,
         amount_ttc: parseFloat(item.montant_ttc) || 0,
         status: item.statut || "en attente",
@@ -386,7 +400,7 @@ const ExpenseReports = ({ consultantData }) => {
   const createExpenseReport = async (values) => {
     setLoading(true);
     try {
-      const { consultantId, token } = getAuthInfo();      // Upload files first using saveDoc API
+      const { consultantId, token } = getAuthInfo(); // Upload files first using saveDoc API
       const uploadedFiles = [];
       if (fileList.length > 0) {
         for (const file of fileList) {
@@ -437,13 +451,15 @@ const ExpenseReports = ({ consultantData }) => {
       // Use exact values provided by the form without calculation
       const montant_ht = values.amount ? parseFloat(values.amount) : 0;
       const montant_ttc = values.amount_ttc ? parseFloat(values.amount_ttc) : 0;
-      const categories = Array.isArray(values.category) ? values.category : [values.category];
+      const categories = Array.isArray(values.category)
+        ? values.category
+        : [values.category];
 
       // Prepare JSON payload according to API structure
       const payload = {
         période: period,
         jour: day,
-        type_frais: categories.map(cat => cat.toLowerCase()).join(","), // Join multiple categories
+        type_frais: categories.map((cat) => cat.toLowerCase()).join(","), // Join multiple categories
         id_consultan: parseInt(consultantId),
         montant_ht: montant_ht,
         montant_ttc: montant_ttc,
@@ -568,16 +584,18 @@ const ExpenseReports = ({ consultantData }) => {
       const day = dateObj.getDate();
       const month = (dateObj.getMonth() + 1).toString().padStart(2, "0");
       const year = dateObj.getFullYear().toString();
-      const period = `${month}_${year}`;      // Use exact values from form without automatic VAT calculation
+      const period = `${month}_${year}`; // Use exact values from form without automatic VAT calculation
       const montant_ht = values.amount ? parseFloat(values.amount) : 0;
       const montant_ttc = values.amount_ttc ? parseFloat(values.amount_ttc) : 0;
-      const categories = Array.isArray(values.category) ? values.category : [values.category];
+      const categories = Array.isArray(values.category)
+        ? values.category
+        : [values.category];
 
       // Prepare JSON payload according to API structure
       const payload = {
         période: period,
         jour: day,
-        type_frais: categories.map(cat => cat.toLowerCase()).join(","), // Join multiple categories
+        type_frais: categories.map((cat) => cat.toLowerCase()).join(","), // Join multiple categories
         id_consultan: parseInt(consultantId),
         montant_ht: montant_ht,
         montant_ttc: montant_ttc,
@@ -700,7 +718,7 @@ const ExpenseReports = ({ consultantData }) => {
       return false;
     }
   };
-  
+
   // Function to submit an expense report (change status to EVP)
   const submitExpenseReport = async (id) => {
     Modal.confirm({
@@ -788,7 +806,7 @@ const ExpenseReports = ({ consultantData }) => {
         ...filterParams,
       };
       fetchExpenseReports(params);
-      
+
       // Refresh BDC list as it depends on period
       fetchBdcs();
     }
@@ -812,17 +830,17 @@ const ExpenseReports = ({ consultantData }) => {
       limit: pagination.pageSize,
       offset: 0, // Reset to first page when filtering
       ...filterParams,
-    };    // Handle date range filtering - convert to period format or use start/end dates
+    }; // Handle date range filtering - convert to period format or use start/end dates
     if (dateRange && dateRange[0]) {
       // For API compatibility, we can send the month in the required format
       const selectedMonth = dateRange[0];
-      
+
       // Format as MM_YYYY for the API
       params.period = selectedMonth.format("MM_YYYY");
-      
+
       // Store the actual date range for potential client-side filtering
-      params.startDate = selectedMonth.startOf('month').format("YYYY-MM-DD");
-      params.endDate = selectedMonth.endOf('month').format("YYYY-MM-DD");
+      params.startDate = selectedMonth.startOf("month").format("YYYY-MM-DD");
+      params.endDate = selectedMonth.endOf("month").format("YYYY-MM-DD");
     } else {
       // Remove period filter if no date range is selected
       delete params.period;
@@ -858,12 +876,15 @@ const ExpenseReports = ({ consultantData }) => {
     // Text search filter
     let textMatch = true;
     if (searchText) {
-      textMatch = (
+      textMatch =
         expense.description.toLowerCase().includes(searchText.toLowerCase()) ||
-        (Array.isArray(expense.category) 
-          ? expense.category.some(cat => cat.toLowerCase().includes(searchText.toLowerCase()))
-          : expense.category.toLowerCase().includes(searchText.toLowerCase())
-        ) ||
+        (Array.isArray(expense.category)
+          ? expense.category.some((cat) =>
+              cat.toLowerCase().includes(searchText.toLowerCase())
+            )
+          : expense.category
+              .toLowerCase()
+              .includes(searchText.toLowerCase())) ||
         (expense.esn &&
           expense.esn.toLowerCase().includes(searchText.toLowerCase())) ||
         (expense.client &&
@@ -871,16 +892,16 @@ const ExpenseReports = ({ consultantData }) => {
         (expense.consultant_name &&
           expense.consultant_name
             .toLowerCase()
-            .includes(searchText.toLowerCase()))
-      );
-    }    // Date range filter (client-side backup)
+            .includes(searchText.toLowerCase()));
+    } // Date range filter (client-side backup)
     let dateMatch = true;
     if (dateRange && dateRange[0]) {
       const expenseDate = dayjs(expense.date);
       const selectedMonth = dateRange[0];
-      
+
       // Check if the expense date is in the same month and year
-      dateMatch = expenseDate.format('MM_YYYY') === selectedMonth.format('MM_YYYY');
+      dateMatch =
+        expenseDate.format("MM_YYYY") === selectedMonth.format("MM_YYYY");
     }
 
     return textMatch && dateMatch;
@@ -1104,7 +1125,7 @@ const ExpenseReports = ({ consultantData }) => {
   };
 
   const showModal = (record = null) => {
-    setEditingExpense(record);    // Reset file list and auto-filled state
+    setEditingExpense(record); // Reset file list and auto-filled state
     setFileList([]);
     setAutoFilledFields({
       esn_id: true, // Keep ESN field hidden by default
@@ -1113,7 +1134,8 @@ const ExpenseReports = ({ consultantData }) => {
 
     if (record) {
       // For date picker to work properly, convert string date to dayjs object
-      const dateValue = record.date ? dayjs(record.date) : null;      form.setFieldsValue({
+      const dateValue = record.date ? dayjs(record.date) : null;
+      form.setFieldsValue({
         date: dateValue,
         description: record.description,
         category: record.category,
@@ -1133,12 +1155,13 @@ const ExpenseReports = ({ consultantData }) => {
           url: `${Endpoint()}/media/attachments/${file}`, // Adjust the URL according to your API
         }));
         setFileList(existingFiles);
-      }    } else {
+      }
+    } else {
       form.resetFields();
       // Set default values for amount fields
       form.setFieldsValue({
         amount: 0,
-        amount_ttc: 0
+        amount_ttc: 0,
       });
     }
 
@@ -1172,7 +1195,8 @@ const ExpenseReports = ({ consultantData }) => {
         }
       },
     });
-  };  const handleCancel = () => {
+  };
+  const handleCancel = () => {
     setIsModalVisible(false);
     form.resetFields();
     setFileList([]);
@@ -1181,7 +1205,7 @@ const ExpenseReports = ({ consultantData }) => {
       client_id: false,
     });
   };
-  
+
   const handleSubmit = () => {
     form
       .validateFields()
@@ -1190,16 +1214,18 @@ const ExpenseReports = ({ consultantData }) => {
         const formattedValues = {
           ...values,
           date: values.date ? values.date.format("YYYY-MM-DD") : "",
-        };        // Ensure TTC amount is valid (greater than 0), HT can be 0 or greater
+        }; // Ensure TTC amount is valid (greater than 0), HT can be 0 or greater
         const amount = parseFloat(values.amount) || 0;
         const amount_ttc = parseFloat(values.amount_ttc) || 0;
 
         // Validate amounts before submission - only TTC is required to be > 0
         if (amount_ttc <= 0) {
-          form.setFields([{
-            name: "amount_ttc",
-            errors: ["Le montant TTC doit être supérieur à 0"]
-          }]);
+          form.setFields([
+            {
+              name: "amount_ttc",
+              errors: ["Le montant TTC doit être supérieur à 0"],
+            },
+          ]);
           return;
         }
 
@@ -1216,7 +1242,8 @@ const ExpenseReports = ({ consultantData }) => {
           // Create new expense report
           createExpenseReport(formattedValues);
         }
-      })      .catch((errorInfo) => {
+      })
+      .catch((errorInfo) => {
         console.log("Failed:", errorInfo);
       });
   };
@@ -1226,11 +1253,7 @@ const ExpenseReports = ({ consultantData }) => {
       title: "Description",
       dataIndex: "description",
       key: "description",
-      render: (text) => (
-        <span title={text}>
-          {truncateText(text, 30)}
-        </span>
-      ),
+      render: (text) => <span title={text}>{truncateText(text, 30)}</span>,
     },
     {
       title: "Catégorie",
@@ -1241,16 +1264,20 @@ const ExpenseReports = ({ consultantData }) => {
         const categories = Array.isArray(category) ? category : [category];
         const displayCategories = categories.slice(0, 2); // Show max 2 categories
         const remainingCount = categories.length - displayCategories.length;
-        
+
         return (
           <div>
             {displayCategories.map((cat, index) => (
-              <Tag key={index} color="blue" style={{ marginBottom: '2px', fontSize: '11px' }}>
+              <Tag
+                key={index}
+                color="blue"
+                style={{ marginBottom: "2px", fontSize: "11px" }}
+              >
                 {truncateText(cat, 15)}
               </Tag>
             ))}
             {remainingCount > 0 && (
-              <Tag color="gray" style={{ fontSize: '10px' }}>
+              <Tag color="gray" style={{ fontSize: "10px" }}>
                 +{remainingCount}
               </Tag>
             )}
@@ -1300,13 +1327,15 @@ const ExpenseReports = ({ consultantData }) => {
         <>
           {attachments && attachments.length > 0 ? (
             <div>
-              <PaperClipOutlined style={{ color: '#1890ff', marginRight: 4 }} />
-              <span style={{ fontSize: '12px' }}>
-                {attachments.length} fichier{attachments.length > 1 ? 's' : ''}
+              <PaperClipOutlined style={{ color: "#1890ff", marginRight: 4 }} />
+              <span style={{ fontSize: "12px" }}>
+                {attachments.length} fichier{attachments.length > 1 ? "s" : ""}
               </span>
             </div>
           ) : (
-            <Text type="secondary" style={{ fontSize: '12px' }}>Aucune</Text>
+            <Text type="secondary" style={{ fontSize: "12px" }}>
+              Aucune
+            </Text>
           )}
         </>
       ),
@@ -1323,7 +1352,8 @@ const ExpenseReports = ({ consultantData }) => {
             onClick={() => showDetailModal(record)}
           >
             Voir détails
-          </Button>          {(record.status === "en attente" || record.status === "refusé") && (
+          </Button>{" "}
+          {(record.status === "en attente" || record.status === "refusé") && (
             <>
               <Button
                 type="primary"
@@ -1379,7 +1409,9 @@ const ExpenseReports = ({ consultantData }) => {
         </Button>
       </div>
 
-      <Card style={{ marginBottom: 24 }}>        <div
+      <Card style={{ marginBottom: 24 }}>
+        {" "}
+        <div
           style={{
             display: "flex",
             flexWrap: "wrap",
@@ -1394,8 +1426,7 @@ const ExpenseReports = ({ consultantData }) => {
             value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
             onSearch={handleSearch}
-          />
-          <Select
+          />          <Select
             style={{ width: 200 }}
             placeholder="Filtrer par statut"
             value={filterStatus}
@@ -1406,26 +1437,26 @@ const ExpenseReports = ({ consultantData }) => {
             <Option value="EVP">EVP</Option>
             <Option value="approuvé">Approuvé</Option>
             <Option value="remboursé">Remboursé</Option>
-            <Option value="refusé">Refusé</Option>
-          </Select>          <Input
-            type="month"
+            <Option value="refusé">Refusé</Option>          </Select>{" "}
+          <DatePicker
+            picker="month"
             style={{ width: 250 }}
-            placeholder="Période (MM/YYYY)"
-            value={dateRange ? dateRange[0].format("YYYY-MM") : ""}
-            onChange={(e) => {
-              const monthValue = e.target.value;
-              if (monthValue) {
-                // Create a dayjs object from the month input value
-                const selectedMonth = dayjs(monthValue);
+            placeholder="Sélectionner une période"
+            value={dateRange ? dateRange[0] : null}
+            onChange={(selectedMonth) => {
+              if (selectedMonth) {
                 // Set the date range to cover the entire month
-                const startDate = selectedMonth.startOf('month');
-                const endDate = selectedMonth.endOf('month');
+                const startDate = selectedMonth.startOf("month");
+                const endDate = selectedMonth.endOf("month");
                 setDateRange([startDate, endDate]);
               } else {
                 setDateRange(null);
               }
             }}
-          /><Button
+            format="MM/YYYY"
+            allowClear
+          />
+          <Button
             type="primary"
             icon={<FilterOutlined />}
             onClick={applyFilters}
@@ -1433,8 +1464,6 @@ const ExpenseReports = ({ consultantData }) => {
             Appliquer les filtres
           </Button>
         </div>
-
-  
         <Table
           dataSource={filteredExpenses}
           columns={columns}
@@ -1447,7 +1476,6 @@ const ExpenseReports = ({ consultantData }) => {
           }}
           size="small"
         />
-
       </Card>
 
       {/* Detail Modal */}
@@ -1500,12 +1528,7 @@ const ExpenseReports = ({ consultantData }) => {
                 </Descriptions>
               </Col>
               <Col xs={24} sm={12}>
-                <Descriptions
-                  title="Montants"
-                  bordered
-                  column={1}
-                  size="small"
-                >
+                <Descriptions title="Montants" bordered column={1} size="small">
                   <Descriptions.Item label="Montant HT">
                     {selectedExpense.amount?.toFixed(2)} €
                   </Descriptions.Item>
@@ -1533,7 +1556,11 @@ const ExpenseReports = ({ consultantData }) => {
                     <div>
                       {Array.isArray(selectedExpense.category) ? (
                         selectedExpense.category.map((cat, index) => (
-                          <Tag key={index} color="blue" style={{ marginBottom: '4px' }}>
+                          <Tag
+                            key={index}
+                            color="blue"
+                            style={{ marginBottom: "4px" }}
+                          >
                             {cat}
                           </Tag>
                         ))
@@ -1555,10 +1582,11 @@ const ExpenseReports = ({ consultantData }) => {
               size="small"
             >
               <Descriptions.Item label="Fichiers">
-                {selectedExpense.attachments && selectedExpense.attachments.length > 0 ? (
+                {selectedExpense.attachments &&
+                selectedExpense.attachments.length > 0 ? (
                   <div>
                     {selectedExpense.attachments.map((file, index) => (
-                      <div key={index} style={{ marginBottom: '8px' }}>
+                      <div key={index} style={{ marginBottom: "8px" }}>
                         <Button
                           type="link"
                           icon={<PaperClipOutlined />}
@@ -1606,40 +1634,49 @@ const ExpenseReports = ({ consultantData }) => {
             {editingExpense ? "Mettre à jour" : "Ajouter"}
           </Button>,
         ]}
-      >        <Form form={form} layout="vertical">          <Form.Item
+      >
+        {" "}
+        <Form form={form} layout="vertical">
+          {" "}
+          <Form.Item
             name="date"
             label="Date"
             rules={[
               { required: true, message: "Veuillez sélectionner une date" },
             ]}
-          >            <DatePicker 
-              style={{ width: "100%" }} 
+          >
+            {" "}
+            <DatePicker
+              style={{ width: "100%" }}
               format="YYYY-MM-DD"
-              placeholder="Sélectionner une date"              disabledDate={(current) => {
+              placeholder="Sélectionner une date"
+              disabledDate={(current) => {
                 if (!current) return false;
-                
+
                 const today = dayjs();
                 const currentMonth = today.month();
                 const currentYear = today.year();
                 const currentMonthOfDate = current.month();
                 const currentYearOfDate = current.year();
-                
+
                 // Allow all dates in the current month and past dates
                 // Disable only future dates that are beyond the current month
                 if (currentYearOfDate > currentYear) {
                   return true; // Disable future years
                 }
-                
-                if (currentYearOfDate === currentYear && currentMonthOfDate > currentMonth) {
+
+                if (
+                  currentYearOfDate === currentYear &&
+                  currentMonthOfDate > currentMonth
+                ) {
                   return true; // Disable future months in current year
                 }
-                
+
                 // Allow all dates in current month and past
                 return false;
               }}
             />
           </Form.Item>
-
           <Form.Item name="bdc_id" label="Bon de Commande (BDC)">
             <Select
               placeholder="Sélectionner un BDC"
@@ -1649,12 +1686,12 @@ const ExpenseReports = ({ consultantData }) => {
             >
               {bdcList.map((bdc) => (
                 <Option key={bdc.id} value={bdc.id}>
-                  {bdc.number} - {bdc.appel_offre_titre || 'Titre non disponible'}
+                  {bdc.number} -{" "}
+                  {bdc.appel_offre_titre || "Titre non disponible"}
                 </Option>
               ))}
             </Select>
           </Form.Item>
-         
           <Form.Item
             name="category"
             label="Type de frais"
@@ -1681,7 +1718,8 @@ const ExpenseReports = ({ consultantData }) => {
               <Option value="Fournitures">Fournitures</Option>
               <Option value="Autre">Autre</Option>
             </Select>
-          </Form.Item>          <Form.Item
+          </Form.Item>{" "}
+          <Form.Item
             name="amount_ttc"
             label="Montant TTC (€)"
             initialValue={0}
@@ -1690,14 +1728,16 @@ const ExpenseReports = ({ consultantData }) => {
               {
                 validator: (_, value) => {
                   // Skip validation during user input if field is empty or null
-                  if (value === null || value === undefined || value === '') {
+                  if (value === null || value === undefined || value === "") {
                     return Promise.resolve();
                   }
-                  
+
                   // Require TTC to be greater than 0
                   const numericValue = parseFloat(value);
                   if (!isNaN(numericValue) && numericValue <= 0) {
-                    return Promise.reject(new Error("Le montant TTC doit être supérieur à 0"));
+                    return Promise.reject(
+                      new Error("Le montant TTC doit être supérieur à 0")
+                    );
                   }
                   return Promise.resolve();
                 },
@@ -1711,12 +1751,15 @@ const ExpenseReports = ({ consultantData }) => {
               min={0.01}
               formatter={(value) => {
                 // Handle null/undefined values gracefully
-                return value !== null && value !== undefined ? `${value} €` : '';
+                return value !== null && value !== undefined
+                  ? `${value} €`
+                  : "";
               }}
               parser={(value) => value.replace(" €", "")}
               placeholder="Montant TTC"
             />
-          </Form.Item>          <Form.Item
+          </Form.Item>{" "}
+          <Form.Item
             name="amount"
             label="Montant HT (€) - Optionnel"
             initialValue={0}
@@ -1724,14 +1767,16 @@ const ExpenseReports = ({ consultantData }) => {
               {
                 validator: (_, value) => {
                   // Skip validation during user input if field is empty or null
-                  if (value === null || value === undefined || value === '') {
+                  if (value === null || value === undefined || value === "") {
                     return Promise.resolve();
                   }
-                  
+
                   // Allow values >= 0 (including 0)
                   const numericValue = parseFloat(value);
                   if (!isNaN(numericValue) && numericValue < 0) {
-                    return Promise.reject(new Error("Le montant HT doit être supérieur ou égal à 0"));
+                    return Promise.reject(
+                      new Error("Le montant HT doit être supérieur ou égal à 0")
+                    );
                   }
                   return Promise.resolve();
                 },
@@ -1745,12 +1790,15 @@ const ExpenseReports = ({ consultantData }) => {
               min={0}
               formatter={(value) => {
                 // Handle null/undefined values gracefully
-                return value !== null && value !== undefined ? `${value} €` : '';
+                return value !== null && value !== undefined
+                  ? `${value} €`
+                  : "";
               }}
               parser={(value) => value.replace(" €", "")}
               placeholder="Montant HT (optionnel)"
             />
-          </Form.Item>{/* Show ESN field only if not auto-filled from BDC */}
+          </Form.Item>
+          {/* Show ESN field only if not auto-filled from BDC */}
           {!autoFilledFields.esn_id && (
             <Form.Item name="esn_id" label="ESN">
               <Select
@@ -1769,7 +1817,6 @@ const ExpenseReports = ({ consultantData }) => {
               </Select>
             </Form.Item>
           )}
-
           {/* Show Client field only if not auto-filled from BDC */}
           {!autoFilledFields.client_id && (
             <Form.Item name="client_id" label="Client">
@@ -1789,7 +1836,6 @@ const ExpenseReports = ({ consultantData }) => {
               </Select>
             </Form.Item>
           )}
-
           {/* Show selected Client as read-only if auto-filled */}
           {autoFilledFields.client_id && (
             <Form.Item label="Client (Auto-rempli depuis BDC)">
@@ -1819,7 +1865,7 @@ const ExpenseReports = ({ consultantData }) => {
               />
             </Form.Item>
           )}
-           <Form.Item
+          <Form.Item
             name="description"
             label="Description"
             rules={[
