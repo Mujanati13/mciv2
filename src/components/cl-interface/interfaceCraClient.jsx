@@ -29,6 +29,7 @@ import {
 } from "@ant-design/icons";
 import axios from "axios";
 import { Endponit } from "../../helper/enpoint";
+import InvoiceService from "../../services/invoiceService";
 import moment from "moment";
 
 const { Option } = Select;
@@ -517,14 +518,102 @@ const InterfaceCraClient = () => {
               `CRA refusé par le client - ${formatPeriod(selectedPeriod)}`,
         },
         { headers: { Authorization: `Bearer ${token}` } }
-      );
+      );      if (response.data?.status) {
+        // Si le CRA est validé, générer automatiquement les factures
+        if (approved) {
+          try {            // Récupérer le TJM depuis la même source que les détails CRA
+            let finalTjm = 500; // Valeur par défaut
+            
+            const consultantId = selectedConsultant?.id;
+            const bdcId = selectedBdc?.id;
+            
+            console.log("Récupération du TJM pour génération factures:", {
+              consultantId: consultantId,
+              bdcId: bdcId,
+              craWorkDaysLength: craWorkDays.length
+            });
+            
+            // 1. Priorité: TJM depuis l'API BDC (le plus précis)
+            if (bdcId && consultantId) {
+              const tjmFromBdc = await fetchTjmFromBdc(bdcId, consultantId);
+              if (tjmFromBdc && tjmFromBdc > 0) {
+                finalTjm = tjmFromBdc;
+                console.log("TJM récupéré depuis BDC API:", finalTjm);
+              } else {
+                console.warn("TJM non trouvé dans BDC, tentative avec craWorkDays");
+              }
+            }
+            
+            // 2. Fallback: TJM depuis les jours de travail CRA (même source que l'affichage)
+            if (finalTjm === 500 && craWorkDays.length > 0 && craWorkDays[0].candidature?.tjm) {
+              finalTjm = parseFloat(craWorkDays[0].candidature.tjm) || 500;
+              console.log("TJM récupéré depuis craWorkDays (candidature):", finalTjm);
+            }
+            // 3. Fallback: TJM depuis selectedCraRecord ou selectedBdc
+            else if (finalTjm === 500 && selectedCraRecord.tjm) {
+              finalTjm = parseFloat(selectedCraRecord.tjm) || 500;
+              console.log("TJM récupéré depuis selectedCraRecord:", finalTjm);
+            }
+            else if (finalTjm === 500 && selectedBdc?.tjm) {
+              finalTjm = parseFloat(selectedBdc.tjm) || 500;
+              console.log("TJM récupéré depuis selectedBdc:", finalTjm);
+            }
+            
+            // 4. Log final result
+            if (finalTjm === 500) {
+              console.warn("Aucun TJM trouvé, utilisation de la valeur par défaut:", finalTjm);
+            } else {
+              console.log("TJM final utilisé pour les factures:", finalTjm);
+            }
 
-      if (response.data?.status) {
-        message.success(
-          approved
-            ? "CRA validé avec succès"
-            : "CRA refusé et renvoyé au prestataire"
-        );
+            const craDataForInvoice = {
+              consultant: selectedCraRecord.consultant || {
+                id: selectedConsultant?.id,
+                prenom: selectedConsultant?.prenom,
+                nom: selectedConsultant?.nom,
+              },
+              esn: selectedCraRecord.esn || selectedConsultant?.esn,
+              client: { id: parseInt(clientId) },
+              periode: selectedPeriod,
+              tjm: finalTjm,
+              jours_travailles: craWorkDays.reduce(
+                (total, cra) => total + parseFloat(cra.Durée || 0),
+                0
+              ),
+              bdc_id: selectedBdc?.id,            };
+
+            console.log(
+              "Génération des factures pour CRA management:",
+              craDataForInvoice
+            );
+            console.log("TJM final utilisé pour les factures:", finalTjm);
+
+            const invoiceResult =
+              await InvoiceService.generateInvoicesAfterCRAValidation(
+                craDataForInvoice
+              );
+
+            if (invoiceResult.success) {
+              message.success(
+                `CRA validé avec succès ! ${invoiceResult.factures.length} factures générées automatiquement.`
+              );
+            } else {
+              message.warning(
+                `CRA validé mais erreur lors de la génération des factures: ${invoiceResult.message}`
+              );
+            }
+          } catch (invoiceError) {
+            console.error(
+              "Erreur lors de la génération des factures:",
+              invoiceError
+            );
+            message.warning(
+              "CRA validé mais erreur lors de la génération automatique des factures"
+            );
+          }
+        } else {
+          message.success("CRA refusé et renvoyé au prestataire");
+        }
 
         await fetchCraWorkDays(
           selectedConsultant.id,
@@ -637,11 +726,12 @@ const InterfaceCraClient = () => {
       name: record.consultant_name,
       email: record.consultant_email, // Use consultant_email from the new API
       period: period,
-    });    setSelectedBdc({
+    });
+    setSelectedBdc({
       id: bdcId,
       project: record.project_title || `BDC ${bdcId}`,
       description: record.appel_offre_description, // Use appel_offre_description from the new API
-      tjm: record.tjm || record.candidature?.tjm || '0' // Store TJM for display
+      tjm: record.tjm || record.candidature?.tjm || "0", // Store TJM for display
     });
     setSelectedPeriod(period);
     setCraModalVisible(true);
@@ -839,7 +929,8 @@ const InterfaceCraClient = () => {
       dataIndex: "Durée",
       key: "duration",
       render: (text) => <Tag color="blue">{text || "0"}</Tag>,
-      sorter: (a, b) => (parseFloat(a.Durée) || 0) - (parseFloat(b.Durée) || 0),    },
+      sorter: (a, b) => (parseFloat(a.Durée) || 0) - (parseFloat(b.Durée) || 0),
+    },
     {
       title: "Type",
       dataIndex: "type",
@@ -1119,7 +1210,8 @@ const InterfaceCraClient = () => {
               justifyContent: "space-between",
               alignItems: "center",
               width: "100%",
-            }}          >
+            }}
+          >
             <div>
               <CalendarOutlined style={{ marginRight: 8 }} />
               {selectedConsultant && selectedBdc
@@ -1218,51 +1310,82 @@ const InterfaceCraClient = () => {
             <div style={{ marginTop: 16 }}>
               Chargement des jours de travail...
             </div>
-          </div>        ) : (
+          </div>
+        ) : (
           <Row gutter={[16, 16]}>
             <Col span={24}>
               {selectedBdc && (
-                <Card 
-                  size="small" 
-                  style={{ 
+                <Card
+                  size="small"
+                  style={{
                     marginBottom: 16,
                     background: "#f6ffed",
-                    borderColor: "#b7eb8f"
+                    borderColor: "#b7eb8f",
                   }}
                 >
                   <Row gutter={[16, 0]}>
                     <Col xs={24} sm={12} md={6}>
                       <div style={{ marginBottom: 8 }}>
-                        <Text strong style={{ fontSize: '12px', color: '#666' }}>Projet:</Text>
+                        <Text
+                          strong
+                          style={{ fontSize: "12px", color: "#666" }}
+                        >
+                          Projet:
+                        </Text>
                         <br />
-                        <Text strong style={{ fontSize: '14px' }}>
+                        <Text strong style={{ fontSize: "14px" }}>
                           {selectedBdc.project}
                         </Text>
                       </div>
                     </Col>
                     <Col xs={24} sm={12} md={6}>
                       <div style={{ marginBottom: 8 }}>
-                        <Text strong style={{ fontSize: '12px', color: '#666' }}>TJM:</Text>
-                        <br />
-                        <Tag color="purple" style={{ fontSize: '14px' }}>
-                          {craWorkDays.length > 0 ? `${craWorkDays[0].candidature?.tjm || 0}€` : '0€'}
-                        </Tag>
+                        <Text
+                          strong
+                          style={{ fontSize: "12px", color: "#666" }}
+                        >
+                          TJM:
+                        </Text>
+                        <br />                        <div>
+                          <Tag color="purple" style={{ fontSize: "14px" }}>
+                            {craWorkDays.length > 0
+                              ? `${craWorkDays[0].candidature?.tjm || 0}€`
+                              : "0€"}
+                          </Tag>
+                          {craWorkDays.length > 0 && craWorkDays[0].candidature?.tjm && (
+                            <div>
+                              <Text type="secondary" style={{ fontSize: '12px' }}>
+                                (depuis candidature)
+                              </Text>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </Col>
                     <Col xs={24} sm={12} md={6}>
                       <div style={{ marginBottom: 8 }}>
-                        <Text strong style={{ fontSize: '12px', color: '#666' }}>Consultant:</Text>
+                        <Text
+                          strong
+                          style={{ fontSize: "12px", color: "#666" }}
+                        >
+                          Consultant:
+                        </Text>
                         <br />
-                        <Text style={{ fontSize: '14px' }}>
+                        <Text style={{ fontSize: "14px" }}>
                           {selectedConsultant?.name}
                         </Text>
                       </div>
                     </Col>
                     <Col xs={24} sm={12} md={6}>
                       <div style={{ marginBottom: 8 }}>
-                        <Text strong style={{ fontSize: '12px', color: '#666' }}>Période:</Text>
+                        <Text
+                          strong
+                          style={{ fontSize: "12px", color: "#666" }}
+                        >
+                          Période:
+                        </Text>
                         <br />
-                        <Text style={{ fontSize: '14px' }}>
+                        <Text style={{ fontSize: "14px" }}>
                           {formatPeriod(selectedPeriod)}
                         </Text>
                       </div>
@@ -1304,7 +1427,8 @@ const InterfaceCraClient = () => {
                         >
                           <Table.Summary.Cell index={0}>
                             <strong>Total</strong>
-                          </Table.Summary.Cell>                          <Table.Summary.Cell index={1}>
+                          </Table.Summary.Cell>{" "}
+                          <Table.Summary.Cell index={1}>
                             <Tag color="green">
                               <strong>{totalDays} jours</strong>
                             </Tag>
@@ -1372,3 +1496,59 @@ const InterfaceCraClient = () => {
 };
 
 export default InterfaceCraClient;
+
+// Fetch TJM from Bon de Commande API
+const fetchTjmFromBdc = async (bdcId, consultantId) => {
+  try {
+    const token = localStorage.getItem("token");
+
+    if (!bdcId || !token) {
+      console.warn("BDC ID ou token manquant pour récupérer le TJM");
+      return null;
+    }
+
+    console.log("Récupération du TJM pour BDC:", bdcId, "Consultant:", consultantId);
+
+    const response = await axios.get(
+      `${Endponit()}/api/Bondecommande/${bdcId}/`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    );
+
+    if (response.data?.status && response.data?.data) {
+      const bdcData = response.data.data;
+      console.log("Données BDC récupérées:", bdcData);
+
+      // Look for the TJM in the BDC data - it might be in candidatures or direct field
+      let tjm = null;
+
+      // Check if TJM is directly in BDC data
+      if (bdcData.tjm) {
+        tjm = parseFloat(bdcData.tjm);
+      }
+      // Check if there are candidatures associated with this consultant
+      else if (bdcData.candidatures && Array.isArray(bdcData.candidatures)) {
+        const consultantCandidature = bdcData.candidatures.find(
+          (candidature) => candidature.id_consultant === consultantId || candidature.consultant_id === consultantId
+        );
+        if (consultantCandidature && consultantCandidature.tjm) {
+          tjm = parseFloat(consultantCandidature.tjm);
+        }
+      }
+      // Check if there's a selected candidature
+      else if (bdcData.candidature && bdcData.candidature.tjm) {
+        tjm = parseFloat(bdcData.candidature.tjm);
+      }
+
+      console.log("TJM trouvé dans BDC:", tjm);
+      return tjm;
+    } else {
+      console.error("Erreur API BDC:", response.data);
+      return null;
+    }
+  } catch (error) {
+    console.error("Erreur lors de la récupération du TJM depuis BDC:", error);
+    return null;
+  }
+};

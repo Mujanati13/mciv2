@@ -28,6 +28,7 @@ import {
   CalendarOutlined,
 } from "@ant-design/icons";
 import { Endponit as Endpoint } from "../../helper/enpoint";
+import InvoiceService from "../../services/invoiceService";
 import dayjs from "dayjs";
 
 const { Search } = Input;
@@ -214,11 +215,54 @@ const ClientExpenseReportsValidation = () => {
             )
           );
 
-          Modal.success({
-            title: "Succès",
-            content:
-              "Note de frais validée avec succès. Statut changé vers EVC.",
-          });
+          // Generate invoices after NDF validation
+          try {
+            const { clientId } = getAuthInfo();
+            const validatedExpense = expenses.find(exp => exp.id === id);
+            console.log(validatedExpense);
+            
+            if (validatedExpense) {
+              const ndfDataForInvoice = {
+                consultant: validatedExpense.consultant || { id: validatedExpense.consultant_id },
+                esn: validatedExpense.consultant?.esn || null,
+                client: { id: parseInt(clientId) },
+                periode: validatedExpense.periode,
+                montant_total: parseFloat(validatedExpense.amount_ttc) || 0,
+                montant_ttc: parseFloat(validatedExpense.amount_ttc) || 0,
+                montant_ht: parseFloat(validatedExpense.amount) || 0,
+                expenses: validatedExpense.expenses || [],
+                selectedNdf: validatedExpense,
+                bdc_id: validatedExpense.bdc_id || null,
+              };
+
+              console.log("Génération des factures NDF pour:", ndfDataForInvoice);
+
+              const invoiceResult = await InvoiceService.generateInvoicesAfterNDFValidation(ndfDataForInvoice);
+
+              if (invoiceResult.success) {
+                Modal.success({
+                  title: "Succès",
+                  content: `Note de frais validée avec succès ! ${invoiceResult.factures.length} factures NDF générées automatiquement.`,
+                });
+              } else {
+                Modal.warning({
+                  title: "Succès partiel",
+                  content: `Note de frais validée mais erreur lors de la génération des factures: ${invoiceResult.message}`,
+                });
+              }
+            } else {
+              Modal.success({
+                title: "Succès",
+                content: "Note de frais validée avec succès. Statut changé vers EVC.",
+              });
+            }
+          } catch (invoiceError) {
+            console.error("Erreur lors de la génération des factures NDF:", invoiceError);
+            Modal.warning({
+              title: "Succès partiel",
+              content: "Note de frais validée mais erreur lors de la génération automatique des factures NDF",
+            });
+          }
         } catch (error) {
           console.error("Error validating expense report:", error);
           Modal.error({

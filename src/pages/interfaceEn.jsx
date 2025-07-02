@@ -65,6 +65,7 @@ import AppelDOffreInterface from "../components/en-interface/add-condi";
 import BonDeCommandeInterface from "../components/en-interface/bdc-list";
 import ClientPartenariatInterface from "../components/en-interface/partenariat-list";
 import ContractList from "../components/en-interface/contart-en";
+import ESNInvoices from "../components/en-interface/esn-invoices";
 import { isEsnLoggedIn, logoutEsn } from "../helper/db";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import ESNCandidatureInterface from "../components/en-interface/me-codi";
@@ -97,9 +98,9 @@ const translations = {
     commercialManagement: "Gestion Commerciale",
     tenders: "Appels d'Offres",
     applications: "Mes Candidatures",
-    purchaseOrders: "Bons de Commande",
-    contracts: "Contrats",
+    purchaseOrders: "Bons de Commande",    contracts: "Contrats",
     craValidation: "Validation des CRAs",
+    invoices: "Mes Factures",
     documentation: "Mes Documents",
     clientDocuments: "Documents",
     notifications: "Notifications",
@@ -878,11 +879,16 @@ const InterfaceEn = () => {
             label: t.purchaseOrders,            key: "Bon-de-Commande",
             icon: <MacCommandOutlined />,
             disabled: !esnStatus,
-          },
-          {
+          },          {
             label: t.craValidation,
             key: "cra-validation",
             icon: <CalendarOutlined />,
+            disabled: !esnStatus,
+          },
+          {
+            label: t.invoices,
+            key: "invoices",
+            icon: <BankOutlined />,
             disabled: !esnStatus,
           },
           // {
@@ -1104,9 +1110,10 @@ const InterfaceEn = () => {
         );
       case "Mes-condidateur":
         return <ESNCandidatureInterface />;      case "Bon-de-Commande":
-        return <BonDeCommandeInterface />;
-      case "cra-validation":
+        return <BonDeCommandeInterface />;      case "cra-validation":
         return <CraValidation />;
+      case "invoices":
+        return <ESNInvoices />;
       case "Contart":
         return <ContractList />;
       case "Partenariat":

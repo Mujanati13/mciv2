@@ -57,6 +57,7 @@ import ClientCraValidation from "../components/cl-interface/ClientCraValidation"
 import ClientCraInterface from "../components/cl-interface/ClientCraInterface";
 import ClientFinancialDashboard from "../components/cl-interface/financial-dashboard";
 import ClientExpenseReportsValidation from "../components/cl-interface/ClientExpenseReportsValidation";
+import ClientInvoices from "../components/cl-interface/client-invoices";
 import { isClientLoggedIn, logoutEsn } from "../helper/db";
 import { useNavigate, useSearchParams } from "react-router-dom";  // Text constants
 import InterfaceCraClient from "../components/cl-interface/interfaceCraClient";
@@ -74,6 +75,7 @@ const t = {
   craValidation: "Validation des CRAs",
   craManagement: "Gestion des CRAs",
   expenseReportsValidation: "Validation Notes de Frais",
+  invoices: "Mes Factures",
   documents: "Mes Documents",
   documentManagement: " Gestion Documentaire",
   notifications: "Notifications",
@@ -737,11 +739,16 @@ const ClientProfile = () => {
             key: "cra-management",
             icon: <FileDoneOutlined />,
             disabled: !esnStatus,
-          },
-          {
+          },          {
             label: t.expenseReportsValidation,
             key: "expense-reports-validation",
             icon: <FileTextOutlined />,
+            disabled: !esnStatus,
+          },
+          {
+            label: t.invoices,
+            key: "invoices",
+            icon: <BankOutlined />,
             disabled: !esnStatus,
           },
           // {
@@ -918,9 +925,10 @@ const ClientProfile = () => {
         return <PurchaseOrderInterface />;
       case "cra-validation":
         return <ClientCraValidation />;      case "cra-management":
-        return <InterfaceCraClient />;
-      case "expense-reports-validation":
+        return <InterfaceCraClient />;      case "expense-reports-validation":
         return <ClientExpenseReportsValidation />;
+      case "invoices":
+        return <ClientInvoices />;
       case "Partenariat":
         return <PartenariatInterface />;
       default:

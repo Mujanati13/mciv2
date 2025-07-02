@@ -32,6 +32,7 @@ import moment from "moment";
 import "moment/locale/fr";
 import axios from "axios";
 import { Endponit } from "../../helper/enpoint";
+import InvoiceService from "../../services/invoiceService";
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -485,13 +486,92 @@ const ClientCraValidation = () => {
         updatedCraData,
         { headers: { Authorization: `Bearer ${token}` } }
       );
-
       if (response.data?.status) {
-        message.success(
-          approved
-            ? "CRA validé avec succès"
-            : "CRA refusé et renvoyé au prestataire pour modifications"
-        );
+        // Si le CRA est validé, générer automatiquement les factures
+        if (approved) {
+          try {
+            // Récupérer le TJM depuis le BDC en priorité, puis candidature en fallback
+            let finalTjm = 500; // Valeur par défaut
+            
+            const consultant = selectedCra.consultant || {};
+            const candidature = selectedCra.candidature || {};
+            const bdcId = selectedCra.id_bdc;
+            const consultantId = consultant.id || selectedCra.id_consultan;
+
+            console.log("Récupération du TJM pour la génération de factures:", {
+              bdcId: bdcId,
+              consultantId: consultantId,
+              candidature: candidature,
+              selectedCra: selectedCra
+            });
+
+            // 1. Essayer de récupérer le TJM depuis l'API BDC
+            if (bdcId && consultantId) {
+              const tjmFromBdc = await fetchTjmFromBdc(bdcId, consultantId);
+              if (tjmFromBdc && tjmFromBdc > 0) {
+                finalTjm = tjmFromBdc;
+                console.log("TJM récupéré depuis BDC:", finalTjm);
+              } else {
+                console.warn("TJM non trouvé dans BDC, tentative avec candidature");
+              }
+            }
+
+            // 2. Si pas de TJM depuis BDC, utiliser la candidature
+            if (finalTjm === 500 && candidature.tjm) {
+              const tjmFromCandidature = parseFloat(candidature.tjm) || 0;
+              if (tjmFromCandidature > 0) {
+                finalTjm = tjmFromCandidature;
+                console.log("TJM récupéré depuis candidature:", finalTjm);
+              }
+            }
+
+            // 3. Log final TJM
+            if (finalTjm === 500) {
+              console.warn("Aucun TJM trouvé, utilisation de la valeur par défaut:", finalTjm);
+            } else {
+              console.log("TJM final utilisé pour les factures:", finalTjm);
+            }
+
+            const craDataForInvoice = {
+              consultant: selectedCra.consultant,
+              esn: selectedCra.consultant?.esn,
+              client: { id: parseInt(clientId) },
+              periode: selectedCra.période,
+              tjm: finalTjm,
+              jours_travailles: parseFloat(selectedCra.Durée) || 1,
+              bdc_id: selectedCra.id_bdc,
+            };            console.log("Génération des factures pour:", craDataForInvoice);
+            console.log("TJM utilisé:", craDataForInvoice.tjm);
+
+            const invoiceResult =
+              await InvoiceService.generateInvoicesAfterCRAValidation(
+                craDataForInvoice
+              );
+
+            if (invoiceResult.success) {
+              message.success(
+                `CRA validé avec succès ! ${invoiceResult.factures.length} factures générées automatiquement.`
+              );
+            } else {
+              message.warning(
+                `CRA validé mais erreur lors de la génération des factures: ${invoiceResult.message}`
+              );
+            }
+          } catch (invoiceError) {
+            console.error(
+              "Erreur lors de la génération des factures:",
+              invoiceError
+            );
+            message.warning(
+              "CRA validé mais erreur lors de la génération automatique des factures"
+            );
+          }
+        } else {
+          message.success(
+            "CRA refusé et renvoyé au prestataire pour modifications"
+          );
+        }
+
         setCraDetailVisible(false);
         setSelectedCra(null);
         setValidationNote("");
@@ -509,6 +589,60 @@ const ClientCraValidation = () => {
       );
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Fetch TJM from Bon de Commande API
+  const fetchTjmFromBdc = async (bdcId, consultantId) => {
+    try {
+      const token = localStorage.getItem("token");
+
+      if (!bdcId || !token) {
+        console.warn("BDC ID ou token manquant pour récupérer le TJM");
+        return null;
+      }
+
+      console.log("Récupération du TJM pour BDC:", bdcId, "Consultant:", consultantId);      const response = await axios.get(
+        `${Endponit()}/api/Bondecommande/${bdcId}/`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      if (response.data?.status && response.data?.data) {
+        const bdcData = response.data.data;
+        console.log("Données BDC récupérées:", bdcData);
+
+        // Look for the TJM in the BDC data - it might be in candidatures or direct field
+        let tjm = null;
+
+        // Check if TJM is directly in BDC data
+        if (bdcData.tjm) {
+          tjm = parseFloat(bdcData.tjm);
+        }
+        // Check if there are candidatures associated with this consultant
+        else if (bdcData.candidatures && Array.isArray(bdcData.candidatures)) {
+          const consultantCandidature = bdcData.candidatures.find(
+            (candidature) => candidature.id_consultant === consultantId || candidature.consultant_id === consultantId
+          );
+          if (consultantCandidature && consultantCandidature.tjm) {
+            tjm = parseFloat(consultantCandidature.tjm);
+          }
+        }
+        // Check if there's a selected candidature
+        else if (bdcData.candidature && bdcData.candidature.tjm) {
+          tjm = parseFloat(bdcData.candidature.tjm);
+        }
+
+        console.log("TJM trouvé dans BDC:", tjm);
+        return tjm;
+      } else {
+        console.error("Erreur API BDC:", response.data);
+        return null;
+      }
+    } catch (error) {
+      console.error("Erreur lors de la récupération du TJM depuis BDC:", error);
+      return null;
     }
   };
 
@@ -819,10 +953,23 @@ const ClientCraValidation = () => {
                 </Col>
                 <Col span={12}>
                   <Text strong>Statut BDC:</Text> {bdc.statut || "-"}
-                </Col>
-                <Col span={12}>
+                </Col>                <Col span={12}>
                   <Text strong>TJM:</Text>{" "}
-                  {candidature.tjm ? `${candidature.tjm} €` : "-"}
+                  {candidature.tjm ? (
+                    <span>
+                      <Tag color="purple">{candidature.tjm} €</Tag>
+                      <Text type="secondary" style={{ fontSize: '12px' }}>
+                        (depuis candidature)
+                      </Text>
+                    </span>
+                  ) : (
+                    <span>
+                      <Text>-</Text>
+                      <Text type="secondary" style={{ fontSize: '12px' }}>
+                        {" "}(sera récupéré depuis BDC)
+                      </Text>
+                    </span>
+                  )}
                 </Col>
               </Row>
             </Card>

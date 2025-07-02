@@ -16,6 +16,7 @@ import { ClientList } from "../components/ad-interface/list-cl";
 import ContractStats from "../components/ad-interface/list-contract";
 import ClientDocument from "../components/cl-interface/document";
 import CollaboratorList from "../components/ad-interface/list-ens";
+import AdminInvoices from "../components/ad-interface/admin-invoices";
 import { isAdminLoggedIn } from "../helper/db";
 import BDCManagement from "../components/ad-interface/bdc-validateur";
 import ListeAppelOffre from "../components/ad-interface/list-appeloffre";
@@ -32,6 +33,7 @@ const COMPONENT_MAP = {
   appeloffre: () => <ListeAppelOffre />,
   bdc: () => <BDCManagement />,
   bdcconsult: () => <ConsulterBDC />,
+  invoices: () => <AdminInvoices />,
 };
 
 const InterfaceAd = () => {
@@ -161,9 +163,13 @@ const InterfaceAd = () => {
             />
           )}
         </span>
-      ),
-      key: "bdc",
+      ),      key: "bdc",
       icon: <FileOutlined />,
+    },
+    {
+      label: "Gestion des Factures",
+      key: "invoices",
+      icon: <CalendarOutlined />,
     },
     // {
     //   label: "Consulter les Bon de commandes",
